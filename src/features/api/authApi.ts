@@ -43,6 +43,12 @@ export const authApi = baseApi.injectEndpoints({
     >({
       query: (body) => ({ url: "/auth/set-password", method: "POST", body }),
     }),
+    inviteEmail: build.query<{ email: string }, string>({
+      query: (token) => ({
+        url: "/auth/invite/email",
+        params: { token },
+      }),
+    }),
   }),
   overrideExisting: false,
 });
@@ -54,4 +60,5 @@ export const {
   useEnableTwoFactorMutation,
   useMeQuery,
   useSetPasswordMutation,
+  useInviteEmailQuery,
 } = authApi;

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, Loader2 } from "lucide-react";
+import { Check, Copy, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useCreateUserMutation, type CreateUserBody } from "@/features/api/usersApi";
 import { useListAccountsQuery } from "@/features/api/accountsApi";
@@ -34,10 +34,13 @@ export function InviteUserDialog() {
   const [open, setOpen] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
 
+  // Platform super admins only ever add fellow super admins here.
+  const defaultRole: Role = platform ? "platform_super_admin" : "shop_admin";
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [userRole, setUserRole] = useState<Role>("shop_admin");
+  const [userRole, setUserRole] = useState<Role>(defaultRole);
   const [accountId, setAccountId] = useState("");
   const [shopIds, setShopIds] = useState<string[]>([]);
 
@@ -54,15 +57,15 @@ export function InviteUserDialog() {
     { skip: userRole !== "shop_admin" },
   );
 
-  const roleOptions: Role[] = platform
-    ? ["platform_super_admin", "account_super_admin", "shop_admin"]
-    : ["shop_admin"];
+  // Super admins only add other super admins from this portal.
+  const roleOptions: Role[] = platform ? ["platform_super_admin"] : ["shop_admin"];
+  const singleRole = roleOptions.length === 1;
 
   const reset = () => {
     setName("");
     setEmail("");
     setPhone("");
-    setUserRole("shop_admin");
+    setUserRole(defaultRole);
     setAccountId("");
     setShopIds([]);
     setInviteToken(null);
@@ -71,6 +74,9 @@ export function InviteUserDialog() {
   const submit = async () => {
     if (name.trim().length < 2 || !email.trim()) {
       return toast.error("Name and email are required");
+    }
+    if (userRole === "shop_admin" && shopIds.length === 0) {
+      return toast.error("Select a branch");
     }
     const body: CreateUserBody = {
       name: name.trim(),
@@ -124,19 +130,21 @@ export function InviteUserDialog() {
                 <Label>Email</Label>
                 <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
-              <div className="flex flex-col gap-1.5">
-                <Label>Role</Label>
-                <Select value={userRole} onValueChange={(v) => setUserRole(v as Role)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {roleOptions.map((r) => (
-                      <SelectItem key={r} value={r}>
-                        {r.replace(/_/g, " ")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!singleRole && (
+                <div className="flex flex-col gap-1.5">
+                  <Label>Role</Label>
+                  <Select value={userRole} onValueChange={(v) => setUserRole(v as Role)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {roleOptions.map((r) => (
+                        <SelectItem key={r} value={r}>
+                          {r.replace(/_/g, " ")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               {platform && accountScoped && (
                 <div className="flex flex-col gap-1.5">
                   <Label>Shop</Label>
@@ -152,41 +160,52 @@ export function InviteUserDialog() {
               )}
               {userRole === "shop_admin" && (
                 <div className="flex flex-col gap-1.5">
-                  <Label>Assign branches</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {(shops?.data ?? []).map((s) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() =>
-                          setShopIds((prev) =>
-                            prev.includes(s.id)
-                              ? prev.filter((x) => x !== s.id)
-                              : [...prev, s.id],
-                          )
-                        }
-                        className={
-                          "rounded-md border px-2.5 py-1 text-xs " +
-                          (shopIds.includes(s.id)
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "text-muted-foreground")
-                        }
-                      >
-                        {s.branchName}
-                      </button>
-                    ))}
-                    {(shops?.data ?? []).length === 0 && (
-                      <span className="text-xs text-muted-foreground">
-                        No branches available.
-                      </span>
-                    )}
-                  </div>
+                  <Label>
+                    Assign branch <span className="text-destructive">*</span>
+                  </Label>
+                  {(shops?.data ?? []).length > 0 ? (
+                    <>
+                      <div className="flex flex-wrap gap-2">
+                        {(shops?.data ?? []).map((s) => {
+                          const selected = shopIds[0] === s.id;
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              role="radio"
+                              aria-checked={selected}
+                              onClick={() => setShopIds([s.id])}
+                              className={
+                                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 " +
+                                (selected
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "border-input bg-background text-foreground hover:border-primary/50 hover:bg-accent")
+                              }
+                            >
+                              {selected && <Check className="h-3.5 w-3.5" />}
+                              {s.branchName}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Select the branch this shop admin will manage.
+                      </p>
+                    </>
+                  ) : (
+                    <div className="rounded-md border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">
+                      No branches available.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
             <DialogFooter>
               <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button onClick={submit} disabled={isLoading}>
+              <Button
+                onClick={submit}
+                disabled={isLoading || (userRole === "shop_admin" && shopIds.length === 0)}
+              >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Invite
               </Button>

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Bar,
   BarChart,
@@ -20,6 +19,11 @@ import {
 } from "lucide-react";
 import { useShopAnalyticsQuery } from "@/features/api/analyticsApi";
 import { useEntitlements } from "@/hooks/useEntitlements";
+import { useAppSelector } from "@/app/hooks";
+import {
+  ALL_BRANCHES,
+  selectSelectedBranchId,
+} from "@/features/branch/branchSlice";
 import { ShopSelect } from "@/components/ShopSelect";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -212,7 +216,9 @@ function DeliveryChart({ data }: { data: ShopAnalytics }) {
 }
 
 export function ShopDashboard() {
-  const [shopId, setShopId] = useState("");
+  const selectedBranch = useAppSelector(selectSelectedBranchId);
+  // Analytics needs a concrete branch; the "all" sentinel isn't valid here.
+  const shopId = selectedBranch === ALL_BRANCHES ? "" : selectedBranch;
   const { hasFeature } = useEntitlements();
   const canUseAnalytics = hasFeature("can_use_analytics");
   const { data, isLoading, isFetching } = useShopAnalyticsQuery(
@@ -224,7 +230,7 @@ export function ShopDashboard() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-end">
-        <ShopSelect value={shopId} onChange={setShopId} />
+        <ShopSelect />
       </div>
 
       {/* KPI cards */}

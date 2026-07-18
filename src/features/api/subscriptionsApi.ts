@@ -11,8 +11,16 @@ import type {
 } from "@/types";
 
 export interface SubscriptionsQuery extends PaginationQuery {
+  accountId?: string;
   status?: SubscriptionStatus;
   dueBefore?: string;
+}
+
+export interface UpdateSubscriptionBody {
+  planId?: string;
+  autoRenew?: boolean;
+  nextBillingDate?: string;
+  notes?: string;
 }
 
 export interface CreateSubscriptionBody {
@@ -45,6 +53,7 @@ export const subscriptionsApi = baseApi.injectEndpoints({
         params: {
           page: params?.page ?? 1,
           limit: params?.limit ?? 20,
+          ...(params?.accountId ? { accountId: params.accountId } : {}),
           ...(params?.status ? { status: params.status } : {}),
           ...(params?.dueBefore ? { dueBefore: params.dueBefore } : {}),
         },
@@ -64,6 +73,12 @@ export const subscriptionsApi = baseApi.injectEndpoints({
     billingSummary: build.query<BillingSummary, void>({
       query: () => ({ url: "/subscriptions/summary" }),
       providesTags: [{ type: "Subscription", id: "SUMMARY" }],
+    }),
+
+    /** The authenticated account admin's own current subscription (read-only). */
+    mySubscription: build.query<Subscription, void>({
+      query: () => ({ url: "/subscriptions/me" }),
+      providesTags: [{ type: "Subscription", id: "ME" }],
     }),
 
     subscriptionPayments: build.query<SubscriptionPayment[], string>({
@@ -96,6 +111,22 @@ export const subscriptionsApi = baseApi.injectEndpoints({
       ],
     }),
 
+    updateSubscription: build.mutation<
+      Subscription,
+      { id: string; body: UpdateSubscriptionBody }
+    >({
+      query: ({ id, body }) => ({
+        url: `/subscriptions/${id}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: "Subscription", id },
+        { type: "Subscription", id: "LIST" },
+        { type: "Subscription", id: "SUMMARY" },
+      ],
+    }),
+
     cancelSubscription: build.mutation<Subscription, string>({
       query: (id) => ({ url: `/subscriptions/${id}/cancel`, method: "POST" }),
       invalidatesTags: (_r, _e, id) => [
@@ -111,8 +142,10 @@ export const subscriptionsApi = baseApi.injectEndpoints({
 export const {
   useListSubscriptionsQuery,
   useBillingSummaryQuery,
+  useMySubscriptionQuery,
   useSubscriptionPaymentsQuery,
   useCreateSubscriptionMutation,
   useMarkPaidMutation,
+  useUpdateSubscriptionMutation,
   useCancelSubscriptionMutation,
 } = subscriptionsApi;

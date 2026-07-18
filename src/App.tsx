@@ -10,6 +10,7 @@ import { DashboardPage } from "@/pages/DashboardPage";
 import { AccountsPage } from "@/pages/AccountsPage";
 import { PlansPage } from "@/pages/PlansPage";
 import { SubscriptionsPage } from "@/pages/SubscriptionsPage";
+import { MySubscriptionPage } from "@/pages/MySubscriptionPage";
 import { ShopsPage } from "@/pages/ShopsPage";
 import { UsersPage } from "@/pages/UsersPage";
 import { CouponsPage } from "@/pages/CouponsPage";
@@ -88,6 +89,16 @@ export default function App() {
               }
             >
               <Route path="/users" element={<UsersPage />} />
+            </Route>
+
+            {/* Account super admin — read-only view of their own subscription */}
+            <Route
+              element={<ProtectedRoute roles={["account_super_admin"]} />}
+            >
+              <Route
+                path="/my-subscription"
+                element={<MySubscriptionPage />}
+              />
             </Route>
           </Route>
         </Route>

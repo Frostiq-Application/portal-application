@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   Cake,
@@ -14,9 +14,11 @@ import { logout } from "@/features/auth/authSlice";
 import { toggleTheme } from "@/features/ui/uiSlice";
 import { useAuth } from "@/hooks/useAuth";
 import { useEntitlements } from "@/hooks/useEntitlements";
-import { NoPlanGate } from "@/components/gating/NoPlanGate";
+import { AccountDeactivatedGate } from "@/components/gating/AccountDeactivatedGate";
+import { NoSubscriptionGate } from "@/components/gating/NoSubscriptionGate";
 import { navForRole, type NavItem } from "@/config/nav";
 import { roleLabel } from "@/lib/roles";
+import { applyBrandTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -103,14 +105,31 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-function Brand() {
+/**
+ * App-shell brand header. For brand & shop admins it renders their own
+ * account's logo + name (from entitlements); for the platform admin — or before
+ * the brand has loaded — it falls back to the default Frostique branding.
+ */
+function Brand({
+  brand,
+}: {
+  brand: { name: string; logoUrl: string | null } | null;
+}) {
   return (
     <div className="flex items-center gap-2 px-5 py-4">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-        <Cake className="h-5 w-5" />
+      <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-primary text-primary-foreground">
+        {brand?.logoUrl ? (
+          <img
+            src={brand.logoUrl}
+            alt={brand.name}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <Cake className="h-5 w-5" />
+        )}
       </div>
       <div className="leading-tight">
-        <p className="text-sm font-semibold">Frostique</p>
+        <p className="text-sm font-semibold">{brand?.name ?? "Frostique"}</p>
         <p className="text-xs text-muted-foreground">Admin Portal</p>
       </div>
     </div>
@@ -121,13 +140,34 @@ export function AppLayout() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isExempt, isLoading, hasActiveSubscription, entitlements } =
-    useEntitlements();
+  const {
+    isExempt,
+    isLoading,
+    hasActiveSubscription,
+    isAccountDeactivated,
+    isSubscriptionExpired,
+    entitlements,
+    brand,
+  } = useEntitlements();
   const theme = useAppSelector((s) => s.ui.theme);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Gated roles with no active plan get the contact-admin screen — the whole
-  // app shell is unreachable until an administrator activates a subscription.
+  // Reflect the brand in the browser tab so the whole portal reads as theirs.
+  useEffect(() => {
+    document.title = brand?.name
+      ? `${brand.name} Portal`
+      : "Frostique Portal";
+  }, [brand?.name]);
+
+  // Recolour the portal's primary accents with the brand's theme colour while a
+  // brand/shop admin is signed in; clear it on logout (platform admin / login).
+  useEffect(() => {
+    applyBrandTheme(brand?.themeColor);
+    return () => applyBrandTheme(null);
+  }, [brand?.themeColor]);
+
+  // Gated roles get one of two blocking screens when they can't use the app.
+  // The whole shell is unreachable until the underlying issue is resolved.
   if (!isExempt) {
     if (isLoading) {
       return (
@@ -136,8 +176,24 @@ export function AppLayout() {
         </div>
       );
     }
+    // The account itself is deactivated (suspended/rejected/pending) — a plan
+    // can't fix it, so send them to contact the super admin.
+    if (isAccountDeactivated) {
+      return <AccountDeactivatedGate support={entitlements?.support} />;
+    }
+    // Subscription has expired — a hard lockout the brand can't self-serve
+    // (only the platform admin records payments). Same gate, expiry message.
+    if (isSubscriptionExpired) {
+      return (
+        <AccountDeactivatedGate
+          support={entitlements?.support}
+          reason="expired"
+        />
+      );
+    }
+    // Account is active but has no usable subscription — let them pick a plan.
     if (!hasActiveSubscription) {
-      return <NoPlanGate support={entitlements?.support} />;
+      return <NoSubscriptionGate support={entitlements?.support} />;
     }
   }
 
@@ -158,7 +214,7 @@ export function AppLayout() {
       {/* Desktop sidebar */}
       <aside className="hidden w-64 shrink-0 border-r bg-background lg:block">
         <div className="sticky top-0 flex h-screen flex-col overflow-y-auto">
-          <Brand />
+          <Brand brand={brand} />
           <SidebarNav />
         </div>
       </aside>
@@ -172,7 +228,7 @@ export function AppLayout() {
           />
           <aside className="absolute left-0 top-0 h-full w-64 overflow-y-auto border-r bg-background">
             <div className="flex items-center justify-between pr-2">
-              <Brand />
+              <Brand brand={brand} />
               <Button
                 variant="ghost"
                 size="icon"

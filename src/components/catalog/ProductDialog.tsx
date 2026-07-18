@@ -35,6 +35,12 @@ import {
 
 const TYPES: ProductType[] = ["cake", "cupcake", "chocolate"];
 
+// Local editing rows keep price fields as raw strings so the user can clear
+// the input (empty string) instead of it snapping back to 0. Converted to
+// numbers on submit.
+type VariantRow = Omit<VariantInput, "price"> & { price: string };
+type FlavorRow = Omit<FlavorInput, "priceDelta"> & { priceDelta: string };
+
 interface Props {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -56,10 +62,10 @@ export function ProductDialog({ open, onOpenChange, shopId, product }: Props) {
   const [isEggless, setIsEggless] = useState(false);
   const [isFeatured, setIsFeatured] = useState(false);
   const [minOrderHours, setMinOrderHours] = useState("0");
-  const [variants, setVariants] = useState<VariantInput[]>([
-    { label: "", price: 0, isDefault: true },
+  const [variants, setVariants] = useState<VariantRow[]>([
+    { label: "", price: "", isDefault: true },
   ]);
-  const [flavors, setFlavors] = useState<FlavorInput[]>([]);
+  const [flavors, setFlavors] = useState<FlavorRow[]>([]);
 
   useEffect(() => {
     if (open) {
@@ -75,25 +81,25 @@ export function ProductDialog({ open, onOpenChange, shopId, product }: Props) {
         product && product.variants.length
           ? product.variants.map((v) => ({
               label: v.label,
-              price: Number(v.price),
+              price: String(Number(v.price)),
               unitType: v.unitType,
               isDefault: v.isDefault,
               sku: v.sku ?? undefined,
             }))
-          : [{ label: "", price: 0, isDefault: true }],
+          : [{ label: "", price: "", isDefault: true }],
       );
       setFlavors(
         (product?.flavorOptions ?? []).map((f) => ({
           flavorName: f.flavorName,
-          priceDelta: Number(f.priceDelta),
+          priceDelta: String(Number(f.priceDelta)),
         })),
       );
     }
   }, [open, product]);
 
-  const setVariant = (i: number, patch: Partial<VariantInput>) =>
+  const setVariant = (i: number, patch: Partial<VariantRow>) =>
     setVariants((prev) => prev.map((v, idx) => (idx === i ? { ...v, ...patch } : v)));
-  const setFlavor = (i: number, patch: Partial<FlavorInput>) =>
+  const setFlavor = (i: number, patch: Partial<FlavorRow>) =>
     setFlavors((prev) => prev.map((f, idx) => (idx === i ? { ...f, ...patch } : f)));
 
   const submit = async () => {
@@ -195,7 +201,7 @@ export function ProductDialog({ open, onOpenChange, shopId, product }: Props) {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setVariants((p) => [...p, { label: "", price: 0 }])}
+                onClick={() => setVariants((p) => [...p, { label: "", price: "" }])}
               >
                 <Plus className="mr-1 h-3 w-3" /> Add
               </Button>
@@ -209,14 +215,20 @@ export function ProductDialog({ open, onOpenChange, shopId, product }: Props) {
                     value={v.label}
                     onChange={(e) => setVariant(i, { label: e.target.value })}
                   />
-                  <Input
-                    className="w-28"
-                    type="number"
-                    min={0}
-                    placeholder="Price"
-                    value={v.price}
-                    onChange={(e) => setVariant(i, { price: Number(e.target.value) })}
-                  />
+                  <div className="relative w-28">
+                    <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                      ₹
+                    </span>
+                    <Input
+                      className="pl-6"
+                      type="number"
+                      min={0}
+                      inputMode="decimal"
+                      placeholder="Price"
+                      value={v.price}
+                      onChange={(e) => setVariant(i, { price: e.target.value })}
+                    />
+                  </div>
                   <label className="flex w-20 items-center gap-1 text-xs">
                     <input
                       type="radio"
@@ -251,7 +263,7 @@ export function ProductDialog({ open, onOpenChange, shopId, product }: Props) {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setFlavors((p) => [...p, { flavorName: "", priceDelta: 0 }])}
+                onClick={() => setFlavors((p) => [...p, { flavorName: "", priceDelta: "" }])}
               >
                 <Plus className="mr-1 h-3 w-3" /> Add
               </Button>
@@ -265,13 +277,19 @@ export function ProductDialog({ open, onOpenChange, shopId, product }: Props) {
                     value={f.flavorName}
                     onChange={(e) => setFlavor(i, { flavorName: e.target.value })}
                   />
-                  <Input
-                    className="w-28"
-                    type="number"
-                    placeholder="+₹"
-                    value={f.priceDelta}
-                    onChange={(e) => setFlavor(i, { priceDelta: Number(e.target.value) })}
-                  />
+                  <div className="relative w-28">
+                    <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                      +₹
+                    </span>
+                    <Input
+                      className="pl-8"
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="0"
+                      value={f.priceDelta}
+                      onChange={(e) => setFlavor(i, { priceDelta: e.target.value })}
+                    />
+                  </div>
                   <Button
                     type="button"
                     variant="ghost"

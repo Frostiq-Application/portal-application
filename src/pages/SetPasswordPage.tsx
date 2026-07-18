@@ -2,7 +2,10 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Cake, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { useSetPasswordMutation } from "@/features/api/authApi";
+import {
+  useInviteEmailQuery,
+  useSetPasswordMutation,
+} from "@/features/api/authApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +27,13 @@ export function SetPasswordPage() {
   const [done, setDone] = useState(false);
 
   const [setPasswordMutation, { isLoading }] = useSetPasswordMutation();
+  // Resolve the email this invite is for, to show the user which account they
+  // are activating (read-only) and to prefill the sign-in screen afterwards.
+  const { data: invite } = useInviteEmailQuery(token, { skip: !token });
+  const email = invite?.email;
+
+  const goToSignIn = () =>
+    navigate("/login", email ? { state: { email } } : undefined);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,9 +90,18 @@ export function SetPasswordPage() {
               <div className="flex flex-col items-center gap-4 text-center">
                 <h1 className="text-xl font-bold">Password set</h1>
                 <p className="text-balance text-sm text-muted-foreground">
-                  You can now sign in with your email and new password.
+                  You can now sign in
+                  {email ? (
+                    <>
+                      {" "}
+                      as <span className="font-medium">{email}</span>
+                    </>
+                  ) : (
+                    " with your email"
+                  )}{" "}
+                  and your new password.
                 </p>
-                <Button className="w-full" onClick={() => navigate("/login")}>
+                <Button className="w-full" onClick={goToSignIn}>
                   Go to sign in
                 </Button>
               </div>
@@ -95,6 +114,19 @@ export function SetPasswordPage() {
                   </p>
                 </div>
                 <div className="grid gap-6">
+                  {email && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        autoComplete="username"
+                        value={email}
+                        readOnly
+                        disabled
+                      />
+                    </div>
+                  )}
                   <div className="grid gap-2">
                     <Label htmlFor="password">New password</Label>
                     <Input

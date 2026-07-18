@@ -1,11 +1,19 @@
 import { useMemo, useState } from "react";
-import { MoreHorizontal, Search, Trash2, X } from "lucide-react";
+import {
+  Boxes,
+  Cake,
+  CheckCircle2,
+  EyeOff,
+  LayoutGrid,
+  Layers,
+  MoreHorizontal,
+  Search,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { apiError } from "@/lib/apiError";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
-  useCreateAddonMutation,
-  useCreateCategoryMutation,
   useDeleteAddonMutation,
   useDeleteCategoryMutation,
   useDeleteProductMutation,
@@ -14,18 +22,22 @@ import {
   useListProductsQuery,
   useToggleProductMutation,
   useUpdateAddonMutation,
-  useUpdateCategoryMutation,
 } from "@/features/api/catalogApi";
-import type { Product, ProductType } from "@/types";
+import type { Addon, Category, Product, ProductType } from "@/types";
+import { useAppSelector } from "@/app/hooks";
+import {
+  ALL_BRANCHES,
+  selectSelectedBranchId,
+} from "@/features/branch/branchSlice";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ShopSelect } from "@/components/ShopSelect";
-import { ImageUploader } from "@/components/ImageUploader";
+import { SegmentedStrip } from "@/components/SegmentedStrip";
 import { ProductDialog } from "@/components/catalog/ProductDialog";
+import { AddonDialog } from "@/components/catalog/AddonDialog";
+import { CategoryDialog } from "@/components/catalog/CategoryDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -87,6 +99,29 @@ function ProductsTab({ shopId }: { shopId: string }) {
     );
   }, [data, statusFilter]);
 
+  // Live counts for the status strip, from the current (already-fetched) page.
+  const statusItems = useMemo(() => {
+    const all = data?.data ?? [];
+    const active = all.filter((p) => p.isActive).length;
+    return [
+      { value: "all" as const, label: "All", icon: LayoutGrid, count: all.length },
+      {
+        value: "active" as const,
+        label: "Active",
+        icon: CheckCircle2,
+        accent: "#10b981",
+        count: active,
+      },
+      {
+        value: "hidden" as const,
+        label: "Hidden",
+        icon: EyeOff,
+        accent: "#94a3b8",
+        count: all.length - active,
+      },
+    ];
+  }, [data]);
+
   const hasFilters =
     !!search ||
     productType !== "all" ||
@@ -111,6 +146,15 @@ function ProductsTab({ shopId }: { shopId: string }) {
 
   return (
     <>
+      {/* Secondary sub-filter (active/hidden) — quieter than the tab strip. */}
+      <SegmentedStrip
+        variant="secondary"
+        className="mb-3"
+        value={statusFilter}
+        items={statusItems}
+        onChange={(v) => setStatusFilter(v)}
+      />
+
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -156,21 +200,6 @@ function ProductsTab({ shopId }: { shopId: string }) {
                 {c.name}
               </SelectItem>
             ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={statusFilter}
-          onValueChange={(v) => setStatusFilter(v as "all" | "active" | "hidden")}
-          disabled={!shopId}
-        >
-          <SelectTrigger className="w-36">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="hidden">Hidden</SelectItem>
           </SelectContent>
         </Select>
 
@@ -273,177 +302,400 @@ function ProductsTab({ shopId }: { shopId: string }) {
 }
 
 function CategoriesTab({ shopId }: { shopId: string }) {
-  const { data } = useListCategoriesQuery(shopId ? { shopId } : undefined, { skip: !shopId });
-  const [createCategory, { isLoading }] = useCreateCategoryMutation();
-  const [updateCategory] = useUpdateCategoryMutation();
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 350);
+  const { data, isLoading } = useListCategoriesQuery(
+    shopId ? { shopId, search: debouncedSearch || undefined } : undefined,
+    { skip: !shopId },
+  );
   const [deleteCategory] = useDeleteCategoryMutation();
-  const [name, setName] = useState("");
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Category | null>(null);
   const rows = data?.data ?? [];
 
-  const add = async () => {
-    if (!name.trim()) return;
+  const run = async (fn: () => Promise<unknown>, ok: string) => {
     try {
-      await createCategory({ shopId, name: name.trim(), imageUrl }).unwrap();
-      toast.success("Category added");
-      setName("");
-      setImageUrl(null);
-    } catch (err) {
-      toast.error(apiError(err));
-    }
-  };
-
-  const setRowImage = async (id: string, url: string | null) => {
-    try {
-      await updateCategory({ id, body: { imageUrl: url } }).unwrap();
-      toast.success(url ? "Image updated" : "Image removed");
+      await fn();
+      toast.success(ok);
     } catch (err) {
       toast.error(apiError(err));
     }
   };
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardContent className="space-y-3 pt-6">
-          <div className="flex gap-3">
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Birthday Cakes" disabled={!shopId} />
-            <Button onClick={add} disabled={isLoading || !shopId}>Add</Button>
-          </div>
-          <div>
-            <p className="mb-1.5 text-xs text-muted-foreground">Category image (optional)</p>
-            <ImageUploader
-              value={imageUrl ? [imageUrl] : []}
-              onChange={(urls) => setImageUrl(urls[0] ?? null)}
-              folder="categories"
-              max={1}
-            />
-          </div>
-        </CardContent>
-      </Card>
-      <div className="space-y-2">
-        {rows.map((c) => (
-          <div key={c.id} className="flex items-center gap-3 rounded-md border bg-background p-3">
-            <ImageUploader
-              value={c.imageUrl ? [c.imageUrl] : []}
-              onChange={(urls) => setRowImage(c.id, urls[0] ?? null)}
-              folder="categories"
-              max={1}
-            />
-            <span className="flex-1 text-sm font-medium">{c.name}</span>
-            <Button variant="ghost" size="icon" onClick={() => deleteCategory(c.id)}>
-              <Trash2 className="h-4 w-4 text-destructive" />
-            </Button>
-          </div>
-        ))}
-        {rows.length === 0 && <p className="text-sm text-muted-foreground">No categories yet.</p>}
+    <>
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            placeholder="Search categories…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            disabled={!shopId}
+          />
+        </div>
+        {search && (
+          <Button variant="ghost" size="sm" onClick={() => setSearch("")}>
+            <X className="mr-1 h-3.5 w-3.5" />
+            Clear
+          </Button>
+        )}
+        <Button
+          className="ml-auto"
+          onClick={() => {
+            setEditing(null);
+            setDialogOpen(true);
+          }}
+          disabled={!shopId}
+        >
+          New category
+        </Button>
       </div>
-    </div>
+
+      <div className="rounded-lg border bg-background">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-14" />
+              <TableHead>Category</TableHead>
+              <TableHead>Sort order</TableHead>
+              <TableHead className="w-10" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              [0, 1, 2].map((i) => (
+                <TableRow key={i}>
+                  <TableCell colSpan={4}>
+                    <Skeleton className="h-6 w-full" />
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : rows.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={4}
+                  className="py-10 text-center text-sm text-muted-foreground"
+                >
+                  No categories yet. Add your first one.
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((c) => (
+                <TableRow key={c.id}>
+                  <TableCell>
+                    {c.imageUrl ? (
+                      <img
+                        src={c.imageUrl}
+                        alt={c.name}
+                        className="h-10 w-10 rounded-md object-cover"
+                      />
+                    ) : (
+                      <div className="h-10 w-10 rounded-md bg-muted" />
+                    )}
+                  </TableCell>
+                  <TableCell className="font-medium">{c.name}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {c.sortOrder}
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setEditing(c);
+                            setDialogOpen(true);
+                          }}
+                        >
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() =>
+                            run(() => deleteCategory(c.id).unwrap(), "Deleted")
+                          }
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {shopId && (
+        <CategoryDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          shopId={shopId}
+          category={editing}
+        />
+      )}
+    </>
   );
 }
 
 function AddonsTab({ shopId }: { shopId: string }) {
-  const { data } = useListAddonsQuery(shopId ? { shopId } : undefined, { skip: !shopId });
-  const [createAddon, { isLoading }] = useCreateAddonMutation();
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 350);
+  const { data, isLoading } = useListAddonsQuery(
+    shopId ? { shopId, search: debouncedSearch || undefined } : undefined,
+    { skip: !shopId },
+  );
   const [updateAddon] = useUpdateAddonMutation();
   const [deleteAddon] = useDeleteAddonMutation();
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("0");
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Addon | null>(null);
   const rows = data?.data ?? [];
 
-  const add = async () => {
-    if (!name.trim()) return;
+  const run = async (fn: () => Promise<unknown>, ok: string) => {
     try {
-      await createAddon({ shopId, name: name.trim(), price: Number(price) || 0, imageUrl }).unwrap();
-      toast.success("Add-on added");
-      setName("");
-      setPrice("0");
-      setImageUrl(null);
-    } catch (err) {
-      toast.error(apiError(err));
-    }
-  };
-
-  const setRowImage = async (id: string, url: string | null) => {
-    try {
-      await updateAddon({ id, body: { imageUrl: url } }).unwrap();
-      toast.success(url ? "Image updated" : "Image removed");
+      await fn();
+      toast.success(ok);
     } catch (err) {
       toast.error(apiError(err));
     }
   };
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardContent className="space-y-3 pt-6">
-          <div className="flex gap-3">
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Birthday Candles" disabled={!shopId} />
-            <Input className="w-32" type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} />
-            <Button onClick={add} disabled={isLoading || !shopId}>Add</Button>
-          </div>
-          <div>
-            <p className="mb-1.5 text-xs text-muted-foreground">Add-on image (optional)</p>
-            <ImageUploader
-              value={imageUrl ? [imageUrl] : []}
-              onChange={(urls) => setImageUrl(urls[0] ?? null)}
-              folder="addons"
-              max={1}
-            />
-          </div>
-        </CardContent>
-      </Card>
-      <div className="space-y-2">
-        {rows.map((a) => (
-          <div key={a.id} className="flex items-center gap-3 rounded-md border bg-background p-3">
-            <ImageUploader
-              value={a.imageUrl ? [a.imageUrl] : []}
-              onChange={(urls) => setRowImage(a.id, urls[0] ?? null)}
-              folder="addons"
-              max={1}
-            />
-            <div className="flex-1 text-sm">
-              <span className="font-medium">{a.name}</span>
-              <span className="ml-2 text-muted-foreground">₹{Number(a.price)}</span>
-            </div>
-            <Button variant="ghost" size="icon" onClick={() => deleteAddon(a.id)}>
-              <Trash2 className="h-4 w-4 text-destructive" />
-            </Button>
-          </div>
-        ))}
-        {rows.length === 0 && <p className="text-sm text-muted-foreground">No add-ons yet.</p>}
+    <>
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            placeholder="Search add-ons…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            disabled={!shopId}
+          />
+        </div>
+        {search && (
+          <Button variant="ghost" size="sm" onClick={() => setSearch("")}>
+            <X className="mr-1 h-3.5 w-3.5" />
+            Clear
+          </Button>
+        )}
+        <Button
+          className="ml-auto"
+          onClick={() => {
+            setEditing(null);
+            setDialogOpen(true);
+          }}
+          disabled={!shopId}
+        >
+          New add-on
+        </Button>
       </div>
-    </div>
+
+      <div className="rounded-lg border bg-background">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-14" />
+              <TableHead>Add-on</TableHead>
+              <TableHead>Price</TableHead>
+              <TableHead>Stock</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="w-10" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              [0, 1, 2].map((i) => (
+                <TableRow key={i}>
+                  <TableCell colSpan={6}>
+                    <Skeleton className="h-6 w-full" />
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : rows.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={6}
+                  className="py-10 text-center text-sm text-muted-foreground"
+                >
+                  No add-ons yet. Add your first one.
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((a) => (
+                <TableRow key={a.id}>
+                  <TableCell>
+                    {a.imageUrl ? (
+                      <img
+                        src={a.imageUrl}
+                        alt={a.name}
+                        className="h-10 w-10 rounded-md object-cover"
+                      />
+                    ) : (
+                      <div className="h-10 w-10 rounded-md bg-muted" />
+                    )}
+                  </TableCell>
+                  <TableCell className="font-medium">{a.name}</TableCell>
+                  <TableCell className="text-sm">
+                    ₹{Number(a.price)}
+                    <span className="text-muted-foreground"> / {a.unitType}</span>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {a.trackInventory ? (a.stockQuantity ?? 0) : "—"}
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className={
+                        a.isActive
+                          ? "text-xs text-emerald-600"
+                          : "text-xs text-muted-foreground"
+                      }
+                    >
+                      {a.isActive ? "Active" : "Hidden"}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setEditing(a);
+                            setDialogOpen(true);
+                          }}
+                        >
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            run(
+                              () =>
+                                updateAddon({
+                                  id: a.id,
+                                  body: { isActive: !a.isActive },
+                                }).unwrap(),
+                              "Updated",
+                            )
+                          }
+                        >
+                          {a.isActive ? "Hide" : "Show"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() =>
+                            run(() => deleteAddon(a.id).unwrap(), "Deleted")
+                          }
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {shopId && (
+        <AddonDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          shopId={shopId}
+          addon={editing}
+        />
+      )}
+    </>
   );
 }
 
+type CatalogTab = "products" | "categories" | "addons";
+
+/** Accent per tab — mirrors the Orders strip's per-stage colour language. */
+const TAB_ACCENT: Record<CatalogTab, string> = {
+  products: "#f59e0b", // amber
+  categories: "#6366f1", // indigo
+  addons: "#14b8a6", // teal
+};
+
 export function CatalogPage() {
-  const [shopId, setShopId] = useState("");
+  const shopId = useAppSelector(selectSelectedBranchId);
+  // Catalog is always scoped to a concrete branch; "all" isn't meaningful here.
+  const effectiveShopId = shopId === ALL_BRANCHES ? "" : shopId;
+  const [tab, setTab] = useState<CatalogTab>("products");
+
+  // Lightweight count queries (limit 1 → only meta.total is used) so the strip
+  // shows how many items live under each tab. Shared cache with the tab bodies.
+  const { data: productCount } = useListProductsQuery(
+    effectiveShopId ? { shopId: effectiveShopId, limit: 1 } : undefined,
+    { skip: !effectiveShopId },
+  );
+  const { data: categoryCount } = useListCategoriesQuery(
+    effectiveShopId ? { shopId: effectiveShopId, limit: 1 } : undefined,
+    { skip: !effectiveShopId },
+  );
+  const { data: addonCount } = useListAddonsQuery(
+    effectiveShopId ? { shopId: effectiveShopId, limit: 1 } : undefined,
+    { skip: !effectiveShopId },
+  );
+
+  const tabItems = useMemo(
+    () => [
+      {
+        value: "products" as const,
+        label: "Products",
+        icon: Cake,
+        accent: TAB_ACCENT.products,
+        count: productCount?.meta.total,
+      },
+      {
+        value: "categories" as const,
+        label: "Categories",
+        icon: Layers,
+        accent: TAB_ACCENT.categories,
+        count: categoryCount?.meta.total,
+      },
+      {
+        value: "addons" as const,
+        label: "Add-ons",
+        icon: Boxes,
+        accent: TAB_ACCENT.addons,
+        count: addonCount?.meta.total,
+      },
+    ],
+    [productCount, categoryCount, addonCount],
+  );
 
   return (
     <>
       <PageHeader
         title="Catalog"
         description="Products, categories & add-ons"
-        actions={<ShopSelect value={shopId} onChange={setShopId} />}
+        actions={<ShopSelect />}
       />
-      <Tabs defaultValue="products">
-        <TabsList>
-          <TabsTrigger value="products">Products</TabsTrigger>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
-          <TabsTrigger value="addons">Add-ons</TabsTrigger>
-        </TabsList>
-        <TabsContent value="products" className="mt-4">
-          <ProductsTab shopId={shopId} />
-        </TabsContent>
-        <TabsContent value="categories" className="mt-4">
-          <CategoriesTab shopId={shopId} />
-        </TabsContent>
-        <TabsContent value="addons" className="mt-4">
-          <AddonsTab shopId={shopId} />
-        </TabsContent>
-      </Tabs>
+
+      <SegmentedStrip
+        className="mb-4"
+        value={tab}
+        items={tabItems}
+        onChange={setTab}
+      />
+
+      {tab === "products" && <ProductsTab shopId={effectiveShopId} />}
+      {tab === "categories" && <CategoriesTab shopId={effectiveShopId} />}
+      {tab === "addons" && <AddonsTab shopId={effectiveShopId} />}
     </>
   );
 }

@@ -147,6 +147,16 @@ export type PlanFeatureKey = keyof PlanFeatureFlags;
 /** GET /accounts/me/entitlements — drives the contact-admin gate + feature gating. */
 export interface Entitlements {
   hasActiveSubscription: boolean;
+  /** Brand account display name — shown in the admin app's brand header (both brand & shop admins). */
+  accountName: string;
+  /** Brand account logo URL, if uploaded — shown in the brand header. */
+  logoUrl: string | null;
+  /** Brand account theme (accent) color as a hex string — recolours primary accents. */
+  themeColor: string | null;
+  /** Brand account lifecycle status. When not "active" the app shows the account-deactivated screen. */
+  accountStatus: AccountStatus;
+  /** Whether any subscription record exists (any status). */
+  hasSubscription: boolean;
   planId: string | null;
   planName: string | null;
   subscriptionStatus: SubscriptionStatus | null;
@@ -332,6 +342,18 @@ export interface Order {
   statusHistory: OrderStatusHistory[];
   createdAt: string;
   updatedAt: string;
+}
+
+/** A realtime order change pushed over SSE (`GET /orders/stream`). */
+export interface OrderEvent {
+  accountId: string;
+  shopId: string;
+  orderId: string;
+  orderNumber: string;
+  type: "created" | "status" | "payment" | "cancelled";
+  status: OrderStatus;
+  paymentStatus: OrderPaymentStatus;
+  at: string;
 }
 
 export type CouponType = "percentage" | "flat";

@@ -44,6 +44,13 @@ export const plansApi = baseApi.injectEndpoints({
           : [{ type: "Plan" as const, id: "LIST" }],
     }),
 
+    // Active, public plans only — no auth needed. Used by the choose-a-plan
+    // screen shown to brand admins with no active subscription.
+    publicPlans: build.query<Plan[], void>({
+      query: () => ({ url: "/plans/public" }),
+      providesTags: [{ type: "Plan" as const, id: "PUBLIC" }],
+    }),
+
     createPlan: build.mutation<Plan, CreatePlanBody>({
       query: (body) => ({ url: "/plans", method: "POST", body }),
       invalidatesTags: [{ type: "Plan", id: "LIST" }],
@@ -68,6 +75,14 @@ export const plansApi = baseApi.injectEndpoints({
       ],
     }),
 
+    unarchivePlan: build.mutation<Plan, string>({
+      query: (id) => ({ url: `/plans/${id}/unarchive`, method: "POST" }),
+      invalidatesTags: (_r, _e, id) => [
+        { type: "Plan", id },
+        { type: "Plan", id: "LIST" },
+      ],
+    }),
+
     deletePlan: build.mutation<void, string>({
       query: (id) => ({ url: `/plans/${id}`, method: "DELETE" }),
       invalidatesTags: [{ type: "Plan", id: "LIST" }],
@@ -78,8 +93,10 @@ export const plansApi = baseApi.injectEndpoints({
 
 export const {
   useListPlansQuery,
+  usePublicPlansQuery,
   useCreatePlanMutation,
   useUpdatePlanMutation,
   useArchivePlanMutation,
+  useUnarchivePlanMutation,
   useDeletePlanMutation,
 } = plansApi;

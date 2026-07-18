@@ -14,6 +14,35 @@ export interface OrdersQuery extends PaginationQuery {
   scheduledDate?: string;
 }
 
+/**
+ * Optimistically drop an order from EVERY cached `listOrders` page, returning
+ * an undo fn that restores all patches. Used so an action button removes the
+ * row from the current tab instantly; the undo runs if the request fails.
+ */
+function optimisticallyRemove(id: string, dispatch: any, getState: any) {
+  const patches: { undo: () => void }[] = [];
+  const entries = ordersApi.util.selectInvalidatedBy(getState(), [
+    { type: "Order", id: "LIST" },
+  ]);
+  for (const { originalArgs } of entries) {
+    const patch = dispatch(
+      ordersApi.util.updateQueryData(
+        "listOrders",
+        originalArgs as OrdersQuery | void,
+        (draft) => {
+          const idx = draft.data.findIndex((o) => o.id === id);
+          if (idx !== -1) {
+            draft.data.splice(idx, 1);
+            if (draft.meta.total > 0) draft.meta.total -= 1;
+          }
+        },
+      ),
+    );
+    patches.push(patch);
+  }
+  return () => patches.forEach((p) => p.undo());
+}
+
 export const ordersApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
     listOrders: build.query<Paginated<Order>, OrdersQuery | void>({
@@ -52,6 +81,16 @@ export const ordersApi = baseApi.injectEndpoints({
         method: "POST",
         body: { status, ...(note ? { note } : {}) },
       }),
+      // Optimistic: the order leaves its current-status list at once. On
+      // failure the row snaps back into place.
+      async onQueryStarted({ id }, { dispatch, getState, queryFulfilled }) {
+        const undo = optimisticallyRemove(id, dispatch, getState);
+        try {
+          await queryFulfilled;
+        } catch {
+          undo();
+        }
+      },
       invalidatesTags: (_r, _e, { id }) => [
         { type: "Order", id },
         { type: "Order", id: "LIST" },
@@ -64,14 +103,49 @@ export const ordersApi = baseApi.injectEndpoints({
         method: "POST",
         body: { reason },
       }),
+      async onQueryStarted({ id }, { dispatch, getState, queryFulfilled }) {
+        const undo = optimisticallyRemove(id, dispatch, getState);
+        try {
+          await queryFulfilled;
+        } catch {
+          undo();
+        }
+      },
       invalidatesTags: (_r, _e, { id }) => [
         { type: "Order", id },
         { type: "Order", id: "LIST" },
       ],
     }),
 
+    // Mark-paid does NOT change status, so the row stays in its tab. We patch
+    // the payment badge in place optimistically and revert on failure.
     markOrderPaid: build.mutation<Order, string>({
       query: (id) => ({ url: `/orders/${id}/mark-paid`, method: "POST" }),
+      async onQueryStarted(id, { dispatch, getState, queryFulfilled }) {
+        const patches: { undo: () => void }[] = [];
+        const entries = ordersApi.util.selectInvalidatedBy(getState(), [
+          { type: "Order", id: "LIST" },
+        ]);
+        for (const { originalArgs } of entries) {
+          patches.push(
+            dispatch(
+              ordersApi.util.updateQueryData(
+                "listOrders",
+                originalArgs as OrdersQuery | void,
+                (draft) => {
+                  const o = draft.data.find((x) => x.id === id);
+                  if (o) o.paymentStatus = "paid";
+                },
+              ),
+            ),
+          );
+        }
+        try {
+          await queryFulfilled;
+        } catch {
+          patches.forEach((p) => p.undo());
+        }
+      },
       invalidatesTags: (_r, _e, id) => [
         { type: "Order", id },
         { type: "Order", id: "LIST" },

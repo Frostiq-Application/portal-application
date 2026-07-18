@@ -5,7 +5,8 @@ import { z } from "zod";
 import { Copy, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { isValidPhoneNumber } from "react-phone-number-input";
-import { slugify } from "@/lib/utils";
+import { slugify, cn } from "@/lib/utils";
+import { THEME_PRESETS } from "@/lib/theme";
 import { useCreateAccountMutation } from "@/features/api/accountsApi";
 import { ImageUploader } from "@/components/ImageUploader";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,7 @@ export function CreateAccountDialog() {
   const [slugTouched, setSlugTouched] = useState(false);
   const [logoUrl, setLogoUrl] = useState("");
   const [bannerUrl, setBannerUrl] = useState("");
+  const [themeColor, setThemeColor] = useState(THEME_PRESETS[0].hex);
   const [createAccount, { isLoading }] = useCreateAccountMutation();
 
   const {
@@ -72,6 +74,7 @@ export function CreateAccountDialog() {
         ...values,
         logoUrl: logoUrl || undefined,
         bannerUrl: bannerUrl || undefined,
+        themeColor: themeColor || undefined,
       }).unwrap();
       setInviteToken(res.ownerInviteToken);
       toast.success(`Shop "${res.name}" created.`);
@@ -79,6 +82,7 @@ export function CreateAccountDialog() {
       setSlugTouched(false);
       setLogoUrl("");
       setBannerUrl("");
+      setThemeColor(THEME_PRESETS[0].hex);
     } catch (err) {
       toast.error(extractError(err));
     }
@@ -91,6 +95,7 @@ export function CreateAccountDialog() {
     setSlugTouched(false);
     setLogoUrl("");
     setBannerUrl("");
+    setThemeColor(THEME_PRESETS[0].hex);
   };
 
   const setPasswordLink = inviteToken
@@ -183,6 +188,12 @@ export function CreateAccountDialog() {
                   aspect="banner"
                 />
               </Field>
+              <Field
+                label="Theme color"
+                hint="The brand's accent — colours buttons, the active menu item and highlights in their portal."
+              >
+                <ThemeColorPicker value={themeColor} onChange={setThemeColor} />
+              </Field>
               <div className="flex items-center gap-3 pt-1">
                 <Switch
                   id="activate"
@@ -236,6 +247,66 @@ export function CreateAccountDialog() {
         )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** Preset swatches plus a native custom-colour input, bound to a hex string. */
+function ThemeColorPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (hex: string) => void;
+}) {
+  const isPreset = THEME_PRESETS.some(
+    (p) => p.hex.toLowerCase() === value.toLowerCase(),
+  );
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap gap-2">
+        {THEME_PRESETS.map((p) => {
+          const active = p.hex.toLowerCase() === value.toLowerCase();
+          return (
+            <button
+              key={p.hex}
+              type="button"
+              title={p.name}
+              aria-label={p.name}
+              aria-pressed={active}
+              onClick={() => onChange(p.hex)}
+              className={cn(
+                "h-7 w-7 rounded-full border transition-transform hover:scale-110",
+                active
+                  ? "ring-2 ring-offset-2 ring-offset-background"
+                  : "border-border",
+              )}
+              style={{
+                backgroundColor: p.hex,
+                ...(active ? { boxShadow: `0 0 0 2px ${p.hex}` } : {}),
+              }}
+            />
+          );
+        })}
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          aria-label="Custom color"
+          value={value || "#e91e63"}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-9 w-10 cursor-pointer rounded border bg-transparent p-1"
+        />
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="#E91E63"
+          className="max-w-[10rem] font-mono"
+        />
+        {!isPreset && value && (
+          <span className="text-xs text-muted-foreground">Custom</span>
+        )}
+      </div>
+    </div>
   );
 }
 

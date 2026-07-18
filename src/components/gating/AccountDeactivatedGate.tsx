@@ -1,4 +1,4 @@
-import { Lock, LogOut, Mail, MessageCircle } from "lucide-react";
+import { LogOut, Mail, MessageCircle, ShieldAlert } from "lucide-react";
 import { useAppDispatch } from "@/app/hooks";
 import { logout } from "@/features/auth/authSlice";
 import { useNavigate } from "react-router-dom";
@@ -6,10 +6,19 @@ import { Button } from "@/components/ui/button";
 import type { Entitlements } from "@/types";
 
 /**
- * Full-screen block shown to brand/shop admins whose account has no active
- * subscription. The app is unreachable until an administrator activates a plan.
+ * Full-screen block shown to brand/shop admins who are locked out and can't
+ * self-serve a fix — either the account itself is deactivated (suspended,
+ * rejected, pending) or their subscription has expired. In both cases only the
+ * platform super admin can restore access, so the copy directs them there.
  */
-export function NoPlanGate({ support }: { support?: Entitlements["support"] }) {
+export function AccountDeactivatedGate({
+  support,
+  reason = "account",
+}: {
+  support?: Entitlements["support"];
+  /** Which lockout to explain: a deactivated account, or an expired subscription. */
+  reason?: "account" | "expired";
+}) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
@@ -18,19 +27,23 @@ export function NoPlanGate({ support }: { support?: Entitlements["support"] }) {
     navigate("/login", { replace: true });
   };
 
+  const title =
+    reason === "expired"
+      ? "Your subscription has expired"
+      : "Your account is deactivated";
+  const body =
+    reason === "expired"
+      ? "Your brand’s subscription has expired, so the portal is locked. Please contact the super admin to renew and restore access."
+      : "This brand account has been deactivated and can’t access the portal. Please contact the super admin to have it reactivated.";
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
       <div className="w-full max-w-md rounded-xl border bg-background p-8 text-center shadow-sm">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-          <Lock className="h-6 w-6 text-muted-foreground" />
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+          <ShieldAlert className="h-6 w-6 text-destructive" />
         </div>
-        <h1 className="text-xl font-semibold tracking-tight">
-          No active subscription
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Your brand doesn’t have an active plan yet. Please contact your
-          administrator to get a plan activated before you can use this app.
-        </p>
+        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{body}</p>
 
         {(support?.email || support?.whatsapp) && (
           <div className="mt-6 flex flex-col gap-2">

@@ -1,20 +1,65 @@
-import { useMemo, useState } from "react";
-import { Search, X } from "lucide-react";
-import { formatDate, cn } from "@/lib/utils";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useCallback, useMemo, useState } from "react";
 import {
-  ORDER_STATUS_FILTERS,
+  Ban,
+  CheckCircle2,
+  ChefHat,
+  Inbox,
+  Loader2,
+  PackageCheck,
+  Search,
+  Truck,
+  Wifi,
+  WifiOff,
+  X,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { toast } from "sonner";
+import { formatDate, cn } from "@/lib/utils";
+import { apiError } from "@/lib/apiError";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useOrderStream } from "@/hooks/useOrderStream";
+import {
+  CANCELLABLE,
+  NEXT_STATUSES,
+  ORDER_STATUS_ACCENT,
   ORDER_STATUS_LABEL,
   ORDER_STATUS_TONE,
 } from "@/lib/orders";
-import { useListOrdersQuery } from "@/features/api/ordersApi";
-import { useListShopsQuery } from "@/features/api/shopsApi";
-import type { DeliveryType, OrderPaymentStatus, OrderStatus } from "@/types";
+import {
+  ordersApi,
+  useCancelOrderMutation,
+  useListOrdersQuery,
+  useMarkOrderPaidMutation,
+  useUpdateOrderStatusMutation,
+} from "@/features/api/ordersApi";
+import type {
+  DeliveryType,
+  Order,
+  OrderEvent,
+  OrderPaymentStatus,
+  OrderStatus,
+} from "@/types";
+import { useAppDispatch, useAppSelector } from "@/app/hooks";
+import {
+  ALL_BRANCHES,
+  selectSelectedBranchId,
+} from "@/features/branch/branchSlice";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { ShopSelect } from "@/components/ShopSelect";
+import { SegmentedStrip } from "@/components/SegmentedStrip";
 import { OrderDetailDialog } from "@/components/orders/OrderDetailDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -34,28 +79,272 @@ import {
 const DELIVERY_TYPES: DeliveryType[] = ["delivery", "pickup"];
 const PAYMENT_STATUSES: OrderPaymentStatus[] = ["pending", "paid"];
 
+/** Status tabs, in pipeline order. */
+const STATUS_TABS: OrderStatus[] = [
+  "placed",
+  "confirmed",
+  "preparing",
+  "ready",
+  "out_for_delivery",
+  "delivered",
+  "cancelled",
+];
+
+/** Icon per status — gives each queue stage a quick visual anchor. */
+const STATUS_ICON: Record<OrderStatus, LucideIcon> = {
+  placed: Inbox,
+  confirmed: CheckCircle2,
+  preparing: ChefHat,
+  ready: PackageCheck,
+  out_for_delivery: Truck,
+  delivered: CheckCircle2,
+  cancelled: Ban,
+};
+
+/** Small live/offline pill reflecting the SSE connection state. */
+function LiveIndicator({
+  status,
+}: {
+  status: "connecting" | "open" | "closed";
+}) {
+  const map = {
+    open: {
+      Icon: Wifi,
+      label: "Live",
+      cls: "text-emerald-600 dark:text-emerald-400",
+      dot: "bg-emerald-500",
+      pulse: true,
+    },
+    connecting: {
+      Icon: Wifi,
+      label: "Connecting…",
+      cls: "text-amber-600 dark:text-amber-400",
+      dot: "bg-amber-500",
+      pulse: true,
+    },
+    closed: {
+      Icon: WifiOff,
+      label: "Offline",
+      cls: "text-muted-foreground",
+      dot: "bg-muted-foreground/50",
+      pulse: false,
+    },
+  }[status];
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium",
+        map.cls,
+      )}
+      title={`Realtime updates: ${map.label}`}
+    >
+      <span className="relative flex h-2 w-2">
+        {map.pulse && (
+          <span
+            className={cn(
+              "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
+              map.dot,
+            )}
+          />
+        )}
+        <span className={cn("relative inline-flex h-2 w-2 rounded-full", map.dot)} />
+      </span>
+      {map.label}
+    </span>
+  );
+}
+
+/**
+ * Inline row action buttons: advance to the next status, decline, mark-paid.
+ *
+ * `onFail` lets the page flash the row when a background request reverts it,
+ * and `busy` reflects that the row has an in-flight action (it fades out
+ * optimistically the instant the action fires).
+ */
+function OrderRowActions({
+  order,
+  onFail,
+}: {
+  order: Order;
+  onFail: (id: string) => void;
+}) {
+  const [updateStatus] = useUpdateOrderStatusMutation();
+  const [markPaid, { isLoading: paying }] = useMarkOrderPaidMutation();
+  const [cancelOrder] = useCancelOrderMutation();
+  const [declineOpen, setDeclineOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [declining, setDeclining] = useState(false);
+
+  const run = async (fn: () => Promise<unknown>, ok: string) => {
+    try {
+      await fn();
+      toast.success(ok);
+    } catch (err) {
+      onFail(order.id);
+      toast.error(apiError(err));
+    }
+  };
+
+  const submitDecline = async () => {
+    if (reason.trim().length < 3) {
+      toast.error("Please give a short reason");
+      return;
+    }
+    setDeclineOpen(false);
+    setDeclining(true);
+    await run(
+      () => cancelOrder({ id: order.id, reason: reason.trim() }).unwrap(),
+      "Order declined",
+    );
+    setDeclining(false);
+    setReason("");
+  };
+
+  const next = NEXT_STATUSES[order.status];
+  const canPay = order.paymentStatus === "pending" && order.status !== "cancelled";
+  const canDecline = CANCELLABLE.includes(order.status);
+
+  if (next.length === 0 && !canPay && !canDecline) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+
+  return (
+    // Stop row-click (which opens the detail dialog) when using the buttons.
+    <div
+      className="flex flex-wrap justify-end gap-2"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {next.map((s) => (
+        <Button
+          key={s}
+          size="sm"
+          disabled={declining}
+          onClick={() =>
+            run(
+              () => updateStatus({ id: order.id, status: s }).unwrap(),
+              `Moved to ${ORDER_STATUS_LABEL[s]}`,
+            )
+          }
+        >
+          Mark {ORDER_STATUS_LABEL[s]}
+        </Button>
+      ))}
+      {canPay && (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={paying}
+          onClick={() => run(() => markPaid(order.id).unwrap(), "Marked paid")}
+        >
+          {paying && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
+          Mark paid
+        </Button>
+      )}
+      {canDecline && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+          disabled={declining}
+          onClick={() => setDeclineOpen(true)}
+        >
+          <Ban className="mr-1 h-3.5 w-3.5" />
+          Decline
+        </Button>
+      )}
+
+      <AlertDialog open={declineOpen} onOpenChange={setDeclineOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Decline order {order.orderNumber}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This cancels the order. The customer will see the reason below.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            placeholder="Reason for declining (e.g. out of stock, outside delivery area)…"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+          />
+          <AlertDialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setDeclineOpen(false);
+                setReason("");
+              }}
+            >
+              Keep order
+            </Button>
+            <Button variant="destructive" onClick={submitDecline}>
+              Decline order
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
 export function OrdersPage() {
+  const dispatch = useAppDispatch();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<OrderStatus | "all">("all");
+  const [status, setStatus] = useState<OrderStatus>("placed");
   const [deliveryType, setDeliveryType] = useState<DeliveryType | "all">("all");
   const [payment, setPayment] = useState<OrderPaymentStatus | "all">("all");
-  const [shopId, setShopId] = useState<string | "all">("all");
+  const shopId = useAppSelector(selectSelectedBranchId);
   const [scheduledDate, setScheduledDate] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
+  // Ids whose background action just failed and snapped back — flashed briefly.
+  const [flashIds, setFlashIds] = useState<Set<string>>(new Set());
 
   const debouncedSearch = useDebouncedValue(search, 350);
 
-  const { data, isLoading } = useListOrdersQuery({
+  const { data, isLoading, isFetching } = useListOrdersQuery({
     page,
     limit: 20,
     search: debouncedSearch || undefined,
-    status: status === "all" ? undefined : status,
+    status,
     deliveryType: deliveryType === "all" ? undefined : deliveryType,
-    shopId: shopId === "all" ? undefined : shopId,
+    shopId: !shopId || shopId === ALL_BRANCHES ? undefined : shopId,
     scheduledDate: scheduledDate || undefined,
   });
-  const { data: shops } = useListShopsQuery({ page: 1, limit: 100 });
+
+  // Realtime: when a change lands for this brand, refresh the affected order and
+  // the list so every open tab reflects it live. New orders get a toast.
+  const branchId = shopId && shopId !== ALL_BRANCHES ? shopId : null;
+  const onEvent = useCallback(
+    (e: OrderEvent) => {
+      // If a branch is selected, ignore events for other branches.
+      if (branchId && e.shopId !== branchId) return;
+      dispatch(
+        ordersApi.util.invalidateTags([
+          { type: "Order", id: e.orderId },
+          { type: "Order", id: "LIST" },
+        ]),
+      );
+      if (e.type === "created") {
+        toast.info(`New order ${e.orderNumber}`, {
+          description: "A fresh order just landed in the queue.",
+        });
+      }
+    },
+    [dispatch, branchId],
+  );
+  const streamStatus = useOrderStream(onEvent);
+
+  const flash = useCallback((id: string) => {
+    setFlashIds((prev) => new Set(prev).add(id));
+    window.setTimeout(() => {
+      setFlashIds((prev) => {
+        const nextSet = new Set(prev);
+        nextSet.delete(id);
+        return nextSet;
+      });
+    }, 1000);
+  }, []);
 
   // paymentStatus isn't a server filter — narrow the current page client-side.
   const rows = useMemo(() => {
@@ -68,27 +357,60 @@ export function OrdersPage() {
   const totalPages = data?.meta.totalPages ?? 1;
 
   const resetPage = () => setPage(1);
+  // Branch selection is a shared, persisted app-wide choice — not a per-page
+  // filter — so it's intentionally excluded from "has filters" / "Clear".
   const hasFilters =
-    !!search ||
-    status !== "all" ||
-    deliveryType !== "all" ||
-    payment !== "all" ||
-    shopId !== "all" ||
-    !!scheduledDate;
+    !!search || deliveryType !== "all" || payment !== "all" || !!scheduledDate;
 
   const clearAll = () => {
     setSearch("");
-    setStatus("all");
     setDeliveryType("all");
     setPayment("all");
-    setShopId("all");
     setScheduledDate("");
     setPage(1);
   };
 
+  // Live count for the active tab, from the server's total.
+  const counts = useMemo<Partial<Record<OrderStatus, number>>>(
+    () => (data ? { [status]: data.meta.total } : {}),
+    [data, status],
+  );
+
+  const statusItems = useMemo(
+    () =>
+      STATUS_TABS.map((s) => ({
+        value: s,
+        label: ORDER_STATUS_LABEL[s],
+        icon: STATUS_ICON[s],
+        accent: ORDER_STATUS_ACCENT[s],
+        count: counts[s],
+      })),
+    [counts],
+  );
+
   return (
     <>
-      <PageHeader title="Orders" description="Order queue & fulfilment" />
+      <PageHeader
+        title="Orders"
+        description="Order queue & fulfilment"
+        actions={
+          <div className="flex items-center gap-3">
+            <LiveIndicator status={streamStatus} />
+            <ShopSelect onChange={resetPage} />
+          </div>
+        }
+      />
+
+      {/* Custom status strip drives the server-side status filter. */}
+      <SegmentedStrip
+        className="mb-4"
+        value={status}
+        items={statusItems}
+        onChange={(s) => {
+          setStatus(s);
+          resetPage();
+        }}
+      />
 
       <div className="mb-4 space-y-3">
         <div className="relative max-w-sm">
@@ -105,26 +427,6 @@ export function OrdersPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Select
-            value={status}
-            onValueChange={(v) => {
-              setStatus(v as OrderStatus | "all");
-              resetPage();
-            }}
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              {ORDER_STATUS_FILTERS.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {ORDER_STATUS_LABEL[s]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
           <Select
             value={deliveryType}
             onValueChange={(v) => {
@@ -165,26 +467,6 @@ export function OrdersPage() {
             </SelectContent>
           </Select>
 
-          <Select
-            value={shopId}
-            onValueChange={(v) => {
-              setShopId(v);
-              resetPage();
-            }}
-          >
-            <SelectTrigger className="w-52">
-              <SelectValue placeholder="Branch" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All branches</SelectItem>
-              {(shops?.data ?? []).map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.branchName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
           <Input
             type="date"
             className="w-44"
@@ -214,18 +496,24 @@ export function OrdersPage() {
               <TableHead>Total</TableHead>
               <TableHead>Payment</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               [0, 1, 2, 3].map((i) => (
                 <TableRow key={i}>
-                  <TableCell colSpan={6}><Skeleton className="h-6 w-full" /></TableCell>
+                  <TableCell colSpan={7}>
+                    <Skeleton className="h-6 w-full" />
+                  </TableCell>
                 </TableRow>
               ))
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                <TableCell
+                  colSpan={7}
+                  className="py-10 text-center text-sm text-muted-foreground"
+                >
                   No orders found.
                 </TableCell>
               </TableRow>
@@ -233,15 +521,22 @@ export function OrdersPage() {
               rows.map((o) => (
                 <TableRow
                   key={o.id}
-                  className="cursor-pointer"
+                  className={cn(
+                    "cursor-pointer animate-row-enter",
+                    flashIds.has(o.id) && "animate-row-flash",
+                  )}
                   onClick={() => setOpenId(o.id)}
                 >
-                  <TableCell className="font-mono font-medium">{o.orderNumber}</TableCell>
+                  <TableCell className="font-mono font-medium">
+                    {o.orderNumber}
+                  </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {formatDate(o.scheduledDate)}
                     {o.scheduledSlotStart && ` · ${o.scheduledSlotStart.slice(0, 5)}`}
                   </TableCell>
-                  <TableCell className="capitalize text-sm">{o.deliveryType}</TableCell>
+                  <TableCell className="capitalize text-sm">
+                    {o.deliveryType}
+                  </TableCell>
                   <TableCell>₹{Number(o.totalAmount)}</TableCell>
                   <TableCell>
                     <span
@@ -264,6 +559,9 @@ export function OrdersPage() {
                       {ORDER_STATUS_LABEL[o.status]}
                     </span>
                   </TableCell>
+                  <TableCell className="text-right">
+                    <OrderRowActions order={o} onFail={flash} />
+                  </TableCell>
                 </TableRow>
               ))
             )}
@@ -271,10 +569,31 @@ export function OrdersPage() {
         </Table>
       </div>
 
-      <div className="mt-4 flex items-center justify-end gap-2">
-        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Previous</Button>
-        <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
-        <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next</Button>
+      <div className="mt-4 flex items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground">
+          {isFetching && !isLoading ? "Refreshing…" : `${rows.length} shown`}
+        </span>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Page {page} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next
+          </Button>
+        </div>
       </div>
 
       <OrderDetailDialog orderId={openId} onOpenChange={(o) => !o && setOpenId(null)} />

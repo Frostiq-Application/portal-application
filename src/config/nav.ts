@@ -84,6 +84,13 @@ export const NAV_ITEMS: NavItem[] = [
     group: "Brand",
   },
   {
+    label: "Subscription",
+    path: "/my-subscription",
+    icon: CreditCard,
+    roles: ["account_super_admin"],
+    group: "Brand",
+  },
+  {
     label: "Team",
     path: "/users",
     icon: UsersIcon,

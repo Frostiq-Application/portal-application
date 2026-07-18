@@ -34,9 +34,11 @@ function addMonthsISO(dateStr: string, months: number): string {
 interface Props {
   subscription: Subscription | null;
   onOpenChange: (o: boolean) => void;
+  /** Fired after a payment is recorded successfully (e.g. to close a detail sheet). */
+  onSuccess?: (subscription: Subscription) => void;
 }
 
-export function MarkPaidDialog({ subscription, onOpenChange }: Props) {
+export function MarkPaidDialog({ subscription, onOpenChange, onSuccess }: Props) {
   const [markPaid, { isLoading }] = useMarkPaidMutation();
   const today = new Date().toISOString().slice(0, 10);
 
@@ -76,6 +78,7 @@ export function MarkPaidDialog({ subscription, onOpenChange }: Props) {
       }).unwrap();
       toast.success(`Payment recorded — receipt ${res.receiptNumber}`);
       onOpenChange(false);
+      onSuccess?.(subscription);
     } catch (err) {
       toast.error(apiError(err, "Failed to record payment"));
     }

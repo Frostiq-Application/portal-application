@@ -1,6 +1,7 @@
 import {
   Ban,
   Check,
+  CreditCard,
   MoreHorizontal,
   Pencil,
   RotateCcw,
@@ -26,6 +27,7 @@ interface Props {
   onReject: () => void;
   onSuspend: () => void;
   onReactivate: () => void;
+  onViewSubscription: () => void;
 }
 
 export function AccountCard({
@@ -35,6 +37,7 @@ export function AccountCard({
   onReject,
   onSuspend,
   onReactivate,
+  onViewSubscription,
 }: Props) {
   // limit: 1 keeps the request cheap — only meta.total is used here.
   const { data: shops } = useListShopsQuery({ accountId: a.id, page: 1, limit: 1 });
@@ -112,6 +115,10 @@ export function AccountCard({
             <DropdownMenuItem onClick={onEdit}>
               <Pencil className="mr-2 h-4 w-4" />
               Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onViewSubscription}>
+              <CreditCard className="mr-2 h-4 w-4" />
+              View subscription
             </DropdownMenuItem>
             {a.status === "pending" && (
               <>

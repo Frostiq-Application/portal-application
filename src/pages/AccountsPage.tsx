@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ChevronDown, Search, Store } from "lucide-react";
 import { toast } from "sonner";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -51,6 +52,7 @@ function extractError(err: unknown): string {
 }
 
 export function AccountsPage() {
+  const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<AccountStatus | "all">("all");
@@ -205,6 +207,9 @@ export function AccountsPage() {
                       }
                       onReactivate={() =>
                         run(() => reactivate(a.id).unwrap(), "Shop reactivated.")
+                      }
+                      onViewSubscription={() =>
+                        navigate(`/subscriptions?accountId=${a.id}`)
                       }
                     />
                   </button>

@@ -5,6 +5,7 @@ import {
   useArchivePlanMutation,
   useDeletePlanMutation,
   useListPlansQuery,
+  useUnarchivePlanMutation,
 } from "@/features/api/plansApi";
 import { apiError } from "@/lib/apiError";
 import type { Plan } from "@/types";
@@ -46,6 +47,7 @@ function FeatureDot({ on }: { on: boolean }) {
 export function PlansPage() {
   const { data, isLoading } = useListPlansQuery({ page: 1, limit: 50 });
   const [archivePlan] = useArchivePlanMutation();
+  const [unarchivePlan] = useUnarchivePlanMutation();
   const [deletePlan] = useDeletePlanMutation();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Plan | null>(null);
@@ -65,6 +67,14 @@ export function PlansPage() {
     try {
       await archivePlan(id).unwrap();
       toast.success("Plan archived");
+    } catch (err) {
+      toast.error(apiError(err));
+    }
+  };
+  const doUnarchive = async (id: string) => {
+    try {
+      await unarchivePlan(id).unwrap();
+      toast.success("Plan unarchived");
     } catch (err) {
       toast.error(apiError(err));
     }
@@ -159,9 +169,13 @@ export function PlansPage() {
                           <DropdownMenuItem onClick={() => openEdit(p)}>
                             Edit
                           </DropdownMenuItem>
-                          {p.isActive && (
+                          {p.isActive ? (
                             <DropdownMenuItem onClick={() => doArchive(p.id)}>
                               Archive
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem onClick={() => doUnarchive(p.id)}>
+                              Unarchive
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem

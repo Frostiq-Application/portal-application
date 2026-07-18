@@ -27,7 +27,10 @@ export function LoginPage() {
   const location = useLocation();
   const { isAuthenticated } = useAuth();
 
-  const [email, setEmail] = useState("");
+  // Prefill from the set-password screen ("Go to sign in" passes the email).
+  const prefillEmail =
+    (location.state as { email?: string } | null)?.email ?? "";
+  const [email, setEmail] = useState(prefillEmail);
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [preAuthToken, setPreAuthToken] = useState<string | null>(null);
