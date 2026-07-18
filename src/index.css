@@ -1,0 +1,164 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Notch / status-bar safe areas (0 outside standalone mode). The topbar
+       and every sticky sub-header offset themselves with these. */
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+    /* Bakery palette: cream canvas, frosting-pink primary, periwinkle accent,
+       chocolate-brown text, cherry red reserved for destructive. */
+    --background: 42 45% 96%;
+    --foreground: 25 40% 18%;
+
+    --card: 40 50% 99%;
+    --card-foreground: 25 40% 18%;
+
+    --popover: 40 50% 99%;
+    --popover-foreground: 25 40% 18%;
+
+    --primary: 344 62% 52%;
+    --primary-foreground: 350 60% 98%;
+
+    --secondary: 348 55% 93%;
+    --secondary-foreground: 344 50% 30%;
+
+    --muted: 40 30% 92%;
+    --muted-foreground: 25 15% 42%;
+
+    --accent: 222 58% 93%;
+    --accent-foreground: 224 55% 30%;
+
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 40 50% 98%;
+
+    --border: 35 30% 87%;
+    --input: 35 30% 87%;
+    --ring: 344 62% 52%;
+
+    --sidebar: 222 50% 94%;
+    --sidebar-foreground: 25 40% 22%;
+    --sidebar-accent: 222 45% 88%;
+    --sidebar-border: 222 40% 86%;
+
+    --radius: 0.6rem;
+
+    --sidebar-background: 222 50% 94%;
+
+    --sidebar-primary: 344 62% 52%;
+
+    --sidebar-primary-foreground: 350 60% 98%;
+
+    --sidebar-accent-foreground: 25 40% 20%;
+
+    --sidebar-ring: 344 62% 52%;
+
+    /* Dataviz categorical palette (validated — see .agents dataviz skill). Fixed slot order, never re-sorted. */
+    --chart-1: 213 68% 50%;
+    --chart-2: 159 73% 40%;
+    --chart-3: 41 100% 46%;
+    --chart-4: 120 100% 26%;
+    --chart-5: 249 48% 44%;
+    --chart-6: 0 73% 59%;
+    --chart-7: 337 70% 70%;
+    --chart-8: 17 82% 56%;
+  }
+
+  .dark {
+    /* Dark bakery: chocolate-brown base, lighter frosting-pink primary. */
+    --background: 25 28% 9%;
+    --foreground: 35 30% 92%;
+
+    --card: 25 24% 12%;
+    --card-foreground: 35 30% 92%;
+
+    --popover: 25 24% 12%;
+    --popover-foreground: 35 30% 92%;
+
+    --primary: 344 68% 68%;
+    --primary-foreground: 344 50% 15%;
+
+    --secondary: 25 20% 17%;
+    --secondary-foreground: 35 30% 92%;
+
+    --muted: 25 20% 17%;
+    --muted-foreground: 30 12% 65%;
+
+    --accent: 224 30% 22%;
+    --accent-foreground: 222 60% 88%;
+
+    --destructive: 0 63% 45%;
+    --destructive-foreground: 35 30% 92%;
+
+    --border: 25 18% 21%;
+    --input: 25 18% 21%;
+    --ring: 344 68% 68%;
+
+    --sidebar: 25 28% 7%;
+    --sidebar-foreground: 35 25% 88%;
+    --sidebar-accent: 25 22% 15%;
+    --sidebar-border: 25 20% 15%;
+    --sidebar-background: 25 28% 8%;
+    --sidebar-primary: 344 68% 68%;
+    --sidebar-primary-foreground: 344 50% 15%;
+    --sidebar-accent-foreground: 35 25% 88%;
+    --sidebar-ring: 344 68% 68%;
+
+    --chart-1: 213 77% 56%;
+    --chart-2: 159 73% 36%;
+    --chart-3: 40 100% 39%;
+    --chart-4: 120 100% 26%;
+    --chart-5: 247 69% 72%;
+    --chart-6: 0 72% 65%;
+    --chart-7: 338 61% 58%;
+    --chart-8: 17 70% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+    /* Native-app feel: no rubber-band scroll chaining or grey tap flashes. */
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+    /* Keep text size stable when rotating on iOS. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  button,
+  [role='button'] {
+    touch-action: manipulation;
+  }
+}
+
+/* iOS Safari zooms into any focused input rendered below 16px — force
+   16px on touch-first viewports so forms behave like a native app. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-border;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/40;
+}

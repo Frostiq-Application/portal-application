@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f3e3c8"/>
+      <stop offset="100%" stop-color="#e6c99a"/>
+    </linearGradient>
+    <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fdf8ee"/>
+      <stop offset="100%" stop-color="#eaddc4"/>
+    </linearGradient>
+    <linearGradient id="tier1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fbead0"/>
+      <stop offset="100%" stop-color="#eecd9c"/>
+    </linearGradient>
+    <linearGradient id="tier2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f6dcae"/>
+      <stop offset="100%" stop-color="#e2b979"/>
+    </linearGradient>
+    <linearGradient id="tier3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#eecB92"/>
+      <stop offset="100%" stop-color="#d6a25e"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="1600" fill="url(#bg)"/>
+
+  <circle cx="230" cy="220" r="90" fill="#fffaf0" opacity="0.35"/>
+  <circle cx="1020" cy="1400" r="140" fill="#fffaf0" opacity="0.25"/>
+  <circle cx="980" cy="200" r="50" fill="#fffaf0" opacity="0.3"/>
+
+  <ellipse cx="600" cy="1310" rx="330" ry="34" fill="#c9a06a" opacity="0.35"/>
+
+  <!-- cake stand -->
+  <rect x="430" y="1250" width="340" height="26" rx="13" fill="url(#plate)" stroke="#d8b98a" stroke-width="2"/>
+  <rect x="580" y="1276" width="40" height="34" fill="#e9d3ab"/>
+  <ellipse cx="600" cy="1312" rx="120" ry="16" fill="url(#plate)" stroke="#d8b98a" stroke-width="2"/>
+
+  <!-- bottom tier -->
+  <rect x="410" y="1050" width="380" height="200" rx="14" fill="url(#tier3)" stroke="#c99a5c" stroke-width="3"/>
+  <path d="M410 1080 q 190 -30 380 0" fill="none" stroke="#fbead0" stroke-width="6" opacity="0.6"/>
+
+  <!-- middle tier -->
+  <rect x="460" y="860" width="280" height="190" rx="14" fill="url(#tier2)" stroke="#c99a5c" stroke-width="3"/>
+  <path d="M460 892 q 140 -26 280 0" fill="none" stroke="#fbead0" stroke-width="6" opacity="0.6"/>
+
+  <!-- top tier -->
+  <rect x="505" y="690" width="190" height="170" rx="14" fill="url(#tier1)" stroke="#c99a5c" stroke-width="3"/>
+  <path d="M505 718 q 95 -22 190 0" fill="none" stroke="#fffaf0" stroke-width="6" opacity="0.7"/>
+
+  <!-- drip icing -->
+  <path d="M505 690 q 12 26 0 40 q -12 26 0 40 q 12 20 0 36 h190 q -12 -16 0 -36 q -12 -14 0 -40 q 12 -14 0 -40 z"
+        fill="#fdf3df" opacity="0.85"/>
+
+  <!-- candle -->
+  <rect x="592" y="620" width="16" height="72" rx="6" fill="#e7ab5c"/>
+  <path d="M600 592 c 14 14 14 30 0 40 c -14 -10 -14 -26 0 -40 z" fill="#f2b23a"/>
+  <path d="M600 602 c 7 8 7 16 0 22 c -7 -6 -7 -14 0 -22 z" fill="#fbe08a"/>
+
+  <!-- berries -->
+  <circle cx="470" cy="760" r="14" fill="#b3492f"/>
+  <circle cx="720" cy="770" r="12" fill="#b3492f"/>
+  <circle cx="500" cy="950" r="15" fill="#b3492f"/>
+  <circle cx="700" cy="960" r="13" fill="#b3492f"/>
+  <circle cx="450" cy="1140" r="16" fill="#b3492f"/>
+  <circle cx="750" cy="1150" r="14" fill="#b3492f"/>
+
+  <!-- sprinkles -->
+  <g stroke-linecap="round">
+    <line x1="540" y1="730" x2="552" y2="722" stroke="#8a6b4a" stroke-width="4"/>
+    <line x1="660" y1="740" x2="672" y2="730" stroke="#8a6b4a" stroke-width="4"/>
+    <line x1="600" y1="900" x2="614" y2="892" stroke="#8a6b4a" stroke-width="4"/>
+    <line x1="520" y1="1100" x2="534" y2="1092" stroke="#8a6b4a" stroke-width="4"/>
+    <line x1="660" y1="1110" x2="674" y2="1100" stroke="#8a6b4a" stroke-width="4"/>
+  </g>
+
+  <!-- little wheat sprigs, echoes theme name -->
+  <g stroke="#a9793f" stroke-width="4" fill="none" opacity="0.8">
+    <path d="M170 1450 q 10 -60 0 -120"/>
+    <path d="M170 1350 l -20 -14 M170 1350 l 20 -14"/>
+    <path d="M170 1390 l -20 -14 M170 1390 l 20 -14"/>
+    <path d="M170 1430 l -20 -14 M170 1430 l 20 -14"/>
+  </g>
+  <g stroke="#a9793f" stroke-width="4" fill="none" opacity="0.8">
+    <path d="M1040 1500 q 10 -60 0 -120"/>
+    <path d="M1040 1400 l -20 -14 M1040 1400 l 20 -14"/>
+    <path d="M1040 1440 l -20 -14 M1040 1440 l 20 -14"/>
+    <path d="M1040 1480 l -20 -14 M1040 1480 l 20 -14"/>
+  </g>
+</svg>

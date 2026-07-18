@@ -1,0 +1,203 @@
+import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Cake, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { useAppDispatch } from "@/app/hooks";
+import { setCredentials } from "@/features/auth/authSlice";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  useLoginMutation,
+  useVerifyTwoFactorMutation,
+} from "@/features/api/authApi";
+import type { LoginResponse } from "@/types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+function extractError(err: unknown): string {
+  const data = (err as { data?: { message?: string | string[] } })?.data;
+  const msg = data?.message;
+  if (Array.isArray(msg)) return msg.join(", ");
+  return msg ?? "Something went wrong. Please try again.";
+}
+
+export function LoginPage() {
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isAuthenticated } = useAuth();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [preAuthToken, setPreAuthToken] = useState<string | null>(null);
+
+  const [login, { isLoading: loggingIn }] = useLoginMutation();
+  const [verify, { isLoading: verifying }] = useVerifyTwoFactorMutation();
+
+  const from = (location.state as { from?: Location })?.from?.pathname ?? "/";
+
+  if (isAuthenticated) {
+    navigate(from, { replace: true });
+  }
+
+  const finish = (res: LoginResponse) => {
+    if (res.user && res.refreshToken) {
+      dispatch(
+        setCredentials({
+          user: res.user,
+          accessToken: res.accessToken,
+          refreshToken: res.refreshToken,
+        }),
+      );
+      navigate(from, { replace: true });
+    }
+  };
+
+  const onSubmitCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await login({ email, password }).unwrap();
+      if (res.requiresTwoFactor) {
+        setPreAuthToken(res.accessToken);
+        toast.info("Enter the 6-digit code from your authenticator app.");
+      } else {
+        finish(res);
+      }
+    } catch (err) {
+      toast.error(extractError(err));
+    }
+  };
+
+  const onSubmitCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!preAuthToken) return;
+    try {
+      const res = await verify({ code, token: preAuthToken }).unwrap();
+      finish(res);
+    } catch (err) {
+      toast.error(extractError(err));
+    }
+  };
+
+  return (
+    <div className="grid min-h-svh lg:grid-cols-2">
+      <div className="relative hidden bg-muted lg:block">
+        <img
+          src="/placeholder.svg"
+          alt="A tiered cake on a stand, decorated with berries and icing"
+          className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.85]"
+        />
+      </div>
+      <div className="flex flex-col gap-4 p-6 md:p-10">
+        <div className="flex justify-center gap-2 md:justify-start">
+          <a href="#" className="flex items-center gap-2 font-medium">
+            <div className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
+              <Cake className="size-4" />
+            </div>
+            Frostique Portal
+          </a>
+        </div>
+        <div className="flex flex-1 items-center justify-center">
+          <div className="w-full max-w-xs">
+            {!preAuthToken ? (
+              <form
+                onSubmit={onSubmitCredentials}
+                className="flex flex-col gap-6"
+              >
+                <div className="flex flex-col items-center gap-2 text-center">
+                  <h1 className="text-xl font-bold">
+                    Sign in to the admin portal
+                  </h1>
+                  <p className="text-balance text-sm text-muted-foreground">
+                    Enter your email below to sign in to your account
+                  </p>
+                </div>
+                <div className="grid gap-6">
+                  <div className="grid gap-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      autoComplete="username"
+                      placeholder="admin@pronttera.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      autoComplete="current-password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" disabled={loggingIn} className="w-full">
+                    {loggingIn && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Sign in
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={onSubmitCode} className="flex flex-col gap-6">
+                <div className="flex flex-col items-center gap-2 text-center">
+                  <h1 className="text-xl font-bold">
+                    Two-factor verification
+                  </h1>
+                  <p className="text-balance text-sm text-muted-foreground">
+                    Enter the 6-digit code from your authenticator app
+                  </p>
+                </div>
+                <div className="grid gap-6">
+                  <div className="grid gap-2">
+                    <Label htmlFor="code">Authentication code</Label>
+                    <Input
+                      id="code"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="123456"
+                      maxLength={6}
+                      value={code}
+                      onChange={(e) =>
+                        setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                      }
+                      required
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={verifying || code.length !== 6}
+                    className="w-full"
+                  >
+                    {verifying && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Verify
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setPreAuthToken(null);
+                      setCode("");
+                    }}
+                  >
+                    Back
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
