@@ -19,9 +19,12 @@ import {
 } from "@/features/api/shopsApi";
 import type { Shop } from "@/types";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { isShopAdmin } from "@/lib/roles";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ShopStatusBadge } from "@/components/StatusBadge";
 import { ShopDialog } from "@/components/shops/ShopDialog";
+import { BranchDetails } from "@/components/shops/BranchDetails";
 import { InfiniteScroll } from "@/components/common/InfiniteScroll";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +39,57 @@ import {
 const PAGE_SIZE = 24;
 
 export function ShopsPage() {
+  const { role } = useAuth();
+  // A shop admin owns exactly one branch → show a rich detail view instead of
+  // the multi-branch grid used by account/platform admins.
+  if (isShopAdmin(role)) return <MyBranch />;
+  return <BranchGrid />;
+}
+
+/** Shop-admin view: their single branch as a detail page. */
+function MyBranch() {
+  const { data, isLoading } = useListShopsQuery({ page: 1, limit: 1 });
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const shop = data?.data[0] ?? null;
+
+  if (isLoading) {
+    return (
+      <>
+        <PageHeader title="My Branch" description="Your outlet at a glance" />
+        <Skeleton className="h-52 w-full rounded-xl" />
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-20 w-full rounded-xl" />
+          ))}
+        </div>
+      </>
+    );
+  }
+
+  if (!shop) {
+    return (
+      <>
+        <PageHeader title="My Branch" description="Your outlet at a glance" />
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-background py-20 text-center">
+          <Store className="mb-3 h-8 w-8 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">
+            No branch is assigned to you yet.
+          </p>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <BranchDetails shop={shop} onEdit={() => setDialogOpen(true)} />
+      <ShopDialog open={dialogOpen} onOpenChange={setDialogOpen} shop={shop} />
+    </>
+  );
+}
+
+/** Account / platform admin view: the searchable multi-branch grid. */
+function BranchGrid() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const debounced = useDebouncedValue(search, 350);
