@@ -7,10 +7,16 @@ export interface PlansQuery extends PaginationQuery {
 
 export interface PlanFeatures {
   can_use_coupons?: boolean;
-  can_use_analytics?: boolean;
   can_use_cms?: boolean;
   can_clone_catalog?: boolean;
+  can_use_realtime?: boolean;
+  can_use_analytics?: boolean;
+  can_use_wishlist_analytics?: boolean;
+  can_use_advanced_analytics?: boolean;
+  can_use_audit_log?: boolean;
   priority_support?: boolean;
+  /** Numeric limit carried inside the features blob. Null = unlimited. */
+  max_team_seats?: number | null;
 }
 
 export interface CreatePlanBody {

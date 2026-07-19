@@ -23,11 +23,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+/** Boolean feature toggles (max_team_seats is a numeric field, handled separately). */
 const FEATURE_LABELS: { key: keyof PlanFeatures; label: string }[] = [
   { key: "can_use_coupons", label: "Coupons" },
-  { key: "can_use_analytics", label: "Analytics" },
   { key: "can_use_cms", label: "CMS" },
   { key: "can_clone_catalog", label: "Catalog cloning" },
+  { key: "can_use_realtime", label: "Realtime orders" },
+  { key: "can_use_analytics", label: "Analytics" },
+  { key: "can_use_wishlist_analytics", label: "Wishlist analytics" },
+  { key: "can_use_advanced_analytics", label: "Advanced analytics" },
+  { key: "can_use_audit_log", label: "Audit log" },
   { key: "priority_support", label: "Priority support" },
 ];
 
@@ -47,6 +52,7 @@ export function PlanDialog({ open, onOpenChange, plan }: Props) {
   const [priceMonthly, setPriceMonthly] = useState("0");
   const [maxShops, setMaxShops] = useState("");
   const [maxProducts, setMaxProducts] = useState("");
+  const [maxTeamSeats, setMaxTeamSeats] = useState("");
   const [isPublic, setIsPublic] = useState(true);
   const [features, setFeatures] = useState<PlanFeatures>({});
 
@@ -60,7 +66,9 @@ export function PlanDialog({ open, onOpenChange, plan }: Props) {
         plan?.maxProductsPerShop != null ? String(plan.maxProductsPerShop) : "",
       );
       setIsPublic(plan?.isPublic ?? true);
-      setFeatures((plan?.features as PlanFeatures) ?? {});
+      const f = (plan?.features as PlanFeatures) ?? {};
+      setFeatures(f);
+      setMaxTeamSeats(f.max_team_seats != null ? String(f.max_team_seats) : "");
     }
   }, [open, plan]);
 
@@ -75,7 +83,10 @@ export function PlanDialog({ open, onOpenChange, plan }: Props) {
       priceMonthly: Number(priceMonthly) || 0,
       maxShops: maxShops === "" ? null : Number(maxShops),
       maxProductsPerShop: maxProducts === "" ? null : Number(maxProducts),
-      features,
+      features: {
+        ...features,
+        max_team_seats: maxTeamSeats === "" ? null : Number(maxTeamSeats),
+      },
       isPublic,
     };
     try {
@@ -145,6 +156,16 @@ export function PlanDialog({ open, onOpenChange, plan }: Props) {
               onChange={(e) => setMaxProducts(e.target.value)}
             />
           </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>Max team members</Label>
+            <Input
+              type="number"
+              min={1}
+              placeholder="Unlimited"
+              value={maxTeamSeats}
+              onChange={(e) => setMaxTeamSeats(e.target.value)}
+            />
+          </div>
           <div className="flex items-end gap-2">
             <Switch id="public" checked={isPublic} onCheckedChange={setIsPublic} />
             <Label htmlFor="public" className="cursor-pointer">
@@ -161,7 +182,7 @@ export function PlanDialog({ open, onOpenChange, plan }: Props) {
                   className="flex items-center gap-2 rounded-md border p-2 text-sm"
                 >
                   <Switch
-                    checked={features[f.key] ?? false}
+                    checked={features[f.key] === true}
                     onCheckedChange={(v) =>
                       setFeatures((prev) => ({ ...prev, [f.key]: v }))
                     }
