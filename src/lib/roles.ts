@@ -18,6 +18,10 @@ export function isAccountAdmin(role?: Role): boolean {
   return role === "account_super_admin";
 }
 
+export function isShopAdmin(role?: Role): boolean {
+  return role === "shop_admin";
+}
+
 /** Tailwind badge variant/tone per account status. */
 export const ACCOUNT_STATUS_TONE: Record<
   AccountStatus,
