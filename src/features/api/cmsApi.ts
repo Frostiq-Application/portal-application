@@ -1,4 +1,5 @@
 import { baseApi } from "./baseApi";
+import type { Occasion } from "@/types";
 
 export type BannerTapAction =
   | "none"
@@ -121,6 +122,69 @@ export const cmsApi = baseApi.injectEndpoints({
       query: (body) => ({ url: "/cms/account-content", method: "PUT", body }),
       invalidatesTags: [{ type: "Cms", id: "CONTENT" }],
     }),
+
+    // Occasions & featured products
+    listOccasions: build.query<Occasion[], void>({
+      query: () => ({ url: "/cms/occasions" }),
+      providesTags: [{ type: "Occasion", id: "LIST" }],
+    }),
+    createOccasion: build.mutation<
+      Occasion,
+      { name: string; iconUrl?: string; displayOrder?: number }
+    >({
+      query: (body) => ({ url: "/cms/occasions", method: "POST", body }),
+      invalidatesTags: [{ type: "Occasion", id: "LIST" }],
+    }),
+    updateOccasion: build.mutation<
+      Occasion,
+      {
+        id: string;
+        body: {
+          name?: string;
+          iconUrl?: string;
+          displayOrder?: number;
+          isActive?: boolean;
+        };
+      }
+    >({
+      query: ({ id, body }) => ({
+        url: `/cms/occasions/${id}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: [{ type: "Occasion", id: "LIST" }],
+    }),
+    deleteOccasion: build.mutation<void, string>({
+      query: (id) => ({ url: `/cms/occasions/${id}`, method: "DELETE" }),
+      invalidatesTags: [{ type: "Occasion", id: "LIST" }],
+    }),
+
+    // Featured products assigned to an occasion for a branch
+    getOccasionProducts: build.query<
+      { productIds: string[] },
+      { occasionId: string; shopId: string }
+    >({
+      query: ({ occasionId, shopId }) => ({
+        url: `/cms/occasions/${occasionId}/products`,
+        params: { shopId },
+      }),
+      providesTags: (_r, _e, { occasionId, shopId }) => [
+        { type: "OccasionProducts", id: `${occasionId}:${shopId}` },
+      ],
+    }),
+    assignOccasionProducts: build.mutation<
+      { assigned: number },
+      { occasionId: string; shopId: string; productIds: string[] }
+    >({
+      query: ({ occasionId, shopId, productIds }) => ({
+        url: `/cms/occasions/${occasionId}/products`,
+        method: "POST",
+        body: { shopId, productIds },
+      }),
+      invalidatesTags: (_r, _e, { occasionId, shopId }) => [
+        { type: "OccasionProducts", id: `${occasionId}:${shopId}` },
+      ],
+    }),
   }),
   overrideExisting: false,
 });
@@ -136,4 +200,10 @@ export const {
   useDeleteAnnouncementMutation,
   useGetAccountContentQuery,
   useUpsertAccountContentMutation,
+  useListOccasionsQuery,
+  useCreateOccasionMutation,
+  useUpdateOccasionMutation,
+  useDeleteOccasionMutation,
+  useGetOccasionProductsQuery,
+  useAssignOccasionProductsMutation,
 } = cmsApi;

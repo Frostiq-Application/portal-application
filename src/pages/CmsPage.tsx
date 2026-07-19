@@ -16,6 +16,7 @@ import {
 } from "@/features/api/cmsApi";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ImageUploader } from "@/components/ImageUploader";
+import { FeaturedTab } from "@/components/cms/FeaturedTab";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -223,6 +224,7 @@ export function CmsPage() {
         <TabsList>
           <TabsTrigger value="banners">Banners</TabsTrigger>
           <TabsTrigger value="announcements">Announcements</TabsTrigger>
+          <TabsTrigger value="featured">Featured</TabsTrigger>
           {showBrand && <TabsTrigger value="brand">Brand</TabsTrigger>}
         </TabsList>
         <TabsContent value="banners" className="mt-4">
@@ -230,6 +232,9 @@ export function CmsPage() {
         </TabsContent>
         <TabsContent value="announcements" className="mt-4">
           <AnnouncementsTab />
+        </TabsContent>
+        <TabsContent value="featured" className="mt-4">
+          <FeaturedTab />
         </TabsContent>
         {showBrand && (
           <TabsContent value="brand" className="mt-4">
