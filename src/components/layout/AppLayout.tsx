@@ -5,6 +5,7 @@ import {
   LogOut,
   Menu,
   Moon,
+  Plus,
   Sun,
   UserRound,
   X,
@@ -148,6 +149,7 @@ export function AppLayout() {
     isSubscriptionExpired,
     entitlements,
     brand,
+    hasFeature,
   } = useEntitlements();
   const theme = useAppSelector((s) => s.ui.theme);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -254,6 +256,16 @@ export function AppLayout() {
             <Menu className="h-5 w-5" />
           </Button>
           <div className="ml-auto flex items-center gap-2">
+            {!isExempt && hasFeature("can_use_custom_cake") && (
+              <Button
+                size="sm"
+                className="gap-1.5"
+                onClick={() => navigate("/custom-cakes")}
+              >
+                <Plus className="h-4 w-4" />
+                New Order
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"

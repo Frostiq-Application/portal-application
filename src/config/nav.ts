@@ -13,6 +13,7 @@ import {
   ScrollText,
   ShoppingBag,
   Cake,
+  CakeSlice,
   type LucideIcon,
 } from "lucide-react";
 import type { PlanFeatureKey, Role } from "@/types";
@@ -60,6 +61,14 @@ export const NAV_ITEMS: NavItem[] = [
     path: "/customers",
     icon: Contact,
     roles: NON_PLATFORM_ADMINS,
+    group: "Operations",
+  },
+  {
+    label: "Custom Cakes",
+    path: "/custom-cakes",
+    icon: CakeSlice,
+    roles: NON_PLATFORM_ADMINS,
+    feature: "can_use_custom_cake",
     group: "Operations",
   },
 

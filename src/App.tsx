@@ -19,6 +19,7 @@ import { CmsPage } from "@/pages/CmsPage";
 import { CatalogPage } from "@/pages/CatalogPage";
 import { OrdersPage } from "@/pages/OrdersPage";
 import { CustomersPage } from "@/pages/CustomersPage";
+import { CustomCakesPage } from "@/pages/CustomCakesPage";
 import { SchedulingPage } from "@/pages/SchedulingPage";
 import { AnalyticsPage } from "@/pages/AnalyticsPage";
 import { ProfilePage } from "@/pages/ProfilePage";
@@ -85,6 +86,16 @@ export default function App() {
                 }
               >
                 <Route path="/cms" element={<CmsPage />} />
+              </Route>
+              <Route
+                element={
+                  <FeatureRoute
+                    feature="can_use_custom_cake"
+                    featureLabel="Custom Cakes"
+                  />
+                }
+              >
+                <Route path="/custom-cakes" element={<CustomCakesPage />} />
               </Route>
             </Route>
 

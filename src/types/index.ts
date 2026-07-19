@@ -149,6 +149,10 @@ export interface PlanFeatureFlags {
   can_use_advanced_analytics?: boolean;
   /** Admin audit-log viewer. */
   can_use_audit_log?: boolean;
+  /** Custom cake ordering (quote-request module). */
+  can_use_custom_cake?: boolean;
+  /** Route checkout through WhatsApp instead of in-app place-order. */
+  can_use_whatsapp_checkout?: boolean;
   priority_support?: boolean;
 }
 
@@ -387,6 +391,7 @@ export interface Coupon {
   isActive: boolean;
   isPublic: boolean;
   displayLabel: string | null;
+  applicableBranchIds: string[];
 }
 
 // ==================== Customers ====================
@@ -442,12 +447,29 @@ export interface Occasion {
 
 // ==================== Scheduling ====================
 
+/** 'all' = branch default; 'delivery'/'pickup' rows fully override it for that type. */
+export type SchedulingScope = "all" | "delivery" | "pickup";
+
 export interface SchedulingSettings {
   id: string;
   shopId: string;
+  fulfilmentType: SchedulingScope;
   slotDurationMinutes: number;
   dailyCutoffTime: string | null;
   maxAdvanceDays: number;
+  /** Max active orders per slot; null = unlimited. */
+  slotCapacity: number | null;
+}
+
+export interface WeeklyHours {
+  id: string;
+  shopId: string;
+  fulfilmentType: SchedulingScope;
+  /** 0 = Sunday … 6 = Saturday. */
+  weekday: number;
+  closed: boolean;
+  openTime: string | null;
+  closeTime: string | null;
 }
 
 export interface BlackoutDate {
@@ -460,6 +482,10 @@ export interface BlackoutDate {
 export interface Slot {
   start: string;
   end: string;
+  /** False once the slot's capacity is exhausted. */
+  available: boolean;
+  /** Orders still bookable in this slot; null = unlimited. */
+  remaining: number | null;
 }
 
 export interface SlotsResponse {
