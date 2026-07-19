@@ -7,12 +7,14 @@ import {
   type CreateCouponBody,
 } from "@/features/api/couponsApi";
 import { useListShopsQuery } from "@/features/api/shopsApi";
+import { useMeQuery } from "@/features/api/authApi";
 import { apiError } from "@/lib/apiError";
 import type { Coupon, CouponType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -45,6 +47,8 @@ interface Props {
 
 export function CouponDialog({ open, onOpenChange, coupon }: Props) {
   const isEdit = Boolean(coupon);
+  const { data: user } = useMeQuery();
+  const isBranchManager = user?.role === "shop_admin";
   const { data: shops } = useListShopsQuery({ page: 1, limit: 100 });
   const [createCoupon, { isLoading: creating }] = useCreateCouponMutation();
   const [updateCoupon, { isLoading: updating }] = useUpdateCouponMutation();
@@ -62,6 +66,7 @@ export function CouponDialog({ open, onOpenChange, coupon }: Props) {
   const [validUntil, setValidUntil] = useState("");
   const [isPublic, setIsPublic] = useState(false);
   const [displayLabel, setDisplayLabel] = useState("");
+  const [applicableBranchIds, setApplicableBranchIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (open) {
@@ -78,6 +83,7 @@ export function CouponDialog({ open, onOpenChange, coupon }: Props) {
       setValidUntil(toLocalInput(coupon?.validUntil));
       setIsPublic(coupon?.isPublic ?? false);
       setDisplayLabel(coupon?.displayLabel ?? "");
+      setApplicableBranchIds(new Set(coupon?.applicableBranchIds ?? []));
     }
   }, [open, coupon]);
 
@@ -90,6 +96,11 @@ export function CouponDialog({ open, onOpenChange, coupon }: Props) {
     if (!usageUnlimited && (usageTotal === "" || Number(usageTotal) < 1))
       return toast.error("Enter a total usage limit, or turn on “Unlimited”");
 
+    // Branch managers can't create multi-branch coupons
+    if (isBranchManager && applicableBranchIds.size > 1) {
+      return toast.error("Branch managers can only create single-branch coupons");
+    }
+
     const common = {
       discountType,
       discountValue: Number(discountValue) || 0,
@@ -101,6 +112,7 @@ export function CouponDialog({ open, onOpenChange, coupon }: Props) {
       validUntil: new Date(validUntil).toISOString(),
       isPublic,
       displayLabel: displayLabel.trim() || undefined,
+      applicableBranchIds: applicableBranchIds.size > 0 ? Array.from(applicableBranchIds) : undefined,
     };
     try {
       if (isEdit && coupon) {
@@ -119,7 +131,7 @@ export function CouponDialog({ open, onOpenChange, coupon }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit coupon" : "New coupon"}</DialogTitle>
           <DialogDescription>Shop-funded discount with validation rules.</DialogDescription>
@@ -128,7 +140,7 @@ export function CouponDialog({ open, onOpenChange, coupon }: Props) {
         <div className="grid gap-4 py-2 sm:grid-cols-2">
           {!isEdit && (
             <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <Label>Branch</Label>
+              <Label>Owning branch</Label>
               <Select value={shopId} onValueChange={setShopId}>
                 <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
                 <SelectContent>
@@ -137,6 +149,29 @@ export function CouponDialog({ open, onOpenChange, coupon }: Props) {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          )}
+          {!isEdit && !isBranchManager && (
+            <div className="flex flex-col gap-2 sm:col-span-2">
+              <Label>Apply to branches</Label>
+              <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
+                {(shops?.data ?? []).map((s) => (
+                  <div key={s.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={s.id}
+                      checked={applicableBranchIds.has(s.id)}
+                      onCheckedChange={(checked) => {
+                        const updated = new Set(applicableBranchIds);
+                        if (checked) updated.add(s.id);
+                        else updated.delete(s.id);
+                        setApplicableBranchIds(updated);
+                      }}
+                    />
+                    <Label htmlFor={s.id} className="cursor-pointer text-sm font-normal">{s.branchName}</Label>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">Select branches where this coupon will be valid. If none selected, defaults to owning branch only.</p>
             </div>
           )}
           <div className="flex flex-col gap-1.5">

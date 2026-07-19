@@ -18,6 +18,7 @@ export interface CreateCouponBody {
   validUntil: string;
   isPublic?: boolean;
   displayLabel?: string;
+  applicableBranchIds?: string[];
 }
 
 export type UpdateCouponBody = Partial<
