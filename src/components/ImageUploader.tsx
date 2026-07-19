@@ -3,6 +3,7 @@ import { ImagePlus, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useUploadAssetMutation } from "@/features/api/uploadApi";
 import { apiError } from "@/lib/apiError";
+import { compressImage } from "@/lib/compressImage";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -39,7 +40,9 @@ export function ImageUploader({
     const uploaded: string[] = [];
     for (const file of chosen) {
       try {
-        const res = await upload({ file, folder }).unwrap();
+        // Oversized photos are compressed silently before upload.
+        const prepared = await compressImage(file);
+        const res = await upload({ file: prepared, folder }).unwrap();
         uploaded.push(res.url);
       } catch (err) {
         toast.error(apiError(err, `Failed to upload ${file.name}`));
