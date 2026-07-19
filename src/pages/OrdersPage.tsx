@@ -6,6 +6,7 @@ import {
   Inbox,
   Loader2,
   PackageCheck,
+  Plus,
   Search,
   Truck,
   Wifi,
@@ -50,6 +51,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { ShopSelect } from "@/components/ShopSelect";
 import { SegmentedStrip } from "@/components/SegmentedStrip";
 import { OrderDetailDialog } from "@/components/orders/OrderDetailDialog";
+import { CreateOrderDialog } from "@/components/orders/CreateOrderDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -90,6 +92,30 @@ const STATUS_TABS: OrderStatus[] = [
   "out_for_delivery",
   "delivered",
   "cancelled",
+];
+
+/**
+ * Team presets scope the status strip to a team's stages and jump to that
+ * team's primary queue — the kitchen team lives in prep/ready, the delivery
+ * team in dispatch/delivered. "All" shows the full pipeline.
+ */
+type TeamView = "all" | "kitchen" | "delivery";
+
+const TEAM_STATUSES: Record<TeamView, OrderStatus[]> = {
+  all: STATUS_TABS,
+  kitchen: ["placed", "confirmed", "preparing", "ready"],
+  delivery: ["ready", "out_for_delivery", "delivered"],
+};
+
+const TEAM_PRIMARY: Record<Exclude<TeamView, "all">, OrderStatus> = {
+  kitchen: "preparing",
+  delivery: "out_for_delivery",
+};
+
+const TEAM_ITEMS: { value: TeamView; label: string }[] = [
+  { value: "all", label: "All orders" },
+  { value: "kitchen", label: "Kitchen" },
+  { value: "delivery", label: "Delivery" },
 ];
 
 /** Icon per status — gives each queue stage a quick visual anchor. */
@@ -294,11 +320,13 @@ export function OrdersPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<OrderStatus>("placed");
+  const [team, setTeam] = useState<TeamView>("all");
   const [deliveryType, setDeliveryType] = useState<DeliveryType | "all">("all");
   const [payment, setPayment] = useState<OrderPaymentStatus | "all">("all");
   const shopId = useAppSelector(selectSelectedBranchId);
   const [scheduledDate, setScheduledDate] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   // Ids whose background action just failed and snapped back — flashed briefly.
   const [flashIds, setFlashIds] = useState<Set<string>>(new Set());
 
@@ -386,14 +414,14 @@ export function OrdersPage() {
   });
   const statusItems = useMemo(
     () =>
-      STATUS_TABS.map((s) => ({
+      TEAM_STATUSES[team].map((s) => ({
         value: s,
         label: ORDER_STATUS_LABEL[s],
         icon: STATUS_ICON[s],
         accent: ORDER_STATUS_ACCENT[s],
         count: statusCounts?.[s],
       })),
-    [statusCounts],
+    [statusCounts, team],
   );
 
   return (
@@ -405,8 +433,25 @@ export function OrdersPage() {
           <div className="flex items-center gap-3">
             {realtimeEnabled && <LiveIndicator status={streamStatus} />}
             <ShopSelect onChange={resetPage} />
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-1 h-4 w-4" />
+              Create order
+            </Button>
           </div>
         }
+      />
+
+      {/* Team preset scopes the pipeline to the kitchen or delivery team. */}
+      <SegmentedStrip
+        className="mb-3"
+        variant="secondary"
+        value={team}
+        items={TEAM_ITEMS}
+        onChange={(t) => {
+          setTeam(t);
+          if (t !== "all") setStatus(TEAM_PRIMARY[t]);
+          resetPage();
+        }}
       />
 
       {/* Custom status strip drives the server-side status filter. */}
@@ -605,6 +650,11 @@ export function OrdersPage() {
       </div>
 
       <OrderDetailDialog orderId={openId} onOpenChange={(o) => !o && setOpenId(null)} />
+      <CreateOrderDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        defaultShopId={branchId}
+      />
     </>
   );
 }

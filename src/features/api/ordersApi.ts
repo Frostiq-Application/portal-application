@@ -2,6 +2,7 @@ import { baseApi } from "./baseApi";
 import type {
   DeliveryType,
   Order,
+  OrderPaymentMethod,
   OrderStatus,
   Paginated,
   PaginationQuery,
@@ -12,6 +13,29 @@ export interface OrdersQuery extends PaginationQuery {
   status?: OrderStatus;
   deliveryType?: DeliveryType;
   scheduledDate?: string;
+}
+
+export interface ManualOrderItemInput {
+  productId: string;
+  variantId: string;
+  flavorOptionId?: string;
+  quantity: number;
+  addonIds?: string[];
+}
+
+export interface CreateManualOrderBody {
+  shopId: string;
+  customerId: string;
+  items: ManualOrderItemInput[];
+  deliveryType: DeliveryType;
+  deliveryAddressId?: string;
+  scheduledDate: string;
+  scheduledSlotStart?: string;
+  scheduledSlotEnd?: string;
+  paymentMethod: OrderPaymentMethod;
+  markAsPaid?: boolean;
+  couponCode?: string;
+  note?: string;
 }
 
 /**
@@ -88,6 +112,11 @@ export const ordersApi = baseApi.injectEndpoints({
         },
       }),
       providesTags: [{ type: "Order", id: "LIST" }],
+    }),
+
+    createOrder: build.mutation<Order, CreateManualOrderBody>({
+      query: (body) => ({ url: "/orders", method: "POST", body }),
+      invalidatesTags: [{ type: "Order", id: "LIST" }],
     }),
 
     updateOrderStatus: build.mutation<
@@ -174,6 +203,7 @@ export const ordersApi = baseApi.injectEndpoints({
 });
 
 export const {
+  useCreateOrderMutation,
   useListOrdersQuery,
   useGetOrderQuery,
   useGetOrderStatusCountsQuery,
