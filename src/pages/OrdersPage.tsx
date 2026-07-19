@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { formatDate, cn } from "@/lib/utils";
 import { apiError } from "@/lib/apiError";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useEntitlements } from "@/hooks/useEntitlements";
 import { useOrderStream } from "@/hooks/useOrderStream";
 import {
   CANCELLABLE,
@@ -28,6 +29,7 @@ import {
 import {
   ordersApi,
   useCancelOrderMutation,
+  useGetOrderStatusCountsQuery,
   useListOrdersQuery,
   useMarkOrderPaidMutation,
   useUpdateOrderStatusMutation,
@@ -333,7 +335,11 @@ export function OrdersPage() {
     },
     [dispatch, branchId],
   );
-  const streamStatus = useOrderStream(onEvent);
+  // Realtime order stream is a plan feature (Growth+). Without it we still show
+  // orders — just no live updates and no Live indicator.
+  const { hasFeature } = useEntitlements();
+  const realtimeEnabled = hasFeature("can_use_realtime");
+  const streamStatus = useOrderStream(onEvent, realtimeEnabled);
 
   const flash = useCallback((id: string) => {
     setFlashIds((prev) => new Set(prev).add(id));
@@ -370,12 +376,14 @@ export function OrdersPage() {
     setPage(1);
   };
 
-  // Live count for the active tab, from the server's total.
-  const counts = useMemo<Partial<Record<OrderStatus, number>>>(
-    () => (data ? { [status]: data.meta.total } : {}),
-    [data, status],
-  );
-
+  // Live per-status totals so every tab shows its count, not just the active
+  // one. Same filters as the list; refreshed by the same realtime invalidation.
+  const { data: statusCounts } = useGetOrderStatusCountsQuery({
+    search: debouncedSearch || undefined,
+    deliveryType: deliveryType === "all" ? undefined : deliveryType,
+    shopId: !shopId || shopId === ALL_BRANCHES ? undefined : shopId,
+    scheduledDate: scheduledDate || undefined,
+  });
   const statusItems = useMemo(
     () =>
       STATUS_TABS.map((s) => ({
@@ -383,9 +391,9 @@ export function OrdersPage() {
         label: ORDER_STATUS_LABEL[s],
         icon: STATUS_ICON[s],
         accent: ORDER_STATUS_ACCENT[s],
-        count: counts[s],
+        count: statusCounts?.[s],
       })),
-    [counts],
+    [statusCounts],
   );
 
   return (
@@ -395,7 +403,7 @@ export function OrdersPage() {
         description="Order queue & fulfilment"
         actions={
           <div className="flex items-center gap-3">
-            <LiveIndicator status={streamStatus} />
+            {realtimeEnabled && <LiveIndicator status={streamStatus} />}
             <ShopSelect onChange={resetPage} />
           </div>
         }

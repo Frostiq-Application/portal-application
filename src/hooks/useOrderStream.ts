@@ -23,8 +23,15 @@ export type StreamStatus = "connecting" | "open" | "closed";
  *
  * Returns the live connection status for a UI indicator. The subscription is
  * torn down on unmount and re-established if the token changes.
+ *
+ * Pass `enabled: false` (e.g. when the brand's plan doesn't include realtime)
+ * to skip connecting entirely — the server would 403 the stream anyway, so we
+ * don't even attempt it, and report "closed".
  */
-export function useOrderStream(onEvent: (e: OrderEvent) => void): StreamStatus {
+export function useOrderStream(
+  onEvent: (e: OrderEvent) => void,
+  enabled = true,
+): StreamStatus {
   const dispatch = useAppDispatch();
   const accessToken = useAppSelector((s) => s.auth.accessToken);
   const refreshToken = useAppSelector((s) => s.auth.refreshToken);
@@ -37,8 +44,9 @@ export function useOrderStream(onEvent: (e: OrderEvent) => void): StreamStatus {
   onEventRef.current = onEvent;
 
   useEffect(() => {
-    // The stream is brand-scoped; platform admins (no accountId) have none.
-    if (!accessToken || !accountId) {
+    // Disabled by plan, or brand-scoped stream for a user without a brand
+    // (platform admins have no accountId) → don't connect.
+    if (!enabled || !accessToken || !accountId) {
       setStatus("closed");
       return;
     }
@@ -140,7 +148,7 @@ export function useOrderStream(onEvent: (e: OrderEvent) => void): StreamStatus {
     });
 
     return () => controller.abort();
-  }, [accessToken, refreshToken, accountId, dispatch]);
+  }, [enabled, accessToken, refreshToken, accountId, dispatch]);
 
   return status;
 }

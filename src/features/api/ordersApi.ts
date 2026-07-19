@@ -72,6 +72,24 @@ export const ordersApi = baseApi.injectEndpoints({
       providesTags: (_r, _e, id) => [{ type: "Order", id }],
     }),
 
+    // Per-status totals for the queue tabs. Tagged LIST so realtime events
+    // (which invalidate the list) refresh the counts too.
+    getOrderStatusCounts: build.query<
+      Partial<Record<OrderStatus, number>>,
+      Omit<OrdersQuery, "status" | "page" | "limit"> | void
+    >({
+      query: (params) => ({
+        url: "/orders/counts",
+        params: {
+          ...(params?.shopId ? { shopId: params.shopId } : {}),
+          ...(params?.deliveryType ? { deliveryType: params.deliveryType } : {}),
+          ...(params?.scheduledDate ? { scheduledDate: params.scheduledDate } : {}),
+          ...(params?.search ? { search: params.search } : {}),
+        },
+      }),
+      providesTags: [{ type: "Order", id: "LIST" }],
+    }),
+
     updateOrderStatus: build.mutation<
       Order,
       { id: string; status: OrderStatus; note?: string }
@@ -158,6 +176,7 @@ export const ordersApi = baseApi.injectEndpoints({
 export const {
   useListOrdersQuery,
   useGetOrderQuery,
+  useGetOrderStatusCountsQuery,
   useUpdateOrderStatusMutation,
   useCancelOrderMutation,
   useMarkOrderPaidMutation,
