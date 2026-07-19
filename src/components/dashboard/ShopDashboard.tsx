@@ -25,6 +25,7 @@ import {
   selectSelectedBranchId,
 } from "@/features/branch/branchSlice";
 import { ShopSelect } from "@/components/ShopSelect";
+import { WishlistAnalytics } from "@/components/dashboard/WishlistAnalytics";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ShopAnalytics } from "@/types";
@@ -360,6 +361,17 @@ export function ShopDashboard() {
           )}
         </CardContent>
       </Card>
+
+      {/* Wishlist interest — what shoppers are saving vs. buying */}
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-base font-semibold">Wishlist insights</h3>
+          <p className="text-sm text-muted-foreground">
+            What shoppers are saving for later — and how often it turns into an order.
+          </p>
+        </div>
+        {shopId && <WishlistAnalytics shopId={shopId} />}
+      </div>
         </>
       )}
     </div>

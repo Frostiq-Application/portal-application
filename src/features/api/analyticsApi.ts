@@ -1,5 +1,5 @@
 import { baseApi } from "./baseApi";
-import type { AccountAnalytics, ShopAnalytics } from "@/types";
+import type { AccountAnalytics, ShopAnalytics, WishlistAnalytics } from "@/types";
 
 export interface DateRange {
   from?: string;
@@ -36,8 +36,26 @@ export const analyticsApi = baseApi.injectEndpoints({
       }),
       providesTags: [{ type: "Analytics", id: "account" }],
     }),
+
+    wishlistAnalytics: build.query<WishlistAnalytics, ShopAnalyticsQuery>({
+      query: ({ shopId, from, to }) => ({
+        url: "/analytics/wishlist",
+        params: {
+          shopId,
+          ...(from ? { from } : {}),
+          ...(to ? { to } : {}),
+        },
+      }),
+      providesTags: (_r, _e, { shopId }) => [
+        { type: "Analytics", id: `wishlist:${shopId}` },
+      ],
+    }),
   }),
   overrideExisting: false,
 });
 
-export const { useShopAnalyticsQuery, useAccountAnalyticsQuery } = analyticsApi;
+export const {
+  useShopAnalyticsQuery,
+  useAccountAnalyticsQuery,
+  useWishlistAnalyticsQuery,
+} = analyticsApi;
