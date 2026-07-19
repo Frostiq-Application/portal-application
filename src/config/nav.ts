@@ -3,6 +3,10 @@ import {
   Building2,
   Store,
   Users as UsersIcon,
+  Contact,
+  CalendarClock,
+  ShieldCheck,
+  BarChart3,
   CreditCard,
   Tags,
   Image as ImageIcon,
@@ -51,6 +55,13 @@ export const NAV_ITEMS: NavItem[] = [
     roles: NON_PLATFORM_ADMINS,
     group: "Operations",
   },
+  {
+    label: "Customers",
+    path: "/customers",
+    icon: Contact,
+    roles: NON_PLATFORM_ADMINS,
+    group: "Operations",
+  },
 
   // Platform super admin
   {
@@ -84,6 +95,13 @@ export const NAV_ITEMS: NavItem[] = [
     group: "Brand",
   },
   {
+    label: "Scheduling",
+    path: "/scheduling",
+    icon: CalendarClock,
+    roles: NON_PLATFORM_ADMINS,
+    group: "Brand",
+  },
+  {
     label: "Subscription",
     path: "/my-subscription",
     icon: CreditCard,
@@ -94,6 +112,13 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Team",
     path: "/users",
     icon: UsersIcon,
+    roles: ["platform_super_admin", "account_super_admin"],
+    group: "Brand",
+  },
+  {
+    label: "Roles",
+    path: "/roles",
+    icon: ShieldCheck,
     roles: ["platform_super_admin", "account_super_admin"],
     group: "Brand",
   },
@@ -113,6 +138,14 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ImageIcon,
     roles: NON_PLATFORM_ADMINS,
     feature: "can_use_cms",
+    group: "Configuration",
+  },
+  {
+    label: "Analytics",
+    path: "/analytics",
+    icon: BarChart3,
+    roles: NON_PLATFORM_ADMINS,
+    feature: "can_use_analytics",
     group: "Configuration",
   },
 ];

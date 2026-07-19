@@ -106,6 +106,7 @@ export interface User {
   twoFactorEnabled: boolean;
   isActive: boolean;
   shopIds: string[];
+  customRoleId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -136,9 +137,18 @@ export type SubscriptionStatus =
 /** Plan feature flags gating admin-app modules (BRD §5.15). */
 export interface PlanFeatureFlags {
   can_use_coupons?: boolean;
-  can_use_analytics?: boolean;
   can_use_cms?: boolean;
   can_clone_catalog?: boolean;
+  /** Live SSE order-stream dashboard. */
+  can_use_realtime?: boolean;
+  /** Per-branch (shop-tier) analytics. */
+  can_use_analytics?: boolean;
+  /** Wishlist save→order conversion analytics. */
+  can_use_wishlist_analytics?: boolean;
+  /** Cross-branch, account-tier analytics. */
+  can_use_advanced_analytics?: boolean;
+  /** Admin audit-log viewer. */
+  can_use_audit_log?: boolean;
   priority_support?: boolean;
 }
 
@@ -164,6 +174,10 @@ export interface Entitlements {
   maxShops: number | null;
   shopsUsed: number;
   maxProductsPerShop: number | null;
+  /** Max team members allowed by the plan. Null = unlimited (or no plan). */
+  maxTeamSeats: number | null;
+  /** Team members currently in use. */
+  teamSeatsUsed: number;
   support: {
     email: string | null;
     whatsapp: string | null;
@@ -375,11 +389,102 @@ export interface Coupon {
   displayLabel: string | null;
 }
 
+// ==================== Customers ====================
+
+export interface Customer {
+  id: string;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  isActive: boolean;
+  orderCount: number;
+  totalSpent: string;
+  lastOrderAt: string | null;
+  createdAt: string;
+}
+
+export interface CustomerAddress {
+  id: string;
+  label: string | null;
+  fullAddress: string;
+  landmark: string | null;
+  city: string | null;
+  pincode: string | null;
+  isDefault: boolean;
+}
+
+export interface CustomerOrderSummary {
+  id: string;
+  orderNumber: string;
+  status: OrderStatus | "completed";
+  totalAmount: string;
+  paymentStatus: OrderPaymentStatus;
+  deliveryType: DeliveryType;
+  scheduledDate: string;
+  createdAt: string;
+}
+
+export interface CustomerDetail extends Customer {
+  addresses: CustomerAddress[];
+  orders: CustomerOrderSummary[];
+}
+
+// ==================== CMS · Occasions / Featured ====================
+
+export interface Occasion {
+  id: string;
+  accountId: string | null;
+  name: string;
+  iconUrl: string | null;
+  displayOrder: number;
+  isActive: boolean;
+}
+
+// ==================== Scheduling ====================
+
+export interface SchedulingSettings {
+  id: string;
+  shopId: string;
+  slotDurationMinutes: number;
+  dailyCutoffTime: string | null;
+  maxAdvanceDays: number;
+}
+
+export interface BlackoutDate {
+  id: string;
+  shopId: string;
+  date: string;
+  reason: string | null;
+}
+
+export interface Slot {
+  start: string;
+  end: string;
+}
+
+export interface SlotsResponse {
+  date: string;
+  open: boolean;
+  closedReason: string | null;
+  slots: Slot[];
+}
+
 // ==================== Analytics ====================
 
 export interface TopProduct {
   name: string;
   quantity: number;
+}
+
+export interface PeakHour {
+  hour: number;
+  orders: number;
+}
+
+export interface CouponReport {
+  code: string;
+  redemptions: number;
+  totalDiscount: string;
 }
 
 /** GET /analytics/shop — branch analytics (ShopAnalyticsDto). */
@@ -392,6 +497,8 @@ export interface ShopAnalytics {
   deliverySplit: { delivery: number; pickup: number };
   statusBreakdown: Record<string, number>;
   topProducts: TopProduct[];
+  peakHours: PeakHour[];
+  couponReport: CouponReport[];
 }
 
 export interface BranchComparison {
@@ -399,6 +506,30 @@ export interface BranchComparison {
   branchName: string;
   orders: number;
   revenue: string;
+}
+
+/** GET /analytics/wishlist — wishlist interest analytics. */
+export interface WishlistTrendPoint {
+  date: string;
+  saves: number;
+}
+
+export interface WishlistTopProduct {
+  productId: string;
+  name: string;
+  image: string | null;
+  saves: number;
+  ordered: number;
+  conversionRate: number;
+}
+
+export interface WishlistAnalytics {
+  totalSaves: number;
+  uniqueProducts: number;
+  convertedSavers: number;
+  overallConversionRate: number;
+  trend: WishlistTrendPoint[];
+  topProducts: WishlistTopProduct[];
 }
 
 /** GET /analytics/account — brand analytics (AccountAnalyticsDto). */

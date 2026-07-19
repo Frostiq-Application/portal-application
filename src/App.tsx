@@ -13,10 +13,14 @@ import { SubscriptionsPage } from "@/pages/SubscriptionsPage";
 import { MySubscriptionPage } from "@/pages/MySubscriptionPage";
 import { ShopsPage } from "@/pages/ShopsPage";
 import { UsersPage } from "@/pages/UsersPage";
+import { RolesPage } from "@/pages/RolesPage";
 import { CouponsPage } from "@/pages/CouponsPage";
 import { CmsPage } from "@/pages/CmsPage";
 import { CatalogPage } from "@/pages/CatalogPage";
 import { OrdersPage } from "@/pages/OrdersPage";
+import { CustomersPage } from "@/pages/CustomersPage";
+import { SchedulingPage } from "@/pages/SchedulingPage";
+import { AnalyticsPage } from "@/pages/AnalyticsPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -59,6 +63,9 @@ export default function App() {
             >
               <Route path="/orders" element={<OrdersPage />} />
               <Route path="/catalog" element={<CatalogPage />} />
+              <Route path="/customers" element={<CustomersPage />} />
+              <Route path="/scheduling" element={<SchedulingPage />} />
+              <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/shops" element={<ShopsPage />} />
 
               {/* Plan-gated feature modules */}
@@ -89,6 +96,7 @@ export default function App() {
               }
             >
               <Route path="/users" element={<UsersPage />} />
+              <Route path="/roles" element={<RolesPage />} />
             </Route>
 
             {/* Account super admin — read-only view of their own subscription */}
