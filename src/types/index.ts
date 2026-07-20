@@ -125,6 +125,8 @@ export interface Plan {
   features: Record<string, boolean>;
   isActive: boolean;
   isPublic: boolean;
+  /** Display order in the comparison view. Lower = shown first. */
+  sortOrder: number;
 }
 
 export type SubscriptionStatus =

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Copy, Loader2 } from "lucide-react";
+import { Check, Copy, Loader2, Mail, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useCreateUserMutation, type CreateUserBody } from "@/features/api/usersApi";
 import { useListAccountsQuery } from "@/features/api/accountsApi";
@@ -10,6 +10,7 @@ import { apiError } from "@/lib/apiError";
 import type { Role } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -110,25 +111,45 @@ export function InviteUserDialog() {
         {!inviteToken ? (
           <>
             <DialogHeader>
-              <DialogTitle>Invite admin user</DialogTitle>
+              <DialogTitle>Invite User</DialogTitle>
               <DialogDescription>
                 They&rsquo;ll receive a link to set their password.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-2">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <Label>Name</Label>
-                  <Input value={name} onChange={(e) => setName(e.target.value)} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label>Phone</Label>
-                  <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <div className="flex flex-col gap-1.5">
+                <Label>Name</Label>
+                <div className="relative">
+                  <UserIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    className="pl-9"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Full name"
+                  />
                 </div>
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label>Email</Label>
-                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="email"
+                    className="pl-9"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@example.com"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>Phone</Label>
+                <PhoneInput
+                  defaultCountry="IN"
+                  placeholder="Enter phone number"
+                  value={phone}
+                  onChange={(v) => setPhone(v ?? "")}
+                />
               </div>
               {!singleRole && (
                 <div className="flex flex-col gap-1.5">

@@ -196,7 +196,7 @@ function BranchGrid() {
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2, 3, 4, 5].map((i) => (
             <Skeleton key={i} className="h-56 w-full rounded-xl" />
           ))}
@@ -212,7 +212,7 @@ function BranchGrid() {
           loading={isFetching}
           onLoadMore={loadMore}
           loader={
-            <div className="grid grid-cols-1 gap-4 pt-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 pt-4 sm:grid-cols-2 lg:grid-cols-3">
               {[0, 1, 2].map((i) => (
                 <Skeleton key={i} className="h-56 w-full rounded-xl" />
               ))}
@@ -224,7 +224,7 @@ function BranchGrid() {
             </p>
           }
         >
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {items.map((s) => (
               <BranchTicket
                 key={s.id}

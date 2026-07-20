@@ -5,7 +5,6 @@ import {
   MapPin,
   MoreHorizontal,
   Search,
-  Sparkles,
   Store,
   UserCog,
   Users as UsersIcon,
@@ -26,11 +25,11 @@ import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { InviteUserDialog } from "@/components/users/InviteUserDialog";
 import { BranchAssignmentDialog } from "@/components/users/BranchAssignmentDialog";
-import { RoleAssignmentDialog } from "@/components/users/RoleAssignmentDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,15 +38,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-/** Display order + icon for each role group. */
-const ROLE_ORDER: Role[] = [
-  "platform_super_admin",
-  "account_super_admin",
-  "shop_admin",
-];
+/** Roles surfaced as tabs on this page (Branch Owners are managed elsewhere). */
+const TAB_ROLES: Role[] = ["platform_super_admin", "account_super_admin"];
 const ROLE_ICON: Record<Role, typeof UserCog> = {
   platform_super_admin: UserCog,
-  account_super_admin: UserCog,
+  account_super_admin: Store,
   shop_admin: Store,
 };
 
@@ -73,19 +68,21 @@ export function UsersPage() {
   const [resetPassword] = useResetUserPasswordMutation();
 
   const [assignFor, setAssignFor] = useState<User | null>(null);
-  const [roleFor, setRoleFor] = useState<User | null>(null);
 
   const shopName = useMemo(() => {
     const m = new Map((shops?.data ?? []).map((s) => [s.id, s.branchName]));
     return (id: string) => m.get(id) ?? id.slice(0, 6);
   }, [shops]);
 
-  const groups = useMemo(() => {
+  const membersByRole = useMemo(() => {
     const rows = data?.data ?? [];
-    return ROLE_ORDER.map((role) => ({
-      role,
-      members: rows.filter((u) => u.role === role),
-    })).filter((g) => g.members.length > 0);
+    return TAB_ROLES.reduce(
+      (acc, role) => {
+        acc[role] = rows.filter((u) => u.role === role);
+        return acc;
+      },
+      {} as Record<Role, User[]>,
+    );
   }, [data]);
 
   const toggleActive = async (id: string, isActive: boolean) => {
@@ -167,59 +164,60 @@ export function UsersPage() {
             <Skeleton key={i} className="h-20 w-full rounded-xl" />
           ))}
         </div>
-      ) : totalMembers === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-background py-20 text-center">
-          <UsersIcon className="mb-3 h-8 w-8 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            {search ? "No members match your search." : "No team members yet."}
-          </p>
-        </div>
       ) : (
-        <div className="space-y-7">
-          {groups.map((group) => {
-            const RoleIcon = ROLE_ICON[group.role];
-            return (
-              <section key={group.role}>
-                <div className="mb-2.5 flex items-center gap-2">
-                  <RoleIcon className="h-4 w-4 text-muted-foreground" />
-                  <h2 className="text-sm font-semibold">
-                    {roleLabel(group.role)}
-                  </h2>
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                    {group.members.length}
+        <Tabs defaultValue={TAB_ROLES[0]}>
+          <TabsList>
+            {TAB_ROLES.map((role) => {
+              const RoleIcon = ROLE_ICON[role];
+              return (
+                <TabsTrigger key={role} value={role} className="gap-1.5">
+                  <RoleIcon className="h-4 w-4" />
+                  {roleLabel(role)}
+                  <span className="rounded-full bg-muted px-1.5 text-xs font-medium tabular-nums">
+                    {membersByRole[role].length}
                   </span>
-                </div>
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
 
-                <div className="grid gap-3 md:grid-cols-2">
-                  {group.members.map((u) => (
-                    <MemberCard
-                      key={u.id}
-                      user={u}
-                      shopName={shopName}
-                      onManageBranch={() => setAssignFor(u)}
-                      onAssignRole={() => setRoleFor(u)}
-                      onReset={() => doReset(u.id)}
-                      onToggleActive={() => toggleActive(u.id, !u.isActive)}
-                    />
-                  ))}
-                </div>
-              </section>
+          {TAB_ROLES.map((role) => {
+            const members = membersByRole[role];
+            return (
+              <TabsContent key={role} value={role} className="mt-5">
+                {members.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-background py-20 text-center">
+                    <UsersIcon className="mb-3 h-8 w-8 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      {search
+                        ? "No members match your search."
+                        : `No ${roleLabel(role).toLowerCase()}s yet.`}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {members.map((u) => (
+                      <MemberCard
+                        key={u.id}
+                        user={u}
+                        shopName={shopName}
+                        onManageBranch={() => setAssignFor(u)}
+                        onReset={() => doReset(u.id)}
+                        onToggleActive={() => toggleActive(u.id, !u.isActive)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
             );
           })}
-        </div>
+        </Tabs>
       )}
 
       <BranchAssignmentDialog
         user={assignFor}
         open={!!assignFor}
         onOpenChange={(o) => !o && setAssignFor(null)}
-      />
-
-      <RoleAssignmentDialog
-        user={roleFor}
-        currentRoleId={roleFor?.customRoleId ?? null}
-        open={!!roleFor}
-        onOpenChange={(o) => !o && setRoleFor(null)}
       />
     </>
   );
@@ -229,20 +227,18 @@ function MemberCard({
   user,
   shopName,
   onManageBranch,
-  onAssignRole,
   onReset,
   onToggleActive,
 }: {
   user: User;
   shopName: (id: string) => string;
   onManageBranch: () => void;
-  onAssignRole: () => void;
   onReset: () => void;
   onToggleActive: () => void;
 }) {
   const isShopAdmin = user.role === "shop_admin";
-  // Custom roles only apply to brand/shop members, never platform admins.
-  const canHaveCustomRole = user.role !== "platform_super_admin";
+  // Activation is only managed for platform super admins here.
+  const canToggleActive = user.role === "platform_super_admin";
   return (
     <div
       className={cn(
@@ -270,14 +266,9 @@ function MemberCard({
             {user.isActive ? "Active" : "Inactive"}
           </span>
         </div>
-        <p className="truncate text-sm text-muted-foreground">{user.email}</p>
-
-        {canHaveCustomRole && user.customRoleId && (
-          <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-indigo-500/10 px-2 py-0.5 text-[11px] font-semibold text-indigo-600">
-            <Sparkles className="h-3 w-3" />
-            Custom role
-          </span>
-        )}
+        <p className="truncate text-sm text-muted-foreground">
+          {user.phone || "No phone number"}
+        </p>
 
         {isShopAdmin && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -318,23 +309,21 @@ function MemberCard({
               Assign branch
             </DropdownMenuItem>
           )}
-          {canHaveCustomRole && (
-            <DropdownMenuItem onClick={onAssignRole}>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Assign custom role
-            </DropdownMenuItem>
-          )}
           <DropdownMenuItem onClick={onReset}>
             <KeyRound className="mr-2 h-4 w-4" />
             Reset password
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          {user.isActive ? (
-            <DropdownMenuItem className="text-destructive" onClick={onToggleActive}>
-              Deactivate
-            </DropdownMenuItem>
-          ) : (
-            <DropdownMenuItem onClick={onToggleActive}>Activate</DropdownMenuItem>
+          {canToggleActive && (
+            <>
+              <DropdownMenuSeparator />
+              {user.isActive ? (
+                <DropdownMenuItem className="text-destructive" onClick={onToggleActive}>
+                  Deactivate
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onClick={onToggleActive}>Activate</DropdownMenuItem>
+              )}
+            </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
