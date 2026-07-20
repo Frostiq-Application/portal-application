@@ -60,13 +60,6 @@ export function SetPasswordPage() {
 
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
-      <div className="relative hidden bg-muted lg:block">
-        <img
-          src="/placeholder.svg"
-          alt="A tiered cake on a stand, decorated with berries and icing"
-          className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.85]"
-        />
-      </div>
       <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex justify-center gap-2 md:justify-start">
           <a href="#" className="flex items-center gap-2 font-medium">
@@ -162,6 +155,13 @@ export function SetPasswordPage() {
             )}
           </div>
         </div>
+      </div>
+      <div className="relative hidden bg-muted lg:block">
+        <img
+          src="/placeholder.svg"
+          alt="A tiered cake on a stand, decorated with berries and icing"
+          className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.85]"
+        />
       </div>
     </div>
   );
