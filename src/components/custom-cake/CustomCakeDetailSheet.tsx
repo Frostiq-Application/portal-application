@@ -33,6 +33,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -63,7 +69,7 @@ export function CustomCakeDetailSheet({
   const open = !!request;
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
+      <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
         {request && <SheetBody request={request} />}
       </SheetContent>
     </Sheet>
@@ -175,6 +181,13 @@ function SheetBody({ request }: { request: CustomCakeRequest }) {
         </Button>
       </div>
 
+      <Tabs defaultValue="details" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="details">Details</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="details" className="space-y-6">
       {/* Reference images */}
       {request.referenceImageUrls.length > 0 && (
         <div className="flex gap-2 overflow-x-auto">
@@ -359,11 +372,16 @@ function SheetBody({ request }: { request: CustomCakeRequest }) {
           Save notes
         </Button>
       </section>
+        </TabsContent>
 
+        <TabsContent value="history">
       {/* Timeline — customer actions (no admin author) vs. the team's */}
-      {events && events.length > 0 && (
+      {!events || events.length === 0 ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">
+          No history yet.
+        </p>
+      ) : (
         <section className="space-y-2">
-          <Label>History</Label>
           <ol className="space-y-2">
             {events.map((e) => {
               const fromCustomer = e.changedBy === null;
@@ -401,6 +419,8 @@ function SheetBody({ request }: { request: CustomCakeRequest }) {
           </ol>
         </section>
       )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

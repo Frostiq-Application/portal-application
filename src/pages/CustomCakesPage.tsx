@@ -1,27 +1,33 @@
-import { useMemo, useState } from "react";
-import { CakeSlice, Search, Settings2 } from "lucide-react";
-import { useAppSelector } from "@/app/hooks";
+import { useCallback, useMemo, useState } from "react";
+import { CakeSlice, Eye, Search, Settings2 } from "lucide-react";
+import { toast } from "sonner";
+import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import {
   ALL_BRANCHES,
   selectSelectedBranchId,
 } from "@/features/branch/branchSlice";
 import {
+  customCakeApi,
   useListCustomCakesQuery,
   type CustomCakeRequest,
   type CustomCakeStatus,
   CUSTOM_CAKE_STATUS_ACCENT,
   CUSTOM_CAKE_STATUS_LABELS,
 } from "@/features/api/customCakeApi";
+import type { CustomCakeStreamEvent } from "@/types";
 import { ShopSelect } from "@/components/ShopSelect";
 import { SegmentedStrip, type SegmentedItem } from "@/components/SegmentedStrip";
+import { LiveIndicator } from "@/components/LiveIndicator";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { useCustomCakeStream } from "@/hooks/useCustomCakeStream";
 import { CustomCakeDetailSheet } from "@/components/custom-cake/CustomCakeDetailSheet";
-import { CustomCakeOptionsDialog } from "@/components/custom-cake/CustomCakeOptionsDialog";
+import { CustomCakeOptionsDrawer } from "@/components/custom-cake/CustomCakeOptionsDrawer";
 import { CustomCakeIntro } from "@/components/custom-cake/CustomCakeIntro";
 
 const INTRO_SEEN_KEY = "frostique-portal-custom-cake-intro";
@@ -41,6 +47,7 @@ const STATUS_ORDER: CustomCakeStatus[] = [
 ];
 
 export function CustomCakesPage() {
+  const dispatch = useAppDispatch();
   const branchId = useAppSelector(selectSelectedBranchId);
   const shopId = branchId === ALL_BRANCHES ? "" : branchId;
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -69,6 +76,34 @@ export function CustomCakesPage() {
   );
 
   const items = data?.items ?? [];
+
+  // Realtime: when a request changes for this brand, refresh the affected
+  // request + the list so every open tab reflects it live. New requests toast.
+  const onEvent = useCallback(
+    (e: CustomCakeStreamEvent) => {
+      // A branch is always selected on this page; ignore other branches.
+      if (shopId && e.shopId !== shopId) return;
+      dispatch(
+        customCakeApi.util.invalidateTags([
+          { type: "CustomCake", id: e.requestId },
+          { type: "CustomCake", id: "LIST" },
+          { type: "CustomCake", id: `events:${e.requestId}` },
+        ]),
+      );
+      if (e.type === "created") {
+        toast.info(`New custom cake request ${e.requestNumber}`, {
+          description: "A fresh request just landed in the queue.",
+        });
+      }
+    },
+    [dispatch, shopId],
+  );
+  // Realtime is a plan feature (Growth+); without it the list still works,
+  // just no live updates and no Live indicator. Also needs the custom-cake add-on.
+  const { hasFeature } = useEntitlements();
+  const realtimeEnabled =
+    hasFeature("can_use_realtime") && hasFeature("can_use_custom_cake");
+  const streamStatus = useCustomCakeStream(onEvent, realtimeEnabled);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
@@ -100,6 +135,7 @@ export function CustomCakesPage() {
           </p>
         </div>
         <div className="flex items-end gap-2">
+          {realtimeEnabled && <LiveIndicator status={streamStatus} />}
           <ShopSelect />
           <Button
             variant="outline"
@@ -165,7 +201,7 @@ export function CustomCakesPage() {
         request={selected}
         onOpenChange={(o) => !o && setSelected(null)}
       />
-      <CustomCakeOptionsDialog
+      <CustomCakeOptionsDrawer
         shopId={shopId}
         open={optionsOpen}
         onOpenChange={setOptionsOpen}
@@ -235,6 +271,18 @@ function RequestRow({
       >
         {CUSTOM_CAKE_STATUS_LABELS[request.status]}
       </span>
+      <Button
+        size="sm"
+        variant="outline"
+        className="shrink-0"
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpen();
+        }}
+      >
+        <Eye className="mr-1 h-3.5 w-3.5" />
+        View Details
+      </Button>
     </Card>
   );
 }
