@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, Search, Store } from "lucide-react";
+import { Search, Store } from "lucide-react";
 import { toast } from "sonner";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
@@ -14,8 +14,9 @@ import type { Account, AccountStatus } from "@/types";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { CreateAccountDialog } from "@/components/accounts/CreateAccountDialog";
 import { EditAccountDialog } from "@/components/accounts/EditAccountDialog";
-import { AccountBranchesPanel } from "@/components/accounts/AccountBranchesPanel";
+import { AccountBranchesSheet } from "@/components/accounts/AccountBranchesSheet";
 import { AccountCard } from "@/components/accounts/AccountCard";
+import { InfiniteScroll } from "@/components/common/InfiniteScroll";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,16 +52,19 @@ function extractError(err: unknown): string {
   return msg ?? "Action failed.";
 }
 
+const PAGE_SIZE = 24;
+
 export function AccountsPage() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<AccountStatus | "all">("all");
   const debouncedSearch = useDebouncedValue(search, 350);
+  const [items, setItems] = useState<Account[]>([]);
 
   const { data, isLoading, isFetching } = useListAccountsQuery({
     page,
-    limit: 20,
+    limit: PAGE_SIZE,
     search: debouncedSearch || undefined,
     status: status === "all" ? undefined : status,
   });
@@ -73,11 +77,35 @@ export function AccountsPage() {
   const [rejectTarget, setRejectTarget] = useState<Account | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [editTarget, setEditTarget] = useState<Account | null>(null);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [branchesTarget, setBranchesTarget] = useState<Account | null>(null);
 
   const meta = data?.meta;
-  const rows = data?.data ?? [];
   const totalPages = meta?.totalPages ?? 1;
+  const hasMore = page < totalPages;
+
+  // Reset the accumulator whenever the search term or status filter changes.
+  useEffect(() => {
+    setPage(1);
+    setItems([]);
+  }, [debouncedSearch, status]);
+
+  // Accumulate pages for infinite scroll. Page 1 (initial load, filter change,
+  // or a mutation refetch that invalidates LIST) replaces the accumulator.
+  useEffect(() => {
+    if (!data) return;
+    setItems((prev) =>
+      data.meta.page === 1
+        ? data.data
+        : [
+            ...prev.filter((p) => !data.data.some((n) => n.id === p.id)),
+            ...data.data,
+          ],
+    );
+  }, [data]);
+
+  const loadMore = useCallback(() => {
+    if (!isFetching) setPage((p) => p + 1);
+  }, [isFetching]);
 
   const run = async (
     fn: () => Promise<unknown>,
@@ -104,11 +132,6 @@ export function AccountsPage() {
     setRejectTarget(null);
     setRejectReason("");
   };
-
-  const skeletonRows = useMemo(
-    () => Array.from({ length: 6 }, (_, i) => i),
-    [],
-  );
 
   return (
     <>
@@ -152,23 +175,12 @@ export function AccountsPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex flex-col gap-3">
-          {skeletonRows.map((i) => (
-            <div key={i} className="flex overflow-hidden rounded-lg border bg-background">
-              <Skeleton className="h-24 w-40 shrink-0 rounded-none sm:w-56" />
-              <div className="flex flex-1 items-center gap-4 p-4">
-                <div className="space-y-1.5">
-                  <Skeleton className="h-3.5 w-28" />
-                  <Skeleton className="h-3 w-36" />
-                </div>
-                <Skeleton className="h-3.5 w-16" />
-                <Skeleton className="h-5 w-16 rounded-full" />
-                <Skeleton className="h-3 w-16" />
-              </div>
-            </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-64 w-full rounded-xl" />
           ))}
         </div>
-      ) : rows.length === 0 ? (
+      ) : items.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-lg border bg-background py-16 text-center">
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-muted">
             <Store className="h-5 w-5 text-muted-foreground" />
@@ -183,79 +195,48 @@ export function AccountsPage() {
           </div>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
-          {rows.map((a) => {
-            const isOpen = expanded === a.id;
-            return (
-              <div key={a.id}>
-                <div className="relative">
-                  <button
-                    type="button"
-                    className="block w-full text-left"
-                    onClick={() => setExpanded(isOpen ? null : a.id)}
-                    aria-expanded={isOpen}
-                  >
-                    <AccountCard
-                      account={a}
-                      onEdit={() => setEditTarget(a)}
-                      onApprove={() =>
-                        run(() => approve(a.id).unwrap(), "Shop approved.")
-                      }
-                      onReject={() => setRejectTarget(a)}
-                      onSuspend={() =>
-                        run(() => suspend({ id: a.id }).unwrap(), "Shop suspended.")
-                      }
-                      onReactivate={() =>
-                        run(() => reactivate(a.id).unwrap(), "Shop reactivated.")
-                      }
-                      onViewSubscription={() =>
-                        navigate(`/subscriptions?accountId=${a.id}`)
-                      }
-                    />
-                  </button>
-                  <ChevronDown
-                    className={`pointer-events-none absolute bottom-3 right-3 h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`}
-                  />
-                </div>
-                {isOpen && (
-                  <div className="mt-2 px-1">
-                    <AccountBranchesPanel accountId={a.id} accountName={a.name} />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <InfiniteScroll
+          hasMore={hasMore}
+          loading={isFetching}
+          onLoadMore={loadMore}
+          loader={
+            <div className="grid grid-cols-1 gap-4 pt-4 sm:grid-cols-2 lg:grid-cols-3">
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} className="h-64 w-full rounded-xl" />
+              ))}
+            </div>
+          }
+          endMessage={
+            <p className="pt-6 text-center text-xs text-muted-foreground">
+              {items.length} {items.length === 1 ? "shop" : "shops"}
+            </p>
+          }
+        >
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {items.map((a) => (
+              <AccountCard
+                key={a.id}
+                account={a}
+                onEdit={() => setEditTarget(a)}
+                onApprove={() =>
+                  run(() => approve(a.id).unwrap(), "Shop approved.")
+                }
+                onReject={() => setRejectTarget(a)}
+                onSuspend={() =>
+                  run(() => suspend({ id: a.id }).unwrap(), "Shop suspended.")
+                }
+                onReactivate={() =>
+                  run(() => reactivate(a.id).unwrap(), "Shop reactivated.")
+                }
+                onViewSubscription={() =>
+                  navigate(`/subscriptions?accountId=${a.id}`)
+                }
+                onViewBranches={() => setBranchesTarget(a)}
+              />
+            ))}
+          </div>
+        </InfiniteScroll>
       )}
-
-      {/* Pagination */}
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground">
-          {meta ? `${meta.total} ${meta.total === 1 ? "shop" : "shops"}` : ""}
-          {isFetching && !isLoading ? " · updating…" : ""}
-        </p>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-          >
-            Previous
-          </Button>
-          <span className="text-sm tabular-nums text-muted-foreground">
-            Page {page} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Next
-          </Button>
-        </div>
-      </div>
 
       {/* Reject reason dialog */}
       <Dialog
@@ -296,6 +277,13 @@ export function AccountsPage() {
         open={!!editTarget}
         onOpenChange={(o) => !o && setEditTarget(null)}
         account={editTarget}
+      />
+
+      <AccountBranchesSheet
+        open={!!branchesTarget}
+        onOpenChange={(o) => !o && setBranchesTarget(null)}
+        accountId={branchesTarget?.id ?? ""}
+        accountName={branchesTarget?.name ?? ""}
       />
     </>
   );

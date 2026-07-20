@@ -28,6 +28,7 @@ interface Props {
   onSuspend: () => void;
   onReactivate: () => void;
   onViewSubscription: () => void;
+  onViewBranches: () => void;
 }
 
 export function AccountCard({
@@ -38,29 +39,32 @@ export function AccountCard({
   onSuspend,
   onReactivate,
   onViewSubscription,
+  onViewBranches,
 }: Props) {
   // limit: 1 keeps the request cheap — only meta.total is used here.
   const { data: shops } = useListShopsQuery({ accountId: a.id, page: 1, limit: 1 });
   const branchCount = shops?.meta.total ?? 0;
 
   return (
-    <div className="group relative flex overflow-hidden rounded-lg border bg-background transition-colors hover:bg-muted/30">
-      {/* Left: banner image, fading rightward into the card, with logo + name pinned bottom-left. */}
-      <div className="relative h-auto w-40 shrink-0 overflow-hidden bg-muted sm:w-56">
+    <div className="group relative flex h-full flex-col overflow-hidden rounded-xl border bg-background text-left shadow-sm transition-shadow hover:shadow-md">
+      {/* Banner image on top, with logo + name pinned bottom-left and status top-left. */}
+      <div className="relative aspect-video w-full shrink-0 overflow-hidden bg-muted">
         {a.bannerUrl ? (
           <img
             src={a.bannerUrl}
             alt=""
-            className="absolute inset-0 h-full w-full object-cover"
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/15 to-primary/5">
             <Store className="h-8 w-8 text-primary/40" />
           </div>
         )}
-        {/* Fades the image into the card background toward the right. */}
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-background" />
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2.5 pt-8">
+        <div className="absolute left-2 top-2">
+          <AccountStatusBadge status={a.status} />
+        </div>
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2.5 pt-10">
           <div className="flex items-center gap-2">
             {a.logoUrl ? (
               <img
@@ -80,34 +84,42 @@ export function AccountCard({
         </div>
       </div>
 
-      {/* Right: everything else. */}
-      <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-4 pr-12 sm:flex-row sm:items-center sm:gap-4">
-        <div className="min-w-0 sm:w-1/4">
+      {/* Body: owner, slug, branch count, created date. */}
+      <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-4">
+        <div className="min-w-0 pr-8">
           <div className="truncate text-sm font-medium">{a.ownerName}</div>
           <div className="truncate text-xs text-muted-foreground">{a.ownerEmail}</div>
         </div>
-        <div className="min-w-0 sm:w-1/6">
-          <code className="truncate rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
-            /{a.appSlug}
-          </code>
+        <code className="w-fit max-w-full truncate rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
+          /{a.appSlug}
+        </code>
+        <div className="flex items-center justify-between pt-1 text-xs text-muted-foreground">
+          <span>
+            <span className="font-medium text-foreground">{branchCount}</span>{" "}
+            {branchCount === 1 ? "branch" : "branches"}
+          </span>
+          <span>{formatDate(a.createdAt)}</span>
         </div>
-        <div className="sm:w-24">
-          <AccountStatusBadge status={a.status} />
-        </div>
-        <div className="text-xs text-muted-foreground sm:w-28">
-          <span className="font-medium text-foreground">{branchCount}</span>{" "}
-          {branchCount === 1 ? "branch" : "branches"}
-        </div>
-        <div className="text-xs text-muted-foreground sm:w-24">
-          {formatDate(a.createdAt)}
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-auto w-full"
+          onClick={onViewBranches}
+        >
+          <Store className="mr-1.5 h-4 w-4" />
+          View branches
+        </Button>
       </div>
 
-      {/* Sits above the row so opening the menu doesn't trigger any parent click handler. */}
-      <div className="absolute right-3 top-3">
+      <div className="absolute right-2 top-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label={`Actions for ${a.name}`}>
+            <Button
+              variant="secondary"
+              size="icon"
+              className="h-7 w-7 bg-background/80 backdrop-blur"
+              aria-label={`Actions for ${a.name}`}
+            >
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
