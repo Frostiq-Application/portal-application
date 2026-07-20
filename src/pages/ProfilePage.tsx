@@ -1,12 +1,16 @@
+import { useState } from "react";
 import {
   Building2,
   Mail,
+  Pencil,
   Phone,
   ShieldCheck,
   Store,
   User as UserIcon,
 } from "lucide-react";
 import { useMeQuery } from "@/features/api/authApi";
+import { EditMyBrandDialog } from "@/components/accounts/EditMyBrandDialog";
+import { Button } from "@/components/ui/button";
 import { useMyAccountQuery } from "@/features/api/accountsApi";
 import { useListPlansQuery } from "@/features/api/plansApi";
 import { useAuth } from "@/hooks/useAuth";
@@ -67,11 +71,21 @@ export function ProfilePage() {
     account?.currentPlanId &&
     plans?.data.find((p) => p.id === account.currentPlanId)?.name;
 
+  const [editOpen, setEditOpen] = useState(false);
+
   return (
     <>
       <PageHeader
         title="Profile"
         description="Your account details and onboarding information"
+        actions={
+          isAccountAdmin && account ? (
+            <Button variant="outline" onClick={() => setEditOpen(true)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit profile
+            </Button>
+          ) : undefined
+        }
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -200,6 +214,12 @@ export function ProfilePage() {
           </Card>
         )}
       </div>
+
+      <EditMyBrandDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        account={account ?? null}
+      />
     </>
   );
 }

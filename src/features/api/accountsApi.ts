@@ -86,6 +86,15 @@ export const accountsApi = baseApi.injectEndpoints({
       ],
     }),
 
+    // Self-service edit for the signed-in Shop Owner (no plan change).
+    updateMyAccount: build.mutation<Account, Omit<UpdateAccountBody, "currentPlanId">>({
+      query: (body) => ({ url: "/accounts/me", method: "PATCH", body }),
+      invalidatesTags: [
+        { type: "Account", id: "ME" },
+        { type: "Account", id: "LIST" },
+      ],
+    }),
+
     approveAccount: build.mutation<Account, string>({
       query: (id) => ({ url: `/accounts/${id}/approve`, method: "POST" }),
       invalidatesTags: (_r, _e, id) => [
@@ -135,6 +144,7 @@ export const {
   useMyAccountQuery,
   useCreateAccountMutation,
   useUpdateAccountMutation,
+  useUpdateMyAccountMutation,
   useApproveAccountMutation,
   useRejectAccountMutation,
   useSuspendAccountMutation,
