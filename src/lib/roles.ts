@@ -2,8 +2,8 @@ import type { AccountStatus, Role, ShopStatus } from "@/types";
 
 export const ROLE_LABELS: Record<Role, string> = {
   platform_super_admin: "Platform Super Admin",
-  account_super_admin: "Account Admin",
-  shop_admin: "Shop Admin",
+  account_super_admin: "Shop Owner",
+  shop_admin: "Branch Owner",
 };
 
 export function roleLabel(role?: Role): string {

@@ -5,7 +5,7 @@ import { useCreateUserMutation, type CreateUserBody } from "@/features/api/users
 import { useListAccountsQuery } from "@/features/api/accountsApi";
 import { useListShopsQuery } from "@/features/api/shopsApi";
 import { useAuth } from "@/hooks/useAuth";
-import { isPlatformAdmin } from "@/lib/roles";
+import { isPlatformAdmin, roleLabel } from "@/lib/roles";
 import { apiError } from "@/lib/apiError";
 import type { Role } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -138,7 +138,7 @@ export function InviteUserDialog() {
                     <SelectContent>
                       {roleOptions.map((r) => (
                         <SelectItem key={r} value={r}>
-                          {r.replace(/_/g, " ")}
+                          {roleLabel(r)}
                         </SelectItem>
                       ))}
                     </SelectContent>
