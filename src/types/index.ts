@@ -318,6 +318,8 @@ export type OrderPaymentStatus = "pending" | "paid";
 export interface OrderItemAddon {
   name: string;
   price: string;
+  /** Add-on photo (current catalog image; null if the add-on was removed). */
+  imageUrl: string | null;
 }
 
 export interface OrderItem {
@@ -328,6 +330,8 @@ export interface OrderItem {
   quantity: number;
   unitPrice: string;
   lineTotal: string;
+  /** Product photo (current catalog image; null if the product was removed). */
+  imageUrl: string | null;
   addons: OrderItemAddon[];
 }
 
@@ -373,6 +377,19 @@ export interface OrderEvent {
   type: "created" | "status" | "payment" | "cancelled";
   status: OrderStatus;
   paymentStatus: OrderPaymentStatus;
+  at: string;
+}
+
+/** One custom-cake-request change pushed over the realtime SSE stream. */
+export interface CustomCakeStreamEvent {
+  accountId: string;
+  shopId: string;
+  customerId: string | null;
+  guestId: string | null;
+  requestId: string;
+  requestNumber: string;
+  type: "created" | "status" | "quote" | "converted";
+  status: string;
   at: string;
 }
 

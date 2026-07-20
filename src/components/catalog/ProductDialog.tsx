@@ -104,6 +104,7 @@ export function ProductDialog({ open, onOpenChange, shopId, product }: Props) {
 
   const submit = async () => {
     if (name.trim().length < 1) return toast.error("Name is required");
+    if (categoryId === "none") return toast.error("Category is required");
     const cleanVariants = variants
       .filter((v) => v.label.trim())
       .map((v) => ({ ...v, label: v.label.trim(), price: Number(v.price) || 0 }));
@@ -113,7 +114,7 @@ export function ProductDialog({ open, onOpenChange, shopId, product }: Props) {
       productType,
       name: name.trim(),
       description: description.trim() || undefined,
-      categoryId: categoryId === "none" ? undefined : categoryId,
+      categoryId,
       images,
       isEggless,
       isFeatured,
@@ -161,11 +162,12 @@ export function ProductDialog({ open, onOpenChange, shopId, product }: Props) {
             </Select>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label>Category</Label>
+            <Label>
+              Category <span className="text-destructive">*</span>
+            </Label>
             <Select value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">None</SelectItem>
                 {(categories?.data ?? []).map((c) => (
                   <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}

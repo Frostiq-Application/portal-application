@@ -12,6 +12,8 @@ import {
 import { toast } from "sonner";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useEntitlements } from "@/hooks/useEntitlements";
+import { useAuth } from "@/hooks/useAuth";
+import { isPlatformAdmin } from "@/lib/roles";
 import { apiError } from "@/lib/apiError";
 import {
   useListUsersQuery,
@@ -38,8 +40,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-/** Roles surfaced as tabs on this page (Branch Owners are managed elsewhere). */
-const TAB_ROLES: Role[] = ["platform_super_admin", "account_super_admin"];
+/**
+ * Which roles get a tab depends on who's viewing:
+ *  - Platform Super Admin manages platform admins + Shop Owners.
+ *  - Shop Owner manages their own Branch Owners (never platform admins).
+ */
+const PLATFORM_TAB_ROLES: Role[] = ["platform_super_admin", "account_super_admin"];
+const OWNER_TAB_ROLES: Role[] = ["shop_admin"];
 const ROLE_ICON: Record<Role, typeof UserCog> = {
   platform_super_admin: UserCog,
   account_super_admin: Store,
@@ -56,6 +63,10 @@ function initials(name: string): string {
 }
 
 export function UsersPage() {
+  const { role } = useAuth();
+  const isPlatform = isPlatformAdmin(role);
+  const tabRoles = isPlatform ? PLATFORM_TAB_ROLES : OWNER_TAB_ROLES;
+
   const [search, setSearch] = useState("");
   const debounced = useDebouncedValue(search, 350);
   const { data, isLoading } = useListUsersQuery({
@@ -76,14 +87,14 @@ export function UsersPage() {
 
   const membersByRole = useMemo(() => {
     const rows = data?.data ?? [];
-    return TAB_ROLES.reduce(
-      (acc, role) => {
-        acc[role] = rows.filter((u) => u.role === role);
+    return tabRoles.reduce(
+      (acc, r) => {
+        acc[r] = rows.filter((u) => u.role === r);
         return acc;
       },
       {} as Record<Role, User[]>,
     );
-  }, [data]);
+  }, [data, tabRoles]);
 
   const toggleActive = async (id: string, isActive: boolean) => {
     try {
@@ -118,7 +129,11 @@ export function UsersPage() {
     <>
       <PageHeader
         title="Team"
-        description="Admin members, roles & branch assignments"
+        description={
+          isPlatform
+            ? "Admin members, roles & branch assignments"
+            : "Your branch owners & their branch assignments"
+        }
         actions={
           <div className="flex items-center gap-3">
             {seatCap != null && (
@@ -165,33 +180,33 @@ export function UsersPage() {
           ))}
         </div>
       ) : (
-        <Tabs defaultValue={TAB_ROLES[0]}>
+        <Tabs defaultValue={tabRoles[0]}>
           <TabsList>
-            {TAB_ROLES.map((role) => {
-              const RoleIcon = ROLE_ICON[role];
+            {tabRoles.map((r) => {
+              const RoleIcon = ROLE_ICON[r];
               return (
-                <TabsTrigger key={role} value={role} className="gap-1.5">
+                <TabsTrigger key={r} value={r} className="gap-1.5">
                   <RoleIcon className="h-4 w-4" />
-                  {roleLabel(role)}
+                  {roleLabel(r)}
                   <span className="rounded-full bg-muted px-1.5 text-xs font-medium tabular-nums">
-                    {membersByRole[role].length}
+                    {membersByRole[r].length}
                   </span>
                 </TabsTrigger>
               );
             })}
           </TabsList>
 
-          {TAB_ROLES.map((role) => {
-            const members = membersByRole[role];
+          {tabRoles.map((r) => {
+            const members = membersByRole[r];
             return (
-              <TabsContent key={role} value={role} className="mt-5">
+              <TabsContent key={r} value={r} className="mt-5">
                 {members.length === 0 ? (
                   <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-background py-20 text-center">
                     <UsersIcon className="mb-3 h-8 w-8 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
                       {search
                         ? "No members match your search."
-                        : `No ${roleLabel(role).toLowerCase()}s yet.`}
+                        : `No ${roleLabel(r).toLowerCase()}s yet.`}
                     </p>
                   </div>
                 ) : (
@@ -237,8 +252,9 @@ function MemberCard({
   onToggleActive: () => void;
 }) {
   const isShopAdmin = user.role === "shop_admin";
-  // Activation is only managed for platform super admins here.
-  const canToggleActive = user.role === "platform_super_admin";
+  // Platform admins toggle each other; Shop Owners toggle their Branch Owners.
+  const canToggleActive =
+    user.role === "platform_super_admin" || user.role === "shop_admin";
   return (
     <div
       className={cn(

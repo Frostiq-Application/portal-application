@@ -4,7 +4,7 @@ import { cn, formatDate } from "@/lib/utils";
 import { ORDER_STATUS_LABEL, ORDER_STATUS_TONE } from "@/lib/orders";
 import { useGetCustomerQuery } from "@/features/api/customersApi";
 import type { CustomerOrderSummary, OrderStatus } from "@/types";
-import { OrderDetailDialog } from "@/components/orders/OrderDetailDialog";
+import { OrderDetailDrawer } from "@/components/orders/OrderDetailDrawer";
 import {
   Sheet,
   SheetContent,
@@ -151,7 +151,7 @@ export function CustomerDetailSheet({ customerId, onOpenChange }: Props) {
         </SheetContent>
       </Sheet>
 
-      <OrderDetailDialog
+      <OrderDetailDrawer
         orderId={openOrderId}
         onOpenChange={(open) => !open && setOpenOrderId(null)}
       />

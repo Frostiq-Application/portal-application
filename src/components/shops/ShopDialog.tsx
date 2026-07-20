@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { Clock, Loader2 } from "lucide-react";
+import { Clock, Copy, Loader2, Mail, Store, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
   useCreateShopMutation,
   useUpdateShopMutation,
   type CreateShopBody,
 } from "@/features/api/shopsApi";
+import {
+  useCreateUserMutation,
+  useResetUserPasswordMutation,
+} from "@/features/api/usersApi";
 import { useListAccountsQuery } from "@/features/api/accountsApi";
 import { useAuth } from "@/hooks/useAuth";
 import { isPlatformAdmin } from "@/lib/roles";
@@ -25,14 +29,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 const WEEKDAYS = [
   "sunday",
@@ -86,6 +91,18 @@ export function ShopDialog({
   );
   const [createShop, { isLoading: creating }] = useCreateShopMutation();
   const [updateShop, { isLoading: updating }] = useUpdateShopMutation();
+  const [createUser, { isLoading: invitingOwner }] = useCreateUserMutation();
+  const [resetPassword, { isLoading: resetting }] = useResetUserPasswordMutation();
+
+  // Shop Owners can hand a brand-new branch straight to a Branch Owner. Platform
+  // admins keep the lean flow (they invite staff from the Team page instead).
+  const canAddOwner = !isEdit && !platform;
+  const [tab, setTab] = useState<"branch" | "owner">("branch");
+  const [ownerName, setOwnerName] = useState("");
+  const [ownerEmail, setOwnerEmail] = useState("");
+  const [ownerPhone, setOwnerPhone] = useState("");
+  /** Reset-password token minted after the owner is created — shows the link screen. */
+  const [resetToken, setResetToken] = useState<string | null>(null);
 
   const [accountId, setAccountId] = useState("");
   const [branchName, setBranchName] = useState("");
@@ -115,6 +132,11 @@ export function ShopDialog({
       setClosingTime(shop?.closingTime?.slice(0, 5) ?? "");
       setClosedDays(shop?.closedDays ?? []);
       setSlugTouched(false);
+      setTab("branch");
+      setOwnerName("");
+      setOwnerEmail("");
+      setOwnerPhone("");
+      setResetToken(null);
     }
   }, [open, shop, defaultAccountId]);
 
@@ -143,10 +165,29 @@ export function ShopDialog({
     [openingTime, closingTime],
   );
 
+  // The associated user is optional: a branch owner is invited only when their
+  // details are supplied. Any filled field opts in and makes name + email required.
+  const ownerRequested =
+    canAddOwner &&
+    Boolean(ownerName.trim() || ownerEmail.trim() || ownerPhone.trim());
+
   const submit = async () => {
-    if (branchName.trim().length < 2) return toast.error("Branch name required");
-    if (!isEdit && !slug.trim()) return toast.error("Slug required");
-    if (hoursInvalid) return toast.error("Closing time must be after opening time");
+    if (branchName.trim().length < 2) {
+      setTab("branch");
+      return toast.error("Branch name required");
+    }
+    if (!isEdit && !slug.trim()) {
+      setTab("branch");
+      return toast.error("Slug required");
+    }
+    if (hoursInvalid) {
+      setTab("branch");
+      return toast.error("Closing time must be after opening time");
+    }
+    if (ownerRequested && (ownerName.trim().length < 2 || !ownerEmail.trim())) {
+      setTab("owner");
+      return toast.error("Branch owner needs a name and email");
+    }
     const body: CreateShopBody = {
       branchName: branchName.trim(),
       slug: slug.trim(),
@@ -166,11 +207,34 @@ export function ShopDialog({
         await updateShop({ id: shop.id, body: rest }).unwrap();
         toast.success("Branch updated");
       } else {
-        await createShop({
+        const created = await createShop({
           ...body,
           ...(platform && accountId ? { accountId } : {}),
         }).unwrap();
         toast.success("Branch created");
+
+        // Optionally hand the fresh branch to a Branch Owner. The branch is
+        // already saved, so if the invite fails we keep the drawer's owner
+        // fields and surface the error rather than losing the branch.
+        if (ownerRequested) {
+          try {
+            const owner = await createUser({
+              name: ownerName.trim(),
+              email: ownerEmail.trim(),
+              phone: ownerPhone.trim() || undefined,
+              role: "shop_admin",
+              shopIds: [created.id],
+            }).unwrap();
+            // Mint a reset-password link the owner uses to set their password.
+            const res = await resetPassword(owner.id).unwrap();
+            setResetToken(res.resetToken);
+            toast.success("Branch owner created");
+            return; // Stay open to show the reset-password link.
+          } catch (err) {
+            toast.error(apiError(err, "Branch saved, but the owner invite failed"));
+            return;
+          }
+        }
       }
       onOpenChange(false);
     } catch (err) {
@@ -178,21 +242,42 @@ export function ShopDialog({
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>
-            {isEdit ? "Edit branch" : "New branch"}
-            {scopedShopName && (
-              <span className="text-muted-foreground"> · {scopedShopName}</span>
-            )}
-          </DialogTitle>
-          <DialogDescription>Branch details, hours, and closed days.</DialogDescription>
-        </DialogHeader>
+  if (resetToken) {
+    const link = `${window.location.origin}/set-password?token=${resetToken}`;
+    return (
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent className="flex w-full flex-col sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Branch created · owner added</SheetTitle>
+            <SheetDescription>
+              Share this reset-password link (valid 7 days). {ownerName || "The owner"} will
+              choose their own password before signing in.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex items-center gap-2 py-4">
+            <Input readOnly value={link} className="font-mono text-xs" />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => {
+                navigator.clipboard?.writeText(link);
+                toast.success("Copied");
+              }}
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+          </div>
+          <SheetFooter className="mt-auto">
+            <Button onClick={() => onOpenChange(false)}>Done</Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    );
+  }
 
-        <div className="grid gap-4 py-2 sm:grid-cols-2">
-          {/* Only offer the picker when the shop isn't already implied by context. */}
+  const branchFields = (
+    <div className="grid gap-4 py-2 sm:grid-cols-2">
+      {/* Only offer the picker when the shop isn't already implied by context. */}
           {needsAccountPicker && (
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <Label>Shop</Label>
@@ -355,16 +440,103 @@ export function ShopDialog({
             </p>
           </div>
         </div>
+  );
 
-        <DialogFooter>
+  const ownerFields = (
+    <div className="grid gap-3 py-2 sm:grid-cols-2">
+      <p className="text-sm text-muted-foreground sm:col-span-2">
+        Invite someone to manage this branch. They&rsquo;ll receive a link to set
+        their password after the branch is created. Leave blank to add an owner
+        later from the Team page.
+      </p>
+      <div className="flex flex-col gap-1.5">
+        <Label>Owner name <span className="text-destructive">*</span></Label>
+        <div className="relative">
+          <UserIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            value={ownerName}
+            onChange={(e) => setOwnerName(e.target.value)}
+            placeholder="Full name"
+          />
+        </div>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label>Owner email <span className="text-destructive">*</span></Label>
+        <div className="relative">
+          <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="email"
+            className="pl-9"
+            value={ownerEmail}
+            onChange={(e) => setOwnerEmail(e.target.value)}
+            placeholder="owner@example.com"
+          />
+        </div>
+      </div>
+      <div className="flex flex-col gap-1.5 sm:col-span-2">
+        <Label>Owner phone</Label>
+        <PhoneInput
+          defaultCountry="IN"
+          placeholder="Enter phone number"
+          value={ownerPhone}
+          onChange={(v) => setOwnerPhone(v ?? "")}
+        />
+      </div>
+    </div>
+  );
+
+  const saving = creating || updating || invitingOwner || resetting;
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
+        <SheetHeader className="space-y-1 border-b p-6 pr-14">
+          <SheetTitle>
+            {isEdit ? "Edit branch" : "New branch"}
+            {scopedShopName && (
+              <span className="text-muted-foreground"> · {scopedShopName}</span>
+            )}
+          </SheetTitle>
+          <SheetDescription>
+            {canAddOwner
+              ? "Branch details, hours, and an optional owner to invite."
+              : "Branch details, hours, and closed days."}
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Shop Owners split the form into Branch Details + Associated User; the
+              lean platform/edit flow shows the branch fields on their own. */}
+          {canAddOwner ? (
+            <Tabs value={tab} onValueChange={(v) => setTab(v as "branch" | "owner")}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="branch">
+                  <Store className="mr-2 h-4 w-4" />
+                  Branch Details
+                </TabsTrigger>
+                <TabsTrigger value="owner">
+                  <UserIcon className="mr-2 h-4 w-4" />
+                  Associated User details
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="branch">{branchFields}</TabsContent>
+              <TabsContent value="owner">{ownerFields}</TabsContent>
+            </Tabs>
+          ) : (
+            branchFields
+          )}
+        </div>
+
+        <SheetFooter className="border-t p-6">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={submit} disabled={creating || updating || hoursInvalid}>
-            {(creating || updating) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isEdit ? "Save" : "Create"}
+          <Button onClick={submit} disabled={saving || hoursInvalid}>
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isEdit ? "Save" : ownerRequested ? "Create & invite" : "Create"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
