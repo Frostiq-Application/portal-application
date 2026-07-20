@@ -15,6 +15,8 @@ import { logout } from "@/features/auth/authSlice";
 import { toggleTheme } from "@/features/ui/uiSlice";
 import { useAuth } from "@/hooks/useAuth";
 import { useEntitlements } from "@/hooks/useEntitlements";
+import { selectHasUnseenOrders } from "@/features/notifications/notificationsSlice";
+import { OrderNotifications } from "@/components/orders/OrderNotifications";
 import { AccountDeactivatedGate } from "@/components/gating/AccountDeactivatedGate";
 import { NoSubscriptionGate } from "@/components/gating/NoSubscriptionGate";
 import { navForRole, type NavItem } from "@/config/nav";
@@ -46,6 +48,7 @@ const GROUP_ORDER: NavItem["group"][] = [
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const { role } = useAuth();
   const { hasFeature } = useEntitlements();
+  const hasUnseenOrders = useAppSelector(selectHasUnseenOrders);
   const items = navForRole(role).filter(
     (i) => !i.feature || hasFeature(i.feature),
   );
@@ -95,6 +98,12 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                   >
                     <Icon className="h-4 w-4" />
                     {item.label}
+                    {item.path === "/orders" && hasUnseenOrders && (
+                      <span
+                        className="ml-auto h-2 w-2 shrink-0 rounded-full bg-red-500"
+                        title="New orders"
+                      />
+                    )}
                   </NavLink>
                 );
               })}
@@ -213,6 +222,9 @@ export function AppLayout() {
 
   return (
     <div className="flex min-h-screen bg-muted/30">
+      {/* App-wide order alerts: one SSE connection, bell + toast + sidebar dot. */}
+      <OrderNotifications />
+
       {/* Desktop sidebar */}
       <aside className="hidden w-64 shrink-0 border-r bg-background lg:block">
         <div className="sticky top-0 flex h-screen flex-col overflow-y-auto">

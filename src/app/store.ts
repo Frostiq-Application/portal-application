@@ -3,6 +3,7 @@ import { baseApi } from "@/features/api/baseApi";
 import authReducer from "@/features/auth/authSlice";
 import uiReducer from "@/features/ui/uiSlice";
 import branchReducer from "@/features/branch/branchSlice";
+import notificationsReducer from "@/features/notifications/notificationsSlice";
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
     auth: authReducer,
     ui: uiReducer,
     branch: branchReducer,
+    notifications: notificationsReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(baseApi.middleware),
