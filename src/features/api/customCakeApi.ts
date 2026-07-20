@@ -79,6 +79,7 @@ export interface CustomCakeListResponse {
 export interface CustomCakeQuery {
   shopId?: string;
   status?: CustomCakeStatus;
+  search?: string;
   page?: number;
   limit?: number;
 }
@@ -93,6 +94,7 @@ export const customCakeApi = baseApi.injectEndpoints({
           limit: params?.limit ?? 20,
           ...(params?.shopId ? { shopId: params.shopId } : {}),
           ...(params?.status ? { status: params.status } : {}),
+          ...(params?.search ? { search: params.search } : {}),
         },
       }),
       providesTags: [{ type: "CustomCake", id: "LIST" }],

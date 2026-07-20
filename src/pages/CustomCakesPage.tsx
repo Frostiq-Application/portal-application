@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CakeSlice, Settings2 } from "lucide-react";
+import { CakeSlice, Search, Settings2 } from "lucide-react";
 import { useAppSelector } from "@/app/hooks";
 import {
   ALL_BRANCHES,
@@ -16,8 +16,10 @@ import { ShopSelect } from "@/components/ShopSelect";
 import { SegmentedStrip, type SegmentedItem } from "@/components/SegmentedStrip";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/lib/utils";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { CustomCakeDetailSheet } from "@/components/custom-cake/CustomCakeDetailSheet";
 import { CustomCakeOptionsDialog } from "@/components/custom-cake/CustomCakeOptionsDialog";
 import { CustomCakeIntro } from "@/components/custom-cake/CustomCakeIntro";
@@ -42,6 +44,8 @@ export function CustomCakesPage() {
   const branchId = useAppSelector(selectSelectedBranchId);
   const shopId = branchId === ALL_BRANCHES ? "" : branchId;
   const [status, setStatus] = useState<StatusFilter>("all");
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 350);
   const [selected, setSelected] = useState<CustomCakeRequest | null>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [introOpen, setIntroOpen] = useState(
@@ -50,8 +54,17 @@ export function CustomCakesPage() {
 
   const { data, isLoading, isFetching } = useListCustomCakesQuery(
     shopId
-      ? { shopId, status: status === "all" ? undefined : status, limit: 100 }
-      : { status: status === "all" ? undefined : status, limit: 100 },
+      ? {
+          shopId,
+          status: status === "all" ? undefined : status,
+          search: debouncedSearch || undefined,
+          limit: 100,
+        }
+      : {
+          status: status === "all" ? undefined : status,
+          search: debouncedSearch || undefined,
+          limit: 100,
+        },
     { skip: !shopId },
   );
 
@@ -105,6 +118,16 @@ export function CustomCakesPage() {
         </Card>
       ) : (
         <>
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-9"
+              placeholder="Search request number…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
           <SegmentedStrip
             value={status}
             items={statusItems}
@@ -121,7 +144,9 @@ export function CustomCakesPage() {
             <Card className="flex flex-col items-center gap-2 p-10 text-center">
               <CakeSlice className="h-8 w-8 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                No custom cake requests {status === "all" ? "yet" : "in this status"}.
+                {debouncedSearch
+                  ? "No custom cake requests match your search."
+                  : `No custom cake requests ${status === "all" ? "yet" : "in this status"}.`}
               </p>
             </Card>
           ) : (
