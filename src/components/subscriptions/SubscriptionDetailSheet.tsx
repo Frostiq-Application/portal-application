@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { CreditCard, Receipt, XCircle } from "lucide-react";
+import { ArrowLeftRight, CreditCard, Receipt, XCircle } from "lucide-react";
 import { formatDate, cn } from "@/lib/utils";
 import {
   BILLING_CYCLE_LABEL,
@@ -28,6 +28,7 @@ interface Props {
   planName: string;
   onOpenChange: (open: boolean) => void;
   onRecordPayment: (s: Subscription) => void;
+  onChangePlan: (s: Subscription) => void;
   onCancel: (s: Subscription) => void;
 }
 
@@ -50,6 +51,7 @@ export function SubscriptionDetailSheet({
   planName,
   onOpenChange,
   onRecordPayment,
+  onChangePlan,
   onCancel,
 }: Props) {
   const { data: payments, isLoading: paymentsLoading } =
@@ -112,6 +114,16 @@ export function SubscriptionDetailSheet({
                   <CreditCard className="mr-2 h-4 w-4" />
                   Record payment
                 </Button>
+                {s.status !== "cancelled" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onChangePlan(s)}
+                  >
+                    <ArrowLeftRight className="mr-2 h-4 w-4" />
+                    Change plan
+                  </Button>
+                )}
                 {s.status !== "cancelled" && (
                   <Button
                     size="sm"

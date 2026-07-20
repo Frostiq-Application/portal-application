@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
+  ArrowLeftRight,
   CreditCard,
   MoreHorizontal,
   Receipt,
@@ -30,6 +31,7 @@ import {
 import { useListPlansQuery } from "@/features/api/plansApi";
 import type { Account, Subscription, SubscriptionStatus } from "@/types";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { ChangePlanDialog } from "@/components/subscriptions/ChangePlanDialog";
 import { CreateSubscriptionDialog } from "@/components/subscriptions/CreateSubscriptionDialog";
 import { MarkPaidDialog } from "@/components/subscriptions/MarkPaidDialog";
 import { RenewalAlerts } from "@/components/subscriptions/RenewalAlerts";
@@ -132,6 +134,9 @@ export function SubscriptionsPage() {
   const [payTarget, setPayTarget] = useState<Subscription | null>(null);
   const [detailTarget, setDetailTarget] = useState<Subscription | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Subscription | null>(null);
+  const [changePlanTarget, setChangePlanTarget] = useState<Subscription | null>(
+    null,
+  );
 
   const accountName = useMemo(() => {
     const m = new Map((accounts?.data ?? []).map((a) => [a.id, a.name]));
@@ -407,6 +412,14 @@ export function SubscriptionsPage() {
                           </DropdownMenuItem>
                           {s.status !== "cancelled" && (
                             <DropdownMenuItem
+                              onClick={() => setChangePlanTarget(s)}
+                            >
+                              <ArrowLeftRight className="mr-2 h-4 w-4" />
+                              Change plan
+                            </DropdownMenuItem>
+                          )}
+                          {s.status !== "cancelled" && (
+                            <DropdownMenuItem
                               className="text-destructive"
                               onClick={() => setCancelTarget(s)}
                             >
@@ -431,7 +444,22 @@ export function SubscriptionsPage() {
         planName={detailTarget ? planName(detailTarget.planId) : ""}
         onOpenChange={(o) => !o && setDetailTarget(null)}
         onRecordPayment={setPayTarget}
+        onChangePlan={setChangePlanTarget}
         onCancel={setCancelTarget}
+      />
+
+      <ChangePlanDialog
+        subscription={changePlanTarget}
+        accountName={
+          changePlanTarget ? accountName(changePlanTarget.accountId) : ""
+        }
+        currentPlanName={
+          changePlanTarget ? planName(changePlanTarget.planId) : ""
+        }
+        onOpenChange={(o) => !o && setChangePlanTarget(null)}
+        onSuccess={(s) =>
+          setDetailTarget((d) => (d?.id === s.id ? s : d))
+        }
       />
 
       <MarkPaidDialog
