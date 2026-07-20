@@ -3,23 +3,22 @@ import {
   Ban,
   CheckCircle2,
   ChefHat,
+  Eye,
   Inbox,
   Loader2,
   PackageCheck,
   Plus,
   Search,
   Truck,
-  Wifi,
-  WifiOff,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { formatDate, cn } from "@/lib/utils";
 import { apiError } from "@/lib/apiError";
+import { LiveIndicator } from "@/components/LiveIndicator";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useEntitlements } from "@/hooks/useEntitlements";
-import { useOrderStream } from "@/hooks/useOrderStream";
 import {
   CANCELLABLE,
   NEXT_STATUSES,
@@ -28,7 +27,6 @@ import {
   ORDER_STATUS_TONE,
 } from "@/lib/orders";
 import {
-  ordersApi,
   useCancelOrderMutation,
   useGetOrderStatusCountsQuery,
   useListOrdersQuery,
@@ -38,19 +36,19 @@ import {
 import type {
   DeliveryType,
   Order,
-  OrderEvent,
   OrderPaymentStatus,
   OrderStatus,
 } from "@/types";
-import { useAppDispatch, useAppSelector } from "@/app/hooks";
+import { useAppSelector } from "@/app/hooks";
 import {
   ALL_BRANCHES,
   selectSelectedBranchId,
 } from "@/features/branch/branchSlice";
+import { selectStreamStatus } from "@/features/notifications/notificationsSlice";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ShopSelect } from "@/components/ShopSelect";
 import { SegmentedStrip } from "@/components/SegmentedStrip";
-import { OrderDetailDialog } from "@/components/orders/OrderDetailDialog";
+import { OrderDetailDrawer } from "@/components/orders/OrderDetailDrawer";
 import { CreateOrderDialog } from "@/components/orders/CreateOrderDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -128,59 +126,6 @@ const STATUS_ICON: Record<OrderStatus, LucideIcon> = {
   delivered: CheckCircle2,
   cancelled: Ban,
 };
-
-/** Small live/offline pill reflecting the SSE connection state. */
-function LiveIndicator({
-  status,
-}: {
-  status: "connecting" | "open" | "closed";
-}) {
-  const map = {
-    open: {
-      Icon: Wifi,
-      label: "Live",
-      cls: "text-emerald-600 dark:text-emerald-400",
-      dot: "bg-emerald-500",
-      pulse: true,
-    },
-    connecting: {
-      Icon: Wifi,
-      label: "Connecting…",
-      cls: "text-amber-600 dark:text-amber-400",
-      dot: "bg-amber-500",
-      pulse: true,
-    },
-    closed: {
-      Icon: WifiOff,
-      label: "Offline",
-      cls: "text-muted-foreground",
-      dot: "bg-muted-foreground/50",
-      pulse: false,
-    },
-  }[status];
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium",
-        map.cls,
-      )}
-      title={`Realtime updates: ${map.label}`}
-    >
-      <span className="relative flex h-2 w-2">
-        {map.pulse && (
-          <span
-            className={cn(
-              "absolute inline-flex h-full w-full animate-ping rounded-full opacity-75",
-              map.dot,
-            )}
-          />
-        )}
-        <span className={cn("relative inline-flex h-2 w-2 rounded-full", map.dot)} />
-      </span>
-      {map.label}
-    </span>
-  );
-}
 
 /**
  * Inline row action buttons: advance to the next status, decline, mark-paid.
@@ -316,7 +261,6 @@ function OrderRowActions({
 }
 
 export function OrdersPage() {
-  const dispatch = useAppDispatch();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<OrderStatus>("placed");
@@ -342,32 +286,15 @@ export function OrdersPage() {
     scheduledDate: scheduledDate || undefined,
   });
 
-  // Realtime: when a change lands for this brand, refresh the affected order and
-  // the list so every open tab reflects it live. New orders get a toast.
+  // The single order SSE connection lives in <OrderNotifications /> (app shell)
+  // so alerts fire from any screen. Here we only read its live status for the
+  // indicator; cache refreshes are driven centrally by that listener.
   const branchId = shopId && shopId !== ALL_BRANCHES ? shopId : null;
-  const onEvent = useCallback(
-    (e: OrderEvent) => {
-      // If a branch is selected, ignore events for other branches.
-      if (branchId && e.shopId !== branchId) return;
-      dispatch(
-        ordersApi.util.invalidateTags([
-          { type: "Order", id: e.orderId },
-          { type: "Order", id: "LIST" },
-        ]),
-      );
-      if (e.type === "created") {
-        toast.info(`New order ${e.orderNumber}`, {
-          description: "A fresh order just landed in the queue.",
-        });
-      }
-    },
-    [dispatch, branchId],
-  );
   // Realtime order stream is a plan feature (Growth+). Without it we still show
   // orders — just no live updates and no Live indicator.
   const { hasFeature } = useEntitlements();
   const realtimeEnabled = hasFeature("can_use_realtime");
-  const streamStatus = useOrderStream(onEvent, realtimeEnabled);
+  const streamStatus = useAppSelector(selectStreamStatus);
 
   const flash = useCallback((id: string) => {
     setFlashIds((prev) => new Set(prev).add(id));
@@ -613,7 +540,20 @@ export function OrdersPage() {
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <OrderRowActions order={o} onFail={flash} />
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenId(o.id);
+                        }}
+                      >
+                        <Eye className="mr-1 h-3.5 w-3.5" />
+                        See Order Details
+                      </Button>
+                      <OrderRowActions order={o} onFail={flash} />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -649,7 +589,7 @@ export function OrdersPage() {
         </div>
       </div>
 
-      <OrderDetailDialog orderId={openId} onOpenChange={(o) => !o && setOpenId(null)} />
+      <OrderDetailDrawer orderId={openId} onOpenChange={(o) => !o && setOpenId(null)} />
       <CreateOrderDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
