@@ -39,6 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ImagePreviewDialog } from "@/components/custom-cake/ImagePreviewDialog";
 
 const ADVANCEABLE: CustomCakeStatus[] = [
   "submitted",
@@ -76,6 +77,7 @@ function SheetBody({ request }: { request: CustomCakeRequest }) {
   const [notes, setNotes] = useState(request.adminNotes ?? "");
   const [nextStatus, setNextStatus] = useState<CustomCakeStatus>(request.status);
   const [reason, setReason] = useState("");
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   useEffect(() => {
     setPrice(request.quotedPrice ?? "");
@@ -83,6 +85,7 @@ function SheetBody({ request }: { request: CustomCakeRequest }) {
     setNotes(request.adminNotes ?? "");
     setNextStatus(request.status);
     setReason("");
+    setPreviewIndex(null);
   }, [request.id, request.quotedPrice, request.adminNotes, request.status]);
 
   const { data: events } = useGetCustomCakeEventsQuery(request.id);
@@ -175,17 +178,28 @@ function SheetBody({ request }: { request: CustomCakeRequest }) {
       {/* Reference images */}
       {request.referenceImageUrls.length > 0 && (
         <div className="flex gap-2 overflow-x-auto">
-          {request.referenceImageUrls.map((url) => (
-            <a key={url} href={url} target="_blank" rel="noreferrer">
+          {request.referenceImageUrls.map((url, i) => (
+            <button
+              key={url}
+              type="button"
+              onClick={() => setPreviewIndex(i)}
+              className="shrink-0 overflow-hidden rounded-lg transition-opacity hover:opacity-80"
+            >
               <img
                 src={url}
-                alt="Reference"
-                className="h-24 w-24 shrink-0 rounded-lg object-cover"
+                alt={`Reference ${i + 1}`}
+                className="h-24 w-24 object-cover"
               />
-            </a>
+            </button>
           ))}
         </div>
       )}
+      <ImagePreviewDialog
+        urls={request.referenceImageUrls}
+        index={previewIndex}
+        onIndexChange={setPreviewIndex}
+        onOpenChange={(o) => !o && setPreviewIndex(null)}
+      />
 
       {/* Request details */}
       <div className="space-y-3">
