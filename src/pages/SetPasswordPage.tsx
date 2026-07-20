@@ -59,9 +59,17 @@ export function SetPasswordPage() {
   };
 
   return (
-    <div className="grid min-h-svh lg:grid-cols-2">
-      <div className="flex flex-col gap-4 p-6 md:p-10">
-        <div className="flex justify-center gap-2 md:justify-start">
+    <div className="flex min-h-svh flex-col-reverse lg:flex-row-reverse">
+      <div className="relative flex flex-col gap-4 overflow-hidden bg-gradient-to-br from-secondary/50 via-background to-accent/50 p-6 md:p-10 lg:w-1/2">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -left-24 -top-24 size-72 rounded-full bg-primary/20 blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-32 left-1/4 size-80 rounded-full bg-accent/40 blur-3xl"
+        />
+        <div className="relative flex justify-center gap-2 md:justify-start">
           <a href="#" className="flex items-center gap-2 font-medium">
             <div className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <Cake className="size-4" />
@@ -69,14 +77,14 @@ export function SetPasswordPage() {
             Frostique Portal
           </a>
         </div>
-        <div className="flex flex-1 items-center justify-center">
+        <div className="relative flex flex-1 items-center justify-center">
           <div className="w-full max-w-xs">
             {!token ? (
               <div className="flex flex-col items-center gap-2 text-center">
                 <h1 className="text-xl font-bold">Invalid link</h1>
                 <p className="text-balance text-sm text-muted-foreground">
-                  This set-password link is missing its token. Ask your admin
-                  to resend the invite.
+                  This set-password link is missing its token. Ask your admin to
+                  resend the invite.
                 </p>
               </div>
             ) : done ? (
@@ -156,9 +164,9 @@ export function SetPasswordPage() {
           </div>
         </div>
       </div>
-      <div className="relative hidden bg-muted lg:block">
+      <div className="relative hidden bg-muted lg:block lg:w-1/2">
         <img
-          src="/placeholder.svg"
+          src="/placeholder.avif"
           alt="A tiered cake on a stand, decorated with berries and icing"
           className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.85]"
         />
