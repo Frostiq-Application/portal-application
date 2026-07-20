@@ -128,7 +128,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Roles",
     path: "/roles",
     icon: ShieldCheck,
-    roles: ["platform_super_admin", "account_super_admin"],
+    roles: ["platform_super_admin"],
     group: "Brand",
   },
 

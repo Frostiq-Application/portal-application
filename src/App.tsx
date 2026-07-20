@@ -107,6 +107,12 @@ export default function App() {
               }
             >
               <Route path="/users" element={<UsersPage />} />
+            </Route>
+
+            {/* Roles & Permissions — platform super admin only */}
+            <Route
+              element={<ProtectedRoute roles={["platform_super_admin"]} />}
+            >
               <Route path="/roles" element={<RolesPage />} />
             </Route>
 
