@@ -27,6 +27,7 @@ export interface CreatePlanBody {
   maxProductsPerShop?: number | null;
   features?: PlanFeatures;
   isPublic?: boolean;
+  sortOrder?: number;
 }
 
 export const plansApi = baseApi.injectEndpoints({

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, MoreHorizontal, X } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -8,19 +8,13 @@ import {
   useUnarchivePlanMutation,
 } from "@/features/api/plansApi";
 import { apiError } from "@/lib/apiError";
+import { cn } from "@/lib/utils";
 import type { Plan } from "@/types";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PlanDialog } from "@/components/plans/PlanDialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,21 +22,62 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const FEATURE_KEYS = [
-  "can_use_coupons",
-  "can_use_analytics",
-  "can_use_cms",
-  "can_clone_catalog",
-  "priority_support",
-] as const;
+/**
+ * Comparison-matrix rows. Each row reads a value off a plan and renders the
+ * per-column cell — a check/cross for booleans, or a formatted value/limit.
+ */
+type Row = {
+  label: string;
+  render: (plan: Plan) => React.ReactNode;
+};
 
-function FeatureDot({ on }: { on: boolean }) {
-  return on ? (
-    <Check className="h-4 w-4 text-emerald-600" />
-  ) : (
-    <X className="h-4 w-4 text-muted-foreground/40" />
+function Yes() {
+  return <Check className="mx-auto h-5 w-5 text-emerald-600" />;
+}
+function No() {
+  return <X className="mx-auto h-5 w-5 text-muted-foreground/30" />;
+}
+function bool(plan: Plan, key: string) {
+  return (plan.features as Record<string, boolean>)?.[key] ? <Yes /> : <No />;
+}
+function limit(value: number | null | undefined) {
+  return (
+    <span className="text-sm">{value == null ? "Unlimited" : value}</span>
   );
 }
+
+const ROWS: Row[] = [
+  { label: "Branches", render: (p) => limit(p.maxShops) },
+  { label: "Products / branch", render: (p) => limit(p.maxProductsPerShop) },
+  {
+    label: "Team members",
+    render: (p) =>
+      limit(
+        (p.features as unknown as Record<string, number | null>)
+          ?.max_team_seats ?? null,
+      ),
+  },
+  { label: "Coupons", render: (p) => bool(p, "can_use_coupons") },
+  { label: "CMS", render: (p) => bool(p, "can_use_cms") },
+  { label: "Catalog cloning", render: (p) => bool(p, "can_clone_catalog") },
+  { label: "Realtime orders", render: (p) => bool(p, "can_use_realtime") },
+  { label: "Analytics", render: (p) => bool(p, "can_use_analytics") },
+  {
+    label: "Wishlist analytics",
+    render: (p) => bool(p, "can_use_wishlist_analytics"),
+  },
+  {
+    label: "Advanced analytics",
+    render: (p) => bool(p, "can_use_advanced_analytics"),
+  },
+  { label: "Audit log", render: (p) => bool(p, "can_use_audit_log") },
+  { label: "Custom cake", render: (p) => bool(p, "can_use_custom_cake") },
+  {
+    label: "WhatsApp checkout",
+    render: (p) => bool(p, "can_use_whatsapp_checkout"),
+  },
+  { label: "Priority support", render: (p) => bool(p, "priority_support") },
+];
 
 export function PlansPage() {
   const { data, isLoading } = useListPlansQuery({ page: 1, limit: 50 });
@@ -61,7 +96,14 @@ export function PlansPage() {
     setDialogOpen(true);
   };
 
-  const rows = data?.data ?? [];
+  // Ordered by the plan's sortOrder (API already sorts, but keep it robust).
+  const plans = useMemo(
+    () =>
+      [...(data?.data ?? [])].sort(
+        (a, b) => a.sortOrder - b.sortOrder || Number(a.priceMonthly) - Number(b.priceMonthly),
+      ),
+    [data],
+  );
 
   const doArchive = async (id: string) => {
     try {
@@ -88,6 +130,9 @@ export function PlansPage() {
     }
   };
 
+  // Highlight the mid tier as "popular" (visual accent only).
+  const popularId = plans.length ? plans[Math.floor((plans.length - 1) / 2)].id : null;
+
   return (
     <>
       <PageHeader
@@ -96,104 +141,135 @@ export function PlansPage() {
         actions={<Button onClick={openNew}>New plan</Button>}
       />
 
-      <div className="rounded-lg border bg-background">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Plan</TableHead>
-              <TableHead>Price / mo</TableHead>
-              <TableHead>Branches</TableHead>
-              <TableHead className="text-center">Coupons</TableHead>
-              <TableHead className="text-center">Analytics</TableHead>
-              <TableHead className="text-center">CMS</TableHead>
-              <TableHead className="text-center">Cloning</TableHead>
-              <TableHead className="text-center">Priority</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-10" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              [0, 1, 2].map((i) => (
-                <TableRow key={i}>
-                  <TableCell colSpan={10}>
-                    <Skeleton className="h-6 w-full" />
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">
-                  No plans yet.
-                </TableCell>
-              </TableRow>
-            ) : (
-              rows.map((p) => {
-                const f = (p.features ?? {}) as Record<string, boolean>;
-                return (
-                  <TableRow key={p.id}>
-                    <TableCell>
-                      <div className="font-medium">{p.name}</div>
-                      {p.description && (
-                        <div className="text-xs text-muted-foreground">{p.description}</div>
+      {isLoading ? (
+        <div className="rounded-lg border bg-background p-6">
+          <div className="grid grid-cols-4 gap-4">
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-64 w-full" />
+            ))}
+          </div>
+        </div>
+      ) : plans.length === 0 ? (
+        <div className="rounded-lg border bg-background py-16 text-center text-sm text-muted-foreground">
+          No plans yet.
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border bg-background">
+          <table className="w-full min-w-[720px] border-collapse">
+            <thead>
+              <tr>
+                {/* Corner cell */}
+                <th className="w-56 border-b p-5 text-left align-bottom">
+                  <div className="text-lg font-semibold">Choose your plan</div>
+                  <p className="mt-1 text-xs font-normal text-muted-foreground">
+                    Columns are ordered by each plan's display order.
+                  </p>
+                </th>
+                {plans.map((p) => {
+                  const popular = p.id === popularId;
+                  return (
+                    <th
+                      key={p.id}
+                      className={cn(
+                        "border-b border-l p-5 text-left align-top",
+                        popular && "bg-emerald-50/60 dark:bg-emerald-950/20",
+                        !p.isActive && "opacity-60",
                       )}
-                    </TableCell>
-                    <TableCell>₹{Number(p.priceMonthly).toLocaleString("en-IN")}</TableCell>
-                    <TableCell>{p.maxShops ?? "∞"}</TableCell>
-                    {FEATURE_KEYS.map((k) => (
-                      <TableCell key={k} className="text-center">
-                        <div className="flex justify-center">
-                          <FeatureDot on={!!f[k]} />
-                        </div>
-                      </TableCell>
-                    ))}
-                    <TableCell>
-                      <span
-                        className={
-                          p.isActive
-                            ? "text-xs text-emerald-600"
-                            : "text-xs text-muted-foreground"
-                        }
-                      >
-                        {p.isActive ? "Active" : "Archived"}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEdit(p)}>
-                            Edit
-                          </DropdownMenuItem>
-                          {p.isActive ? (
-                            <DropdownMenuItem onClick={() => doArchive(p.id)}>
-                              Archive
-                            </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem onClick={() => doUnarchive(p.id)}>
-                              Unarchive
-                            </DropdownMenuItem>
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-base font-semibold">
+                              {p.name}
+                            </span>
+                            {popular && (
+                              <Badge className="border-transparent bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-200">
+                                Popular
+                              </Badge>
+                            )}
+                            {!p.isActive && (
+                              <Badge variant="secondary">Archived</Badge>
+                            )}
+                          </div>
+                          {p.description && (
+                            <p className="mt-1 max-w-[13rem] text-xs font-normal text-muted-foreground">
+                              {p.description}
+                            </p>
                           )}
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => doDelete(p.id)}
-                          >
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="-mr-2 -mt-2 shrink-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEdit(p)}>
+                              Edit
+                            </DropdownMenuItem>
+                            {p.isActive ? (
+                              <DropdownMenuItem onClick={() => doArchive(p.id)}>
+                                Archive
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem onClick={() => doUnarchive(p.id)}>
+                                Unarchive
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => doDelete(p.id)}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      <div className="mt-4 flex items-baseline gap-1">
+                        <span className="text-2xl font-bold tracking-tight">
+                          ₹{Number(p.priceMonthly).toLocaleString("en-IN")}
+                        </span>
+                        <span className="text-xs font-normal text-muted-foreground">
+                          / mo
+                        </span>
+                      </div>
+                      <div className="mt-1 text-[11px] font-normal text-muted-foreground">
+                        Order #{p.sortOrder}
+                        {!p.isPublic && " · Hidden"}
+                      </div>
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {ROWS.map((row, i) => (
+                <tr key={row.label} className={cn(i % 2 === 1 && "bg-muted/30")}>
+                  <td className="border-b p-4 text-sm font-medium">
+                    {row.label}
+                  </td>
+                  {plans.map((p) => {
+                    const popular = p.id === popularId;
+                    return (
+                      <td
+                        key={p.id}
+                        className={cn(
+                          "border-b border-l p-4 text-center",
+                          popular && "bg-emerald-50/40 dark:bg-emerald-950/10",
+                          !p.isActive && "opacity-60",
+                        )}
+                      >
+                        {row.render(p)}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <PlanDialog open={dialogOpen} onOpenChange={setDialogOpen} plan={editing} />
     </>

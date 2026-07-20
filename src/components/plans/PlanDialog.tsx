@@ -53,6 +53,7 @@ export function PlanDialog({ open, onOpenChange, plan }: Props) {
   const [maxShops, setMaxShops] = useState("");
   const [maxProducts, setMaxProducts] = useState("");
   const [maxTeamSeats, setMaxTeamSeats] = useState("");
+  const [sortOrder, setSortOrder] = useState("0");
   const [isPublic, setIsPublic] = useState(true);
   const [features, setFeatures] = useState<PlanFeatures>({});
 
@@ -65,6 +66,7 @@ export function PlanDialog({ open, onOpenChange, plan }: Props) {
       setMaxProducts(
         plan?.maxProductsPerShop != null ? String(plan.maxProductsPerShop) : "",
       );
+      setSortOrder(plan?.sortOrder != null ? String(plan.sortOrder) : "0");
       setIsPublic(plan?.isPublic ?? true);
       const f = (plan?.features as PlanFeatures) ?? {};
       setFeatures(f);
@@ -88,6 +90,7 @@ export function PlanDialog({ open, onOpenChange, plan }: Props) {
         max_team_seats: maxTeamSeats === "" ? null : Number(maxTeamSeats),
       },
       isPublic,
+      sortOrder: Number(sortOrder) || 0,
     };
     try {
       if (isEdit && plan) {
@@ -164,6 +167,15 @@ export function PlanDialog({ open, onOpenChange, plan }: Props) {
               placeholder="Unlimited"
               value={maxTeamSeats}
               onChange={(e) => setMaxTeamSeats(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>Display order</Label>
+            <Input
+              type="number"
+              min={0}
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
             />
           </div>
           <div className="flex items-end gap-2">
