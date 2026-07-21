@@ -7,6 +7,7 @@ import {
   type CreatePlanBody,
   type PlanFeatures,
 } from "@/features/api/plansApi";
+import { useListFeaturesQuery } from "@/features/api/featuresApi";
 import { apiError } from "@/lib/apiError";
 import type { Plan } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -23,18 +24,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-/** Boolean feature toggles (max_team_seats is a numeric field, handled separately). */
-const FEATURE_LABELS: { key: keyof PlanFeatures; label: string }[] = [
-  { key: "can_use_coupons", label: "Coupons" },
-  { key: "can_use_cms", label: "CMS" },
-  { key: "can_clone_catalog", label: "Catalog cloning" },
-  { key: "can_use_realtime", label: "Realtime orders" },
-  { key: "can_use_analytics", label: "Analytics" },
-  { key: "can_use_wishlist_analytics", label: "Wishlist analytics" },
-  { key: "can_use_advanced_analytics", label: "Advanced analytics" },
-  { key: "can_use_audit_log", label: "Audit log" },
-  { key: "priority_support", label: "Priority support" },
-];
+/** Limit keys that have their own dedicated numeric inputs (not toggles). */
+const COLUMN_BACKED = new Set([
+  "max_shops",
+  "max_products_per_shop",
+  "max_team_seats",
+]);
 
 interface Props {
   open: boolean;
@@ -50,27 +45,51 @@ export function PlanDialog({ open, onOpenChange, plan }: Props) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [priceMonthly, setPriceMonthly] = useState("0");
+  const [priceAnnual, setPriceAnnual] = useState("");
+  const [monthsFree, setMonthsFree] = useState("");
   const [maxShops, setMaxShops] = useState("");
   const [maxProducts, setMaxProducts] = useState("");
   const [maxTeamSeats, setMaxTeamSeats] = useState("");
   const [sortOrder, setSortOrder] = useState("0");
   const [isPublic, setIsPublic] = useState(true);
-  const [features, setFeatures] = useState<PlanFeatures>({});
+  const [features, setFeatures] = useState<Record<string, boolean | number | null>>(
+    {},
+  );
+
+  // The feature catalog drives which toggles render — add/remove a feature in
+  // the Features manager and it appears/disappears here automatically.
+  const { data: catalog } = useListFeaturesQuery();
+  const toggleFeatures = (catalog ?? []).filter(
+    (f) => f.kind === "boolean" && !COLUMN_BACKED.has(f.key) && f.category !== "core",
+  );
 
   useEffect(() => {
     if (open) {
       setName(plan?.name ?? "");
       setDescription(plan?.description ?? "");
       setPriceMonthly(plan ? String(Number(plan.priceMonthly)) : "0");
+      setPriceAnnual(
+        plan?.priceAnnual != null ? String(Number(plan.priceAnnual)) : "",
+      );
+      // Derive the "months free" helper from the stored annual price.
+      const m = plan ? Number(plan.priceMonthly) : 0;
+      const a = plan?.priceAnnual != null ? Number(plan.priceAnnual) : null;
+      setMonthsFree(
+        a != null && m > 0
+          ? String(+((m * 12 - a) / m).toFixed(2)).replace(/\.00$/, "")
+          : "",
+      );
       setMaxShops(plan?.maxShops != null ? String(plan.maxShops) : "");
       setMaxProducts(
         plan?.maxProductsPerShop != null ? String(plan.maxProductsPerShop) : "",
       );
       setSortOrder(plan?.sortOrder != null ? String(plan.sortOrder) : "0");
       setIsPublic(plan?.isPublic ?? true);
-      const f = (plan?.features as PlanFeatures) ?? {};
+      const f = (plan?.features as Record<string, boolean | number | null>) ?? {};
       setFeatures(f);
-      setMaxTeamSeats(f.max_team_seats != null ? String(f.max_team_seats) : "");
+      setMaxTeamSeats(
+        f.max_team_seats != null ? String(f.max_team_seats) : "",
+      );
     }
   }, [open, plan]);
 
@@ -83,12 +102,13 @@ export function PlanDialog({ open, onOpenChange, plan }: Props) {
       name: name.trim(),
       description: description.trim() || undefined,
       priceMonthly: Number(priceMonthly) || 0,
+      priceAnnual: priceAnnual === "" ? null : Number(priceAnnual),
       maxShops: maxShops === "" ? null : Number(maxShops),
       maxProductsPerShop: maxProducts === "" ? null : Number(maxProducts),
       features: {
         ...features,
         max_team_seats: maxTeamSeats === "" ? null : Number(maxTeamSeats),
-      },
+      } as PlanFeatures,
       isPublic,
       sortOrder: Number(sortOrder) || 0,
     };
@@ -103,6 +123,25 @@ export function PlanDialog({ open, onOpenChange, plan }: Props) {
       onOpenChange(false);
     } catch (err) {
       toast.error(apiError(err, "Failed to save plan"));
+    }
+  };
+
+  // ---- Annual pricing helpers (annual price is the saved source of truth) ----
+  const monthlyNum = Number(priceMonthly) || 0;
+  const annualNum = priceAnnual === "" ? null : Number(priceAnnual);
+  const fullYear = monthlyNum * 12;
+  const savingsPct =
+    annualNum != null && fullYear > 0
+      ? Math.round((1 - annualNum / fullYear) * 100)
+      : null;
+
+  /** "Months free" → fill the annual price (monthly × (12 − N)). */
+  const onMonthsFreeChange = (raw: string) => {
+    setMonthsFree(raw);
+    if (raw === "") return;
+    const n = Number(raw);
+    if (!Number.isNaN(n) && monthlyNum > 0) {
+      setPriceAnnual(String(+(monthlyNum * (12 - n)).toFixed(2)));
     }
   };
 
@@ -139,6 +178,45 @@ export function PlanDialog({ open, onOpenChange, plan }: Props) {
               onChange={(e) => setPriceMonthly(e.target.value)}
             />
           </div>
+
+          {/* Annual pricing */}
+          <div className="rounded-md border p-3 sm:col-span-2">
+            <div className="mb-2 text-sm font-medium">Annual pricing</div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <Label>Months free</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={12}
+                  step="0.5"
+                  placeholder="e.g. 2"
+                  value={monthsFree}
+                  onChange={(e) => onMonthsFreeChange(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>Annual price (₹)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="No annual option"
+                  value={priceAnnual}
+                  onChange={(e) => setPriceAnnual(e.target.value)}
+                />
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {annualNum == null
+                ? "Leave blank to offer monthly billing only."
+                : `Billed ₹${annualNum.toLocaleString("en-IN")}/year${
+                    savingsPct != null && savingsPct > 0
+                      ? ` — save ${savingsPct}% vs ₹${fullYear.toLocaleString("en-IN")} monthly`
+                      : ""
+                  }.`}
+            </p>
+          </div>
+
           <div className="flex flex-col gap-1.5">
             <Label>Max branches</Label>
             <Input
@@ -187,22 +265,29 @@ export function PlanDialog({ open, onOpenChange, plan }: Props) {
 
           <div className="sm:col-span-2">
             <Label className="mb-2 block">Features</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {FEATURE_LABELS.map((f) => (
-                <label
-                  key={f.key}
-                  className="flex items-center gap-2 rounded-md border p-2 text-sm"
-                >
-                  <Switch
-                    checked={features[f.key] === true}
-                    onCheckedChange={(v) =>
-                      setFeatures((prev) => ({ ...prev, [f.key]: v }))
-                    }
-                  />
-                  {f.label}
-                </label>
-              ))}
-            </div>
+            {toggleFeatures.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No gateable features in the catalog yet.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {toggleFeatures.map((f) => (
+                  <label
+                    key={f.key}
+                    className="flex items-center gap-2 rounded-md border p-2 text-sm"
+                    title={f.description ?? undefined}
+                  >
+                    <Switch
+                      checked={features[f.key] === true}
+                      onCheckedChange={(v) =>
+                        setFeatures((prev) => ({ ...prev, [f.key]: v }))
+                      }
+                    />
+                    {f.label}
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
