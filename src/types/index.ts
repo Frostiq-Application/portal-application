@@ -4,7 +4,8 @@
 export type Role =
   | "platform_super_admin"
   | "account_super_admin"
-  | "shop_admin";
+  | "shop_admin"
+  | "staff";
 
 export interface AuthUser {
   id: string;
@@ -120,6 +121,8 @@ export interface Plan {
   name: string;
   description: string | null;
   priceMonthly: string;
+  /** Total yearly price when billed annually. Null = no annual option. */
+  priceAnnual: string | null;
   maxShops: number | null;
   maxProductsPerShop: number | null;
   features: Record<string, boolean>;
@@ -155,6 +158,8 @@ export interface PlanFeatureFlags {
   can_use_custom_cake?: boolean;
   /** Route checkout through WhatsApp instead of in-app place-order. */
   can_use_whatsapp_checkout?: boolean;
+  /** Customer directory: lifetime spend, order history & contact data. */
+  can_use_customer_data?: boolean;
   priority_support?: boolean;
 }
 
