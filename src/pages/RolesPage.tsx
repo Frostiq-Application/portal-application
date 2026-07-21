@@ -41,12 +41,14 @@ const ROLES: Role[] = [
   "platform_super_admin",
   "account_super_admin",
   "shop_admin",
+  "staff",
 ];
 
 const ROLE_BLURB: Record<Role, string> = {
   platform_super_admin: "Runs the platform — brands, plans & subscriptions.",
   account_super_admin: "Owns a brand — full control across all its branches.",
   shop_admin: "Runs a single branch — scoped to their assigned outlet.",
+  staff: "Branch team member — day-to-day order operations only.",
 };
 
 export function RolesPage() {
