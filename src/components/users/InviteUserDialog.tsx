@@ -32,11 +32,17 @@ import {
 export function InviteUserDialog() {
   const { role } = useAuth();
   const platform = isPlatformAdmin(role);
+  // Branch owners (shop_admin) invite branch staff; Shop Owners invite branch owners.
+  const invitesStaff = role === "shop_admin";
   const [open, setOpen] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
 
-  // Platform super admins only ever add fellow super admins here.
-  const defaultRole: Role = platform ? "platform_super_admin" : "shop_admin";
+  // Platform → fellow super admins; shop admin → staff; shop owner → branch owner.
+  const defaultRole: Role = platform
+    ? "platform_super_admin"
+    : invitesStaff
+      ? "staff"
+      : "shop_admin";
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -58,8 +64,12 @@ export function InviteUserDialog() {
     { skip: userRole !== "shop_admin" },
   );
 
-  // Super admins only add other super admins from this portal.
-  const roleOptions: Role[] = platform ? ["platform_super_admin"] : ["shop_admin"];
+  // Each viewer invites exactly one kind of member from this portal.
+  const roleOptions: Role[] = platform
+    ? ["platform_super_admin"]
+    : invitesStaff
+      ? ["staff"]
+      : ["shop_admin"];
   const singleRole = roleOptions.length === 1;
 
   const reset = () => {
@@ -111,9 +121,11 @@ export function InviteUserDialog() {
         {!inviteToken ? (
           <>
             <DialogHeader>
-              <DialogTitle>Invite User</DialogTitle>
+              <DialogTitle>{invitesStaff ? "Invite staff" : "Invite User"}</DialogTitle>
               <DialogDescription>
-                They&rsquo;ll receive a link to set their password.
+                {invitesStaff
+                  ? "Staff help run orders for your branch. They’ll receive a link to set their password."
+                  : "They’ll receive a link to set their password."}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-2">
