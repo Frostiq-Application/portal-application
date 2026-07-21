@@ -61,6 +61,23 @@ export interface CreateAddonBody {
   stockQuantity?: number;
 }
 
+// ---- Catalog clone ----
+export interface CloneCatalogBody {
+  sourceShopId: string;
+  targetShopId: string;
+  mode: "full" | "selective";
+  /** Selective mode only — product ids to copy. */
+  productIds?: string[];
+  /** Copy prices (false = target variants/add-ons start at 0). */
+  copyPrices?: boolean;
+}
+export interface CloneResult {
+  categoriesCreated: number;
+  productsCreated: number;
+  variantsCreated: number;
+  addonsCreated: number;
+}
+
 export const catalogApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
     // Categories
@@ -173,6 +190,18 @@ export const catalogApi = baseApi.injectEndpoints({
       query: (id) => ({ url: `/addons/${id}`, method: "DELETE" }),
       invalidatesTags: [{ type: "Addon", id: "LIST" }],
     }),
+
+    // Clone a catalog between two branches of the same account (plan-gated by
+    // can_clone_catalog on the backend). Invalidates the lists so the target
+    // branch shows its freshly-copied products the moment it's selected.
+    cloneCatalog: build.mutation<CloneResult, CloneCatalogBody>({
+      query: (body) => ({ url: "/catalog/clone", method: "POST", body }),
+      invalidatesTags: [
+        { type: "Product", id: "LIST" },
+        { type: "Category", id: "LIST" },
+        { type: "Addon", id: "LIST" },
+      ],
+    }),
   }),
   overrideExisting: false,
 });
@@ -191,4 +220,5 @@ export const {
   useCreateAddonMutation,
   useUpdateAddonMutation,
   useDeleteAddonMutation,
+  useCloneCatalogMutation,
 } = catalogApi;
