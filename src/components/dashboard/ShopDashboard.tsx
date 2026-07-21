@@ -222,6 +222,7 @@ export function ShopDashboard() {
   const shopId = selectedBranch === ALL_BRANCHES ? "" : selectedBranch;
   const { hasFeature } = useEntitlements();
   const canUseAnalytics = hasFeature("can_use_analytics");
+  const canUseWishlist = hasFeature("can_use_wishlist_analytics");
   const { data, isLoading, isFetching } = useShopAnalyticsQuery(
     { shopId },
     { skip: !shopId },
@@ -362,7 +363,7 @@ export function ShopDashboard() {
         </CardContent>
       </Card>
 
-      {/* Wishlist interest — what shoppers are saving vs. buying */}
+      {/* Wishlist interest — what shoppers are saving vs. buying (Growth+) */}
       <div className="space-y-3">
         <div>
           <h3 className="text-base font-semibold">Wishlist insights</h3>
@@ -370,7 +371,22 @@ export function ShopDashboard() {
             What shoppers are saving for later — and how often it turns into an order.
           </p>
         </div>
-        {shopId && <WishlistAnalytics shopId={shopId} />}
+        {!canUseWishlist ? (
+          <Card>
+            <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10">
+                <Lock className="h-5 w-5 text-primary" />
+              </div>
+              <p className="text-sm font-medium">Wishlist analytics is a Growth feature</p>
+              <p className="max-w-xs text-sm text-muted-foreground">
+                See what shoppers save vs. buy and the save→order conversion.
+                Upgrade to Growth or Pro to unlock it.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          shopId && <WishlistAnalytics shopId={shopId} />
+        )}
       </div>
         </>
       )}
