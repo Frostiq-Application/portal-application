@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Clock, Copy, Loader2, Mail, Store, User as UserIcon } from "lucide-react";
+import { Clock, Copy, Loader2, Mail, MapPin, Store, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
   useCreateShopMutation,
@@ -57,6 +57,32 @@ function formatTimeLabel(value: string): string {
   return `${hour}:${String(m).padStart(2, "0")} ${period}`;
 }
 
+/**
+ * Pulls a "lat,lng" pair out of a pasted Google Maps URL (or a bare
+ * "lat, lng" string). Handles the common `@lat,lng`, `?q=lat,lng`, and
+ * `!3dlat!4dlng` shapes. Returns null when no plausible coordinates are found.
+ */
+function parseCoordinates(input: string): { lat: number; lng: number } | null {
+  const text = input.trim();
+  if (!text) return null;
+
+  // `!3d<lat>!4d<lng>` (place URLs) is the most precise when present.
+  const dm = text.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+  if (dm) return { lat: Number(dm[1]), lng: Number(dm[2]) };
+
+  // `@lat,lng` (map view) or `q=lat,lng` / a bare "lat, lng" paste.
+  const m =
+    text.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/) ??
+    text.match(/[?&]q=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/) ??
+    text.match(/^(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)$/);
+  if (!m) return null;
+
+  const lat = Number(m[1]);
+  const lng = Number(m[2]);
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  return { lat, lng };
+}
+
 /** Half-hour slots across the day: 00:00, 00:30, … 23:30. */
 const TIME_SLOTS = Array.from({ length: 48 }, (_, i) => {
   const value = `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`;
@@ -110,6 +136,8 @@ export function ShopDialog({
   const [displayArea, setDisplayArea] = useState("");
   const [bannerUrl, setBannerUrl] = useState("");
   const [address, setAddress] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
   const [city, setCity] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [openingTime, setOpeningTime] = useState("");
@@ -126,6 +154,8 @@ export function ShopDialog({
       setDisplayArea(shop?.displayArea ?? "");
       setBannerUrl(shop?.bannerUrl ?? "");
       setAddress(shop?.address ?? "");
+      setLatitude(shop?.latitude ?? "");
+      setLongitude(shop?.longitude ?? "");
       setCity(shop?.city ?? "");
       setWhatsapp(shop?.whatsappNumber ?? "");
       setOpeningTime(shop?.openingTime?.slice(0, 5) ?? "");
@@ -158,6 +188,30 @@ export function ShopDialog({
       ? (accounts?.data ?? []).find((a) => a.id === defaultAccountId)?.name
       : undefined);
 
+  /** Coordinates must be a valid, complete pair (both or neither) to save. */
+  const coordsInvalid = useMemo(() => {
+    const hasLat = latitude.trim() !== "";
+    const hasLng = longitude.trim() !== "";
+    if (!hasLat && !hasLng) return false;
+    if (hasLat !== hasLng) return true;
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    return (
+      Number.isNaN(lat) ||
+      Number.isNaN(lng) ||
+      Math.abs(lat) > 90 ||
+      Math.abs(lng) > 180
+    );
+  }, [latitude, longitude]);
+
+  /** Applies a pasted Google Maps link (or "lat, lng") to the two fields. */
+  const applyMapLink = (value: string) => {
+    const parsed = parseCoordinates(value);
+    if (!parsed) return;
+    setLatitude(String(parsed.lat));
+    setLongitude(String(parsed.lng));
+  };
+
   /** Closing before opening is only valid if the branch trades past midnight. */
   const hoursInvalid = useMemo(
     () =>
@@ -184,6 +238,10 @@ export function ShopDialog({
       setTab("branch");
       return toast.error("Closing time must be after opening time");
     }
+    if (coordsInvalid) {
+      setTab("branch");
+      return toast.error("Enter a valid latitude and longitude pair");
+    }
     if (ownerRequested && (ownerName.trim().length < 2 || !ownerEmail.trim())) {
       setTab("owner");
       return toast.error("Branch owner needs a name and email");
@@ -194,6 +252,8 @@ export function ShopDialog({
       displayArea: displayArea.trim() || undefined,
       bannerUrl: bannerUrl || undefined,
       address: address.trim() || undefined,
+      latitude: latitude.trim() ? Number(latitude) : undefined,
+      longitude: longitude.trim() ? Number(longitude) : undefined,
       city: city.trim() || undefined,
       whatsappNumber: whatsapp.trim() || undefined,
       openingTime: openingTime || undefined,
@@ -350,6 +410,52 @@ export function ShopDialog({
               rows={3}
             />
           </div>
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <Label htmlFor="mapLink">Location coordinates</Label>
+            <div className="relative">
+              <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="mapLink"
+                className="pl-9"
+                placeholder="Paste a Google Maps link to auto-fill"
+                onChange={(e) => applyMapLink(e.target.value)}
+                onPaste={(e) =>
+                  applyMapLink(e.clipboardData.getData("text"))
+                }
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Paste a Google Maps link (or type coordinates below). Used to detect
+              the nearest branch for customers.
+            </p>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="latitude">Latitude</Label>
+            <Input
+              id="latitude"
+              inputMode="decimal"
+              value={latitude}
+              onChange={(e) => setLatitude(e.target.value)}
+              placeholder="18.5074"
+              aria-invalid={coordsInvalid}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="longitude">Longitude</Label>
+            <Input
+              id="longitude"
+              inputMode="decimal"
+              value={longitude}
+              onChange={(e) => setLongitude(e.target.value)}
+              placeholder="73.8077"
+              aria-invalid={coordsInvalid}
+            />
+          </div>
+          {coordsInvalid && (
+            <p className="text-xs text-destructive sm:col-span-2 -mt-2">
+              Enter both latitude (−90 to 90) and longitude (−180 to 180).
+            </p>
+          )}
           <div className="flex flex-col gap-1.5 sm:col-span-2">
             <Label>Banner image</Label>
             <ImageUploader
@@ -530,7 +636,7 @@ export function ShopDialog({
 
         <SheetFooter className="border-t p-6">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={submit} disabled={saving || hoursInvalid}>
+          <Button onClick={submit} disabled={saving || hoursInvalid || coordsInvalid}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isEdit ? "Save" : ownerRequested ? "Create & invite" : "Create"}
           </Button>
