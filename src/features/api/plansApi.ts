@@ -14,6 +14,9 @@ export interface PlanFeatures {
   can_use_wishlist_analytics?: boolean;
   can_use_advanced_analytics?: boolean;
   can_use_audit_log?: boolean;
+  can_use_custom_cake?: boolean;
+  can_use_whatsapp_checkout?: boolean;
+  can_use_customer_data?: boolean;
   priority_support?: boolean;
   /** Numeric limit carried inside the features blob. Null = unlimited. */
   max_team_seats?: number | null;
@@ -23,6 +26,8 @@ export interface CreatePlanBody {
   name: string;
   description?: string;
   priceMonthly: number;
+  /** Total yearly price when billed annually. Null = no annual option. */
+  priceAnnual?: number | null;
   maxShops?: number | null;
   maxProductsPerShop?: number | null;
   features?: PlanFeatures;
