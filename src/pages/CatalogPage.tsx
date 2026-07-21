@@ -3,15 +3,18 @@ import {
   Boxes,
   Cake,
   CheckCircle2,
+  Copy,
   EyeOff,
   LayoutGrid,
   Layers,
+  Lock,
   MoreHorizontal,
   Search,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { apiError } from "@/lib/apiError";
+import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   useDeleteAddonMutation,
@@ -29,6 +32,8 @@ import {
   ALL_BRANCHES,
   selectSelectedBranchId,
 } from "@/features/branch/branchSlice";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { CloneCatalogDialog } from "@/components/catalog/CloneCatalogDialog";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ShopSelect } from "@/components/ShopSelect";
 import { SegmentedStrip } from "@/components/SegmentedStrip";
@@ -62,12 +67,23 @@ import {
 
 const PRODUCT_TYPES: ProductType[] = ["cake", "cupcake", "chocolate"];
 
-function ProductsTab({ shopId }: { shopId: string }) {
+function ProductsTab({
+  shopId,
+  used,
+  cap,
+}: {
+  shopId: string;
+  /** Total products in this branch (unfiltered), for the plan cap. */
+  used: number;
+  /** Plan's max products per branch. null = unlimited. */
+  cap: number | null;
+}) {
   const [search, setSearch] = useState("");
   const [productType, setProductType] = useState<ProductType | "all">("all");
   const [categoryId, setCategoryId] = useState<string | "all">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "hidden">("all");
   const debouncedSearch = useDebouncedValue(search, 350);
+  const atCap = cap != null && used >= cap;
 
   const { data, isLoading } = useListProductsQuery(
     shopId
@@ -210,17 +226,39 @@ function ProductsTab({ shopId }: { shopId: string }) {
           </Button>
         )}
 
-        <Button
-          className="ml-auto"
-          onClick={() => {
-            setEditing(null);
-            setDialogOpen(true);
-          }}
-          disabled={!shopId}
-        >
-          New product
-        </Button>
+        <div className="ml-auto flex items-center gap-3">
+          {cap != null && (
+            <span
+              className={cn(
+                "text-xs font-medium",
+                atCap ? "text-destructive" : "text-muted-foreground",
+              )}
+            >
+              {used} / {cap} products
+            </span>
+          )}
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setDialogOpen(true);
+            }}
+            disabled={!shopId || atCap}
+            title={
+              atCap
+                ? `Your plan allows up to ${cap} products per branch. Upgrade to add more.`
+                : undefined
+            }
+          >
+            New product
+          </Button>
+        </div>
       </div>
+      {atCap && (
+        <p className="mb-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          You’ve reached your plan’s limit of {cap} products for this branch.
+          Upgrade to Growth or Pro to add more.
+        </p>
+      )}
       <div className="rounded-lg border bg-background">
         <Table>
           <TableHeader>
@@ -635,6 +673,9 @@ export function CatalogPage() {
   // Catalog is always scoped to a concrete branch; "all" isn't meaningful here.
   const effectiveShopId = shopId === ALL_BRANCHES ? "" : shopId;
   const [tab, setTab] = useState<CatalogTab>("products");
+  const [cloneOpen, setCloneOpen] = useState(false);
+  const { hasFeature, entitlements } = useEntitlements();
+  const canClone = hasFeature("can_clone_catalog");
 
   // Lightweight count queries (limit 1 → only meta.total is used) so the strip
   // shows how many items live under each tab. Shared cache with the tab bodies.
@@ -683,7 +724,28 @@ export function CatalogPage() {
       <PageHeader
         title="Catalog"
         description="Products, categories & add-ons"
-        actions={<ShopSelect />}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setCloneOpen(true)}
+              disabled={!effectiveShopId}
+              title={
+                effectiveShopId
+                  ? undefined
+                  : "Select a branch to clone its catalog"
+              }
+            >
+              {canClone ? (
+                <Copy className="mr-2 h-4 w-4" />
+              ) : (
+                <Lock className="mr-2 h-4 w-4" />
+              )}
+              Clone catalog
+            </Button>
+            <ShopSelect />
+          </div>
+        }
       />
 
       <SegmentedStrip
@@ -693,9 +755,23 @@ export function CatalogPage() {
         onChange={setTab}
       />
 
-      {tab === "products" && <ProductsTab shopId={effectiveShopId} />}
+      {tab === "products" && (
+        <ProductsTab
+          shopId={effectiveShopId}
+          used={productCount?.meta.total ?? 0}
+          cap={entitlements?.maxProductsPerShop ?? null}
+        />
+      )}
       {tab === "categories" && <CategoriesTab shopId={effectiveShopId} />}
       {tab === "addons" && <AddonsTab shopId={effectiveShopId} />}
+
+      {effectiveShopId && (
+        <CloneCatalogDialog
+          open={cloneOpen}
+          onOpenChange={setCloneOpen}
+          sourceShopId={effectiveShopId}
+        />
+      )}
     </>
   );
 }
