@@ -5,7 +5,11 @@ import { useCreateSubscriptionMutation } from "@/features/api/subscriptionsApi";
 import { useListAccountsQuery } from "@/features/api/accountsApi";
 import { useListPlansQuery } from "@/features/api/plansApi";
 import { apiError } from "@/lib/apiError";
-import { BILLING_CYCLE_LABEL, CYCLE_MONTHS } from "@/lib/subscriptions";
+import {
+  BILLING_CYCLE_LABEL,
+  annualSavingsPct,
+  planCyclePrice,
+} from "@/lib/subscriptions";
 import type { BillingCycle, SubscriptionStatus } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,8 +69,12 @@ export function CreateSubscriptionDialog({ defaultAccountId, trigger }: Props) {
   );
 
   const cyclePrice = selectedPlan
-    ? Number(selectedPlan.priceMonthly) * CYCLE_MONTHS[cycle]
+    ? planCyclePrice(selectedPlan.priceMonthly, selectedPlan.priceAnnual, cycle)
     : null;
+  const savingsPct =
+    selectedPlan && cycle === "annual"
+      ? annualSavingsPct(selectedPlan.priceMonthly, selectedPlan.priceAnnual)
+      : null;
 
   const reset = () => {
     setAccountId(defaultAccountId ?? "");
@@ -214,6 +222,11 @@ export function CreateSubscriptionDialog({ defaultAccountId, trigger }: Props) {
                   </span>
                 </span>
               </div>
+              {savingsPct != null && (
+                <p className="mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  Save {savingsPct}% vs {money(Number(selectedPlan.priceMonthly) * 12)}/yr paid monthly
+                </p>
+              )}
               {status === "trial" && (
                 <p className="mt-1 text-xs text-muted-foreground">
                   Starts as a trial — no receipt until you record the first
