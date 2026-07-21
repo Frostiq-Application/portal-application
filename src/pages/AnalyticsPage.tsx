@@ -33,6 +33,7 @@ import {
 import type { AccountAnalytics, ShopAnalytics } from "@/types";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ShopSelect } from "@/components/ShopSelect";
+import { AnalyticsTiers } from "@/components/analytics/AnalyticsTiers";
 import {
   DateRangePicker,
   defaultRange,
@@ -130,6 +131,8 @@ export function AnalyticsPage() {
         description="Sales, best sellers, peak times & coupon performance"
         actions={<DateRangePicker value={range} onChange={setRange} />}
       />
+
+      <AnalyticsTiers />
 
       {showBrandTab ? (
         <Tabs defaultValue="branch">
