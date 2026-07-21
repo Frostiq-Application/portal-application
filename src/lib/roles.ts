@@ -4,6 +4,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   platform_super_admin: "Platform Super Admin",
   account_super_admin: "Shop Owner",
   shop_admin: "Branch Owner",
+  staff: "Branch Staff",
 };
 
 export function roleLabel(role?: Role): string {
@@ -20,6 +21,10 @@ export function isAccountAdmin(role?: Role): boolean {
 
 export function isShopAdmin(role?: Role): boolean {
   return role === "shop_admin";
+}
+
+export function isStaff(role?: Role): boolean {
+  return role === "staff";
 }
 
 /** Tailwind badge variant/tone per account status. */
