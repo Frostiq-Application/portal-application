@@ -38,6 +38,8 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Dashboard",
     path: "/",
     icon: LayoutDashboard,
+    // Everyone except staff, who land straight on Orders (their only workspace).
+    roles: ["platform_super_admin", "account_super_admin", "shop_admin"],
     group: "Overview",
   },
 
@@ -46,7 +48,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Orders",
     path: "/orders",
     icon: ShoppingBag,
-    roles: NON_PLATFORM_ADMINS,
+    roles: [...NON_PLATFORM_ADMINS, "staff"],
     group: "Operations",
   },
   {
@@ -61,6 +63,7 @@ export const NAV_ITEMS: NavItem[] = [
     path: "/customers",
     icon: Contact,
     roles: NON_PLATFORM_ADMINS,
+    feature: "can_use_customer_data",
     group: "Operations",
   },
   {
@@ -121,7 +124,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Team",
     path: "/users",
     icon: UsersIcon,
-    roles: ["platform_super_admin", "account_super_admin"],
+    roles: ["platform_super_admin", "account_super_admin", "shop_admin"],
     group: "Brand",
   },
   {
