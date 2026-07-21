@@ -96,6 +96,7 @@ export const baseApi = createApi({
     "Entitlements",
     "CustomCake",
     "CustomCakeOption",
+    "Feature",
   ],
   endpoints: () => ({}),
 });
