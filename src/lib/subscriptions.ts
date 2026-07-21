@@ -42,6 +42,33 @@ export const CYCLE_MONTHS: Record<BillingCycle, number> = {
   annual: 12,
 };
 
+/**
+ * Price locked in for a billing cycle. Annual honours the plan's explicit
+ * `priceAnnual` (so a "months free" discount applies); everything else is
+ * monthly × months-in-cycle. Mirrors the backend `priceForCycle`.
+ */
+export function planCyclePrice(
+  priceMonthly: string | number,
+  priceAnnual: string | number | null,
+  cycle: BillingCycle,
+): number {
+  if (cycle === "annual" && priceAnnual != null && priceAnnual !== "") {
+    return Number(priceAnnual);
+  }
+  return Number(priceMonthly) * CYCLE_MONTHS[cycle];
+}
+
+/** % saved paying annually vs 12× monthly. Null when no annual price / no saving. */
+export function annualSavingsPct(
+  priceMonthly: string | number,
+  priceAnnual: string | number | null,
+): number | null {
+  const monthly = Number(priceMonthly);
+  if (priceAnnual == null || priceAnnual === "" || monthly <= 0) return null;
+  const pct = Math.round((1 - Number(priceAnnual) / (monthly * 12)) * 100);
+  return pct > 0 ? pct : null;
+}
+
 export const PAYMENT_METHOD_LABEL: Record<PaymentMethodType, string> = {
   upi: "UPI",
   bank_transfer: "Bank transfer",
