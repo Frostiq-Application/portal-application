@@ -6,6 +6,7 @@ import { FeatureRoute } from "@/routes/FeatureRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { LoginPage } from "@/pages/LoginPage";
 import { SetPasswordPage } from "@/pages/SetPasswordPage";
+import { DemoDashboardPage } from "@/pages/DemoDashboardPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { AccountsPage } from "@/pages/AccountsPage";
 import { PlansPage } from "@/pages/PlansPage";
@@ -23,7 +24,14 @@ import { CustomCakesPage } from "@/pages/CustomCakesPage";
 import { SchedulingPage } from "@/pages/SchedulingPage";
 import { AnalyticsPage } from "@/pages/AnalyticsPage";
 import { ProfilePage } from "@/pages/ProfilePage";
+import { useAuth } from "@/hooks/useAuth";
 import { Toaster } from "@/components/ui/sonner";
+
+/** Staff have no dashboard — their whole job is Orders, so send them there. */
+function HomeRoute() {
+  const { role } = useAuth();
+  return role === "staff" ? <Navigate to="/orders" replace /> : <DashboardPage />;
+}
 
 function ThemeSync() {
   const theme = useAppSelector((s) => s.ui.theme);
@@ -41,11 +49,24 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/set-password" element={<SetPasswordPage />} />
+        {/* Public, backend-free replica of the owner dashboard — for marketing screenshots only */}
+        <Route path="/demo-dashboard" element={<DemoDashboardPage />} />
 
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
-            <Route index element={<DashboardPage />} />
+            <Route index element={<HomeRoute />} />
             <Route path="/profile" element={<ProfilePage />} />
+
+            {/* Orders — the one operational area branch staff can reach. */}
+            <Route
+              element={
+                <ProtectedRoute
+                  roles={["account_super_admin", "shop_admin", "staff"]}
+                />
+              }
+            >
+              <Route path="/orders" element={<OrdersPage />} />
+            </Route>
 
             {/* Platform super admin */}
             <Route element={<ProtectedRoute roles={["platform_super_admin"]} />}>
@@ -62,14 +83,22 @@ export default function App() {
                 />
               }
             >
-              <Route path="/orders" element={<OrdersPage />} />
               <Route path="/catalog" element={<CatalogPage />} />
-              <Route path="/customers" element={<CustomersPage />} />
               <Route path="/scheduling" element={<SchedulingPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/shops" element={<ShopsPage />} />
 
               {/* Plan-gated feature modules */}
+              <Route
+                element={
+                  <FeatureRoute
+                    feature="can_use_customer_data"
+                    featureLabel="Customers"
+                  />
+                }
+              >
+                <Route path="/customers" element={<CustomersPage />} />
+              </Route>
               <Route
                 element={
                   <FeatureRoute
@@ -102,7 +131,11 @@ export default function App() {
             <Route
               element={
                 <ProtectedRoute
-                  roles={["platform_super_admin", "account_super_admin"]}
+                  roles={[
+                    "platform_super_admin",
+                    "account_super_admin",
+                    "shop_admin",
+                  ]}
                 />
               }
             >
