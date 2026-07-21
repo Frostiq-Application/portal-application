@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import type { Entitlements, PlanFeatureKey } from "@/types";
 
 /** Roles whose access is gated by the brand's subscription plan. */
-const GATED_ROLES = ["account_super_admin", "shop_admin"] as const;
+const GATED_ROLES = ["account_super_admin", "shop_admin", "staff"] as const;
 
 export interface EntitlementsState {
   /** True while the entitlements query is in flight (gated roles only). */
