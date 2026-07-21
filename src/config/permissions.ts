@@ -39,6 +39,7 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
           platform_super_admin: "none",
           account_super_admin: "full",
           shop_admin: "scoped",
+          staff: "scoped",
         },
       },
       {
@@ -49,6 +50,7 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
           platform_super_admin: "none",
           account_super_admin: "full",
           shop_admin: "scoped",
+          staff: "scoped",
         },
       },
       {
@@ -59,6 +61,7 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
           platform_super_admin: "none",
           account_super_admin: "full",
           shop_admin: "scoped",
+          staff: "none",
         },
       },
       {
@@ -69,6 +72,7 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
           platform_super_admin: "none",
           account_super_admin: "full",
           shop_admin: "scoped",
+          staff: "none",
         },
       },
     ],
@@ -84,6 +88,7 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
           platform_super_admin: "none",
           account_super_admin: "full",
           shop_admin: "scoped",
+          staff: "none",
         },
       },
       {
@@ -95,6 +100,7 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
           platform_super_admin: "none",
           account_super_admin: "full",
           shop_admin: "scoped",
+          staff: "none",
         },
       },
       {
@@ -106,6 +112,7 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
           platform_super_admin: "none",
           account_super_admin: "full",
           shop_admin: "scoped",
+          staff: "none",
         },
       },
       {
@@ -117,6 +124,7 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
           platform_super_admin: "none",
           account_super_admin: "full",
           shop_admin: "none",
+          staff: "none",
         },
       },
     ],
@@ -132,6 +140,7 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
           platform_super_admin: "none",
           account_super_admin: "full",
           shop_admin: "scoped",
+          staff: "none",
         },
       },
       {
@@ -142,6 +151,7 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
           platform_super_admin: "none",
           account_super_admin: "full",
           shop_admin: "none",
+          staff: "none",
         },
       },
       {
@@ -151,7 +161,8 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
         access: {
           platform_super_admin: "full",
           account_super_admin: "full",
-          shop_admin: "none",
+          shop_admin: "scoped",
+          staff: "none",
         },
       },
       {
@@ -163,6 +174,7 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
           platform_super_admin: "full",
           account_super_admin: "full",
           shop_admin: "scoped",
+          staff: "none",
         },
       },
     ],
@@ -178,6 +190,7 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
           platform_super_admin: "full",
           account_super_admin: "none",
           shop_admin: "none",
+          staff: "none",
         },
       },
       {
@@ -188,6 +201,7 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
           platform_super_admin: "full",
           account_super_admin: "none",
           shop_admin: "none",
+          staff: "none",
         },
       },
       {
@@ -198,6 +212,7 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
           platform_super_admin: "full",
           account_super_admin: "none",
           shop_admin: "none",
+          staff: "none",
         },
       },
     ],
