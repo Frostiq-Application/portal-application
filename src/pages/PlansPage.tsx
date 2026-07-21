@@ -8,6 +8,7 @@ import {
   useUnarchivePlanMutation,
 } from "@/features/api/plansApi";
 import { apiError } from "@/lib/apiError";
+import { annualSavingsPct } from "@/lib/subscriptions";
 import { cn } from "@/lib/utils";
 import type { Plan } from "@/types";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -76,6 +77,7 @@ const ROWS: Row[] = [
     label: "WhatsApp checkout",
     render: (p) => bool(p, "can_use_whatsapp_checkout"),
   },
+  { label: "Customer data", render: (p) => bool(p, "can_use_customer_data") },
   { label: "Priority support", render: (p) => bool(p, "priority_support") },
 ];
 
@@ -234,6 +236,23 @@ export function PlansPage() {
                           / mo
                         </span>
                       </div>
+                      {p.priceAnnual != null && (
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                          or ₹{Number(p.priceAnnual).toLocaleString("en-IN")}/yr
+                          {(() => {
+                            const pct = annualSavingsPct(
+                              p.priceMonthly,
+                              p.priceAnnual,
+                            );
+                            return pct != null ? (
+                              <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                                {" "}
+                                · save {pct}%
+                              </span>
+                            ) : null;
+                          })()}
+                        </div>
+                      )}
                       <div className="mt-1 text-[11px] font-normal text-muted-foreground">
                         Order #{p.sortOrder}
                         {!p.isPublic && " · Hidden"}
