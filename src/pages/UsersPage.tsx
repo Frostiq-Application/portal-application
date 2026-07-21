@@ -47,10 +47,12 @@ import {
  */
 const PLATFORM_TAB_ROLES: Role[] = ["platform_super_admin", "account_super_admin"];
 const OWNER_TAB_ROLES: Role[] = ["shop_admin"];
+const SHOP_ADMIN_TAB_ROLES: Role[] = ["staff"];
 const ROLE_ICON: Record<Role, typeof UserCog> = {
   platform_super_admin: UserCog,
   account_super_admin: Store,
   shop_admin: Store,
+  staff: UsersIcon,
 };
 
 function initials(name: string): string {
@@ -65,7 +67,12 @@ function initials(name: string): string {
 export function UsersPage() {
   const { role } = useAuth();
   const isPlatform = isPlatformAdmin(role);
-  const tabRoles = isPlatform ? PLATFORM_TAB_ROLES : OWNER_TAB_ROLES;
+  const isBranchOwner = role === "shop_admin";
+  const tabRoles = isPlatform
+    ? PLATFORM_TAB_ROLES
+    : isBranchOwner
+      ? SHOP_ADMIN_TAB_ROLES
+      : OWNER_TAB_ROLES;
 
   const [search, setSearch] = useState("");
   const debounced = useDebouncedValue(search, 350);
@@ -132,7 +139,9 @@ export function UsersPage() {
         description={
           isPlatform
             ? "Admin members, roles & branch assignments"
-            : "Your branch owners & their branch assignments"
+            : isBranchOwner
+              ? "Your branch staff"
+              : "Your branch owners & their branch assignments"
         }
         actions={
           <div className="flex items-center gap-3">
@@ -252,9 +261,12 @@ function MemberCard({
   onToggleActive: () => void;
 }) {
   const isShopAdmin = user.role === "shop_admin";
-  // Platform admins toggle each other; Shop Owners toggle their Branch Owners.
+  // Platform admins toggle each other; Shop Owners toggle Branch Owners; Branch
+  // Owners toggle their staff.
   const canToggleActive =
-    user.role === "platform_super_admin" || user.role === "shop_admin";
+    user.role === "platform_super_admin" ||
+    user.role === "shop_admin" ||
+    user.role === "staff";
   return (
     <div
       className={cn(
