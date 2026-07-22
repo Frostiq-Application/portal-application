@@ -15,8 +15,12 @@ import { logout } from "@/features/auth/authSlice";
 import { toggleTheme } from "@/features/ui/uiSlice";
 import { useAuth } from "@/hooks/useAuth";
 import { useEntitlements } from "@/hooks/useEntitlements";
-import { selectHasUnseenOrders } from "@/features/notifications/notificationsSlice";
+import {
+  selectHasUnseenOrders,
+  selectHasUnseenEnquiries,
+} from "@/features/notifications/notificationsSlice";
 import { OrderNotifications } from "@/components/orders/OrderNotifications";
+import { EnquiryNotifications } from "@/components/enquiries/EnquiryNotifications";
 import { AccountDeactivatedGate } from "@/components/gating/AccountDeactivatedGate";
 import { NoSubscriptionGate } from "@/components/gating/NoSubscriptionGate";
 import { navForRole, type NavItem } from "@/config/nav";
@@ -49,6 +53,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const { role } = useAuth();
   const { hasFeature } = useEntitlements();
   const hasUnseenOrders = useAppSelector(selectHasUnseenOrders);
+  const hasUnseenEnquiries = useAppSelector(selectHasUnseenEnquiries);
   const items = navForRole(role).filter(
     (i) => !i.feature || hasFeature(i.feature),
   );
@@ -102,6 +107,12 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                       <span
                         className="ml-auto h-2 w-2 shrink-0 rounded-full bg-red-500"
                         title="New orders"
+                      />
+                    )}
+                    {item.path === "/queries" && hasUnseenEnquiries && (
+                      <span
+                        className="ml-auto h-2 w-2 shrink-0 rounded-full bg-red-500"
+                        title="New queries"
                       />
                     )}
                   </NavLink>
@@ -224,6 +235,8 @@ export function AppLayout() {
     <div className="flex min-h-screen bg-muted/30">
       {/* App-wide order alerts: one SSE connection, bell + toast + sidebar dot. */}
       <OrderNotifications />
+      {/* App-wide enquiry alerts (platform super admin only): same pattern. */}
+      <EnquiryNotifications />
 
       {/* Desktop sidebar */}
       <aside className="hidden w-64 shrink-0 border-r bg-background lg:block">

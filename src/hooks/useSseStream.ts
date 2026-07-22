@@ -27,12 +27,20 @@ export type StreamStatus = "connecting" | "open" | "closed";
  * `path` is appended to the API base (e.g. "/orders/stream"). Pass
  * `enabled: false` (e.g. when the brand's plan doesn't include realtime) to skip
  * connecting entirely — the server would 403 anyway, so we report "closed".
+ *
+ * `opts.requireAccount` (default `true`) gates the connection on the signed-in
+ * user having an `accountId` — correct for brand-scoped streams like Orders,
+ * where platform admins (no `accountId`) have nothing to subscribe to. Pass
+ * `false` for platform-wide streams (e.g. Queries) that platform admins *do*
+ * need to connect to despite having no `accountId`.
  */
 export function useSseStream<T>(
   path: string,
   onEvent: (e: T) => void,
   enabled = true,
+  opts?: { requireAccount?: boolean },
 ): StreamStatus {
+  const requireAccount = opts?.requireAccount ?? true;
   const dispatch = useAppDispatch();
   const accessToken = useAppSelector((s) => s.auth.accessToken);
   const refreshToken = useAppSelector((s) => s.auth.refreshToken);
@@ -47,7 +55,7 @@ export function useSseStream<T>(
   useEffect(() => {
     // Disabled by plan, or brand-scoped stream for a user without a brand
     // (platform admins have no accountId) → don't connect.
-    if (!enabled || !accessToken || !accountId) {
+    if (!enabled || !accessToken || (requireAccount && !accountId)) {
       setStatus("closed");
       return;
     }

@@ -385,6 +385,30 @@ export interface OrderEvent {
   at: string;
 }
 
+/** What an enquiry is about. Keep in sync with the backend's ENQUIRY_TYPES. */
+export type EnquiryType =
+  | "general"
+  | "demo"
+  | "custom_quote"
+  | "partnership"
+  | "other";
+
+/** A landing-page enquiry (phone-number lead capture, super admin only). */
+export interface Enquiry {
+  id: string;
+  phone: string;
+  type: EnquiryType;
+  createdAt: string;
+}
+
+/** A new enquiry pushed over SSE (`GET /enquiries/stream`). */
+export interface EnquiryEvent {
+  id: string;
+  phone: string;
+  type: EnquiryType;
+  at: string;
+}
+
 /** One custom-cake-request change pushed over the realtime SSE stream. */
 export interface CustomCakeStreamEvent {
   accountId: string;

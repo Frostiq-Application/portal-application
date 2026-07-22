@@ -7,11 +7,17 @@ interface NotificationsState {
   hasUnseenOrders: boolean;
   /** Live SSE connection state, surfaced app-wide for the Orders indicator. */
   streamStatus: StreamStatus;
+  /** A new enquiry landed while the user was away from the Queries screen. */
+  hasUnseenEnquiries: boolean;
+  /** Live SSE connection state for the Queries indicator. */
+  enquiryStreamStatus: StreamStatus;
 }
 
 const initialState: NotificationsState = {
   hasUnseenOrders: false,
   streamStatus: "connecting",
+  hasUnseenEnquiries: false,
+  enquiryStreamStatus: "connecting",
 };
 
 const notificationsSlice = createSlice({
@@ -29,15 +35,36 @@ const notificationsSlice = createSlice({
     setStreamStatus(state, action: PayloadAction<StreamStatus>) {
       state.streamStatus = action.payload;
     },
+    /** A new enquiry arrived off-screen — raise the sidebar dot. */
+    enquiryArrived(state) {
+      state.hasUnseenEnquiries = true;
+    },
+    /** User opened the Queries screen — clear the dot. */
+    enquiriesSeen(state) {
+      state.hasUnseenEnquiries = false;
+    },
+    setEnquiryStreamStatus(state, action: PayloadAction<StreamStatus>) {
+      state.enquiryStreamStatus = action.payload;
+    },
   },
 });
 
-export const { newOrderArrived, ordersSeen, setStreamStatus } =
-  notificationsSlice.actions;
+export const {
+  newOrderArrived,
+  ordersSeen,
+  setStreamStatus,
+  enquiryArrived,
+  enquiriesSeen,
+  setEnquiryStreamStatus,
+} = notificationsSlice.actions;
 
 export const selectHasUnseenOrders = (s: RootState) =>
   s.notifications.hasUnseenOrders;
 export const selectStreamStatus = (s: RootState) =>
   s.notifications.streamStatus;
+export const selectHasUnseenEnquiries = (s: RootState) =>
+  s.notifications.hasUnseenEnquiries;
+export const selectEnquiryStreamStatus = (s: RootState) =>
+  s.notifications.enquiryStreamStatus;
 
 export default notificationsSlice.reducer;

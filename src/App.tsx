@@ -11,6 +11,7 @@ import { DashboardPage } from "@/pages/DashboardPage";
 import { AccountsPage } from "@/pages/AccountsPage";
 import { PlansPage } from "@/pages/PlansPage";
 import { SubscriptionsPage } from "@/pages/SubscriptionsPage";
+import { QueriesPage } from "@/pages/QueriesPage";
 import { MySubscriptionPage } from "@/pages/MySubscriptionPage";
 import { ShopsPage } from "@/pages/ShopsPage";
 import { UsersPage } from "@/pages/UsersPage";
@@ -73,6 +74,7 @@ export default function App() {
               <Route path="/accounts" element={<AccountsPage />} />
               <Route path="/plans" element={<PlansPage />} />
               <Route path="/subscriptions" element={<SubscriptionsPage />} />
+              <Route path="/queries" element={<QueriesPage />} />
             </Route>
 
             {/* Brand + shop admin (hidden from platform super admin) */}

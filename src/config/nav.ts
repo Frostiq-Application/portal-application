@@ -14,6 +14,7 @@ import {
   ShoppingBag,
   Cake,
   CakeSlice,
+  Phone,
   type LucideIcon,
 } from "lucide-react";
 import type { PlanFeatureKey, Role } from "@/types";
@@ -94,6 +95,13 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Subscriptions",
     path: "/subscriptions",
     icon: ScrollText,
+    roles: ["platform_super_admin"],
+    group: "Platform",
+  },
+  {
+    label: "Queries",
+    path: "/queries",
+    icon: Phone,
     roles: ["platform_super_admin"],
     group: "Platform",
   },
