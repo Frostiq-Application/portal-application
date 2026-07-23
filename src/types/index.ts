@@ -347,15 +347,42 @@ export interface OrderStatusHistory {
   changedAt: string;
 }
 
+/**
+ * Contact details of whoever placed the order. Comes with the order itself
+ * (not the plan-gated /customers module) so staff can always reach the buyer.
+ */
+export interface OrderCustomer {
+  id: string;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+/** The address a delivery order goes to. Null for pickup. */
+export interface OrderDeliveryAddress {
+  id: string;
+  label: string | null;
+  fullAddress: string;
+  landmark: string | null;
+  city: string | null;
+  pincode: string | null;
+  latitude: string | null;
+  longitude: string | null;
+}
+
 export interface Order {
   id: string;
   orderNumber: string;
   shopId: string;
   accountId: string;
   customerId: string;
+  customer: OrderCustomer | null;
   status: OrderStatus;
   deliveryType: DeliveryType;
   deliveryAddressId: string | null;
+  deliveryAddress: OrderDeliveryAddress | null;
   scheduledDate: string;
   scheduledSlotStart: string | null;
   scheduledSlotEnd: string | null;
