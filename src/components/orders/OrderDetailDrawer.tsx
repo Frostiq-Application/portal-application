@@ -25,6 +25,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { OrderCustomerPanel } from "./OrderCustomerPanel";
 
 interface Props {
   orderId: string | null;
@@ -134,107 +136,129 @@ export function OrderDetailDrawer({ orderId, onOpenChange }: Props) {
             </SheetHeader>
 
             <div className="space-y-6 p-6">
-              {/* Items — each line carries the product photo and add-on photos. */}
-              <div className="space-y-3">
-                {order.items.map((it) => (
-                  <div key={it.id} className="rounded-lg border p-3">
-                    <div className="flex gap-3">
-                      <Thumb
-                        src={it.imageUrl}
-                        alt={it.productName}
-                        className="h-16 w-16"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex justify-between gap-2">
-                          <span className="font-medium">
-                            {it.quantity}× {it.productName}
-                          </span>
-                          <span className="whitespace-nowrap">
-                            ₹{Number(it.lineTotal)}
-                          </span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {it.variantLabel}
-                          {it.flavorName ? ` · ${it.flavorName}` : ""}
-                        </p>
-                      </div>
-                    </div>
+              {/* Order lines vs. who placed them — actions below stay visible
+                  on both tabs. Keyed so opening another order resets to Order. */}
+              <Tabs key={order.id} defaultValue="order">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="order">Order</TabsTrigger>
+                  <TabsTrigger value="customer">Customer</TabsTrigger>
+                </TabsList>
 
-                    {it.addons.length > 0 && (
-                      <div className="mt-3 space-y-2 border-t pt-3">
-                        {it.addons.map((a, i) => (
-                          <div key={i} className="flex items-center gap-2 text-xs">
-                            <Thumb
-                              src={a.imageUrl}
-                              alt={a.name}
-                              className="h-8 w-8"
-                            />
-                            <span className="flex-1 text-muted-foreground">
-                              + {a.name}
-                            </span>
-                            <span className="text-muted-foreground">
-                              ₹{Number(a.price)}
-                            </span>
+                <TabsContent value="order" className="mt-4 space-y-6">
+                  {/* Items — each line carries the product photo and add-on photos. */}
+                  <div className="space-y-3">
+                    {order.items.map((it) => (
+                      <div key={it.id} className="rounded-lg border p-3">
+                        <div className="flex gap-3">
+                          <Thumb
+                            src={it.imageUrl}
+                            alt={it.productName}
+                            className="h-16 w-16"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex justify-between gap-2">
+                              <span className="font-medium">
+                                {it.quantity}× {it.productName}
+                              </span>
+                              <span className="whitespace-nowrap">
+                                ₹{Number(it.lineTotal)}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {it.variantLabel}
+                              {it.flavorName ? ` · ${it.flavorName}` : ""}
+                            </p>
                           </div>
-                        ))}
+                        </div>
+
+                        {it.addons.length > 0 && (
+                          <div className="mt-3 space-y-2 border-t pt-3">
+                            {it.addons.map((a, i) => (
+                              <div
+                                key={i}
+                                className="flex items-center gap-2 text-xs"
+                              >
+                                <Thumb
+                                  src={a.imageUrl}
+                                  alt={a.name}
+                                  className="h-8 w-8"
+                                />
+                                <span className="flex-1 text-muted-foreground">
+                                  + {a.name}
+                                </span>
+                                <span className="text-muted-foreground">
+                                  ₹{Number(a.price)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Totals */}
+                  <div className="space-y-1 border-t pt-4 text-sm">
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Subtotal</span>
+                      <span>₹{Number(order.subtotal)}</span>
+                    </div>
+                    {Number(order.discountAmount) > 0 && (
+                      <div className="flex justify-between text-emerald-600">
+                        <span>Discount</span>
+                        <span>−₹{Number(order.discountAmount)}</span>
                       </div>
                     )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Totals */}
-              <div className="space-y-1 border-t pt-4 text-sm">
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Subtotal</span>
-                  <span>₹{Number(order.subtotal)}</span>
-                </div>
-                {Number(order.discountAmount) > 0 && (
-                  <div className="flex justify-between text-emerald-600">
-                    <span>Discount</span>
-                    <span>−₹{Number(order.discountAmount)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between font-semibold">
-                  <span>Total</span>
-                  <span>₹{Number(order.totalAmount)}</span>
-                </div>
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Payment</span>
-                  <span>
-                    {order.paymentMethod.toUpperCase()} · {order.paymentStatus}
-                  </span>
-                </div>
-              </div>
-
-              {order.customerNote && (
-                <p className="rounded-md bg-muted p-3 text-xs">
-                  <span className="font-medium">Note:</span> {order.customerNote}
-                </p>
-              )}
-
-              {/* Timeline */}
-              <div className="border-t pt-4">
-                <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">
-                  Timeline
-                </p>
-                <ol className="space-y-1.5">
-                  {order.statusHistory.map((h, i) => (
-                    <li key={i} className="flex items-center gap-2 text-xs">
-                      <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                      <span className="font-medium">
-                        {ORDER_STATUS_LABEL[h.status]}
+                    <div className="flex justify-between font-semibold">
+                      <span>Total</span>
+                      <span>₹{Number(order.totalAmount)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Payment</span>
+                      <span>
+                        {order.paymentMethod.toUpperCase()} ·{" "}
+                        {order.paymentStatus}
                       </span>
-                      <span className="text-muted-foreground">
-                        {new Date(h.changedAt).toLocaleString()}
-                      </span>
-                      {h.note && (
-                        <span className="text-muted-foreground">— {h.note}</span>
-                      )}
-                    </li>
-                  ))}
-                </ol>
-              </div>
+                    </div>
+                  </div>
+
+                  {order.customerNote && (
+                    <p className="rounded-md bg-muted p-3 text-xs">
+                      <span className="font-medium">Note:</span>{" "}
+                      {order.customerNote}
+                    </p>
+                  )}
+
+                  {/* Timeline */}
+                  <div className="border-t pt-4">
+                    <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">
+                      Timeline
+                    </p>
+                    <ol className="space-y-1.5">
+                      {order.statusHistory.map((h, i) => (
+                        <li key={i} className="flex items-center gap-2 text-xs">
+                          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                          <span className="font-medium">
+                            {ORDER_STATUS_LABEL[h.status]}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {new Date(h.changedAt).toLocaleString()}
+                          </span>
+                          {h.note && (
+                            <span className="text-muted-foreground">
+                              — {h.note}
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="customer" className="mt-4">
+                  <OrderCustomerPanel order={order} />
+                </TabsContent>
+              </Tabs>
 
               {/* Actions */}
               {!showCancel ? (
