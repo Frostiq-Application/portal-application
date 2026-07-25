@@ -14,18 +14,27 @@ export interface EntitlementsState {
   /** Whether the brand has a usable subscription. Exempt roles are always true. */
   hasActiveSubscription: boolean;
   /**
-   * True when the account itself is deactivated (not "active": suspended,
-   * rejected, or pending). Such accounts must contact the super admin — a plan
-   * can't fix it. Exempt roles are never deactivated.
+   * True only when a platform admin has suspended or rejected the account —
+   * something the owner cannot fix themselves, so the gate points at support.
+   *
+   * Explicitly **not** true for `pending`, which just means signup isn't
+   * finished; that routes to onboarding.
    */
   isAccountDeactivated: boolean;
   /**
-   * True when the brand's latest subscription has expired. The brand can't
-   * self-serve a renewal (only the platform admin records payments), so this is
-   * a hard block — treated like a deactivated account, not a "pick a plan"
-   * prompt. Exempt roles are never expired.
+   * True when the subscription is `locked` or `cancelled` — the storefront is
+   * offline and feature modules are unavailable.
+   *
+   * Unlike the old `expired` state, this is **not** a dead end: the owner can
+   * log in and pay, and paying restores service instantly. So the UI points
+   * them at billing rather than at "contact your admin".
    */
   isSubscriptionExpired: boolean;
+  /**
+   * Payment is overdue but the storefront is still live (`grace`). Worth a
+   * banner; never a block.
+   */
+  isInGracePeriod: boolean;
   entitlements?: Entitlements;
   /**
    * The brand identity to render in the app shell. For gated roles (account &
@@ -62,10 +71,25 @@ export function useEntitlements(): EntitlementsState {
     hasActiveSubscription: isExempt
       ? true
       : Boolean(data?.hasActiveSubscription),
+    // Only a *deactivation* counts — `suspended` and `rejected` are things a
+    // platform admin did to an established account.
+    //
+    // `pending` deliberately does NOT: an account that hasn't finished signing
+    // up isn't deactivated, it's mid-signup. Treating the two the same meant
+    // choosing a paid plan bounced the owner to "your account is deactivated"
+    // on the way to checkout, which is both wrong and alarming. OnboardingGate
+    // routes pending accounts to the wizard instead.
     isAccountDeactivated:
-      !isExempt && data != null && data.accountStatus !== "active",
+      !isExempt &&
+      data != null &&
+      (data.accountStatus === "suspended" || data.accountStatus === "rejected"),
     isSubscriptionExpired:
-      !isExempt && data != null && data.subscriptionStatus === "expired",
+      !isExempt &&
+      data != null &&
+      (data.subscriptionStatus === "locked" ||
+        data.subscriptionStatus === "cancelled"),
+    isInGracePeriod:
+      !isExempt && data != null && data.subscriptionStatus === "grace",
     entitlements: data,
     brand:
       !isExempt && data?.accountName
