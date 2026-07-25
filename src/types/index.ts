@@ -116,28 +116,40 @@ export interface UserCreated extends User {
   inviteToken: string;
 }
 
+export type PlanVisibility = "public" | "hidden";
+
 export interface Plan {
   id: string;
+  code: string | null;
   name: string;
+  tagline: string | null;
   description: string | null;
+  /** **The single price.** Every cycle price derives from it. */
   priceMonthly: string;
-  /** Total yearly price when billed annually. Null = no annual option. */
-  priceAnnual: string | null;
-  maxShops: number | null;
-  maxProductsPerShop: number | null;
-  features: Record<string, boolean>;
+  visibility: PlanVisibility;
+  /** Binds a hidden Enterprise plan to one negotiated account. */
+  exclusiveAccountId: string | null;
+  badge: string | null;
+  isArchived: boolean;
   isActive: boolean;
-  isPublic: boolean;
-  /** Display order in the comparison view. Lower = shown first. */
+  /** Display order in the pricing page / comparison view. Lower = first. */
   sortOrder: number;
+  /** Free-trial window in days; 0 on every plan that isn't the offer. */
+  trialDays: number;
+  features: Record<string, boolean | number | null>;
 }
 
+/**
+ * subscription.md §7. `grace` keeps the storefront **live** while payment is
+ * pending — deliberately, to protect orders already in flight. `locked` takes
+ * it offline but still lets the owner log in and pay.
+ */
 export type SubscriptionStatus =
   | "trial"
   | "active"
-  | "expired"
-  | "cancelled"
-  | "suspended";
+  | "grace"
+  | "locked"
+  | "cancelled";
 
 /** Plan feature flags gating admin-app modules (BRD §5.15). */
 export interface PlanFeatureFlags {
@@ -156,8 +168,6 @@ export interface PlanFeatureFlags {
   can_use_audit_log?: boolean;
   /** Custom cake ordering (quote-request module). */
   can_use_custom_cake?: boolean;
-  /** Route checkout through WhatsApp instead of in-app place-order. */
-  can_use_whatsapp_checkout?: boolean;
   /** Customer directory: lifetime spend, order history & contact data. */
   can_use_customer_data?: boolean;
   priority_support?: boolean;
@@ -182,61 +192,24 @@ export interface Entitlements {
   planName: string | null;
   subscriptionStatus: SubscriptionStatus | null;
   features: PlanFeatureFlags;
+  /**
+   * **Effective** limits — plan value plus purchased add-on capacity
+   * (subscription.md §5.1). Null = unlimited. Never the raw plan value.
+   */
   maxShops: number | null;
   shopsUsed: number;
   maxProductsPerShop: number | null;
-  /** Max team members allowed by the plan. Null = unlimited (or no plan). */
   maxTeamSeats: number | null;
-  /** Team members currently in use. */
   teamSeatsUsed: number;
   support: {
     email: string | null;
     whatsapp: string | null;
   };
 }
-export type BillingCycle = "monthly" | "quarterly" | "annual";
-export type PaymentMethodType = "upi" | "bank_transfer" | "cash" | "other";
+/** Cycles are data, not an enum — the API returns whatever rows exist. */
+export type BillingCycleCode = string;
 
-export interface Subscription {
-  id: string;
-  accountId: string;
-  planId: string;
-  status: SubscriptionStatus;
-  billingCycle: BillingCycle;
-  priceAtSubscription: string;
-  startDate: string;
-  endDate: string;
-  nextBillingDate: string;
-  trialEndsAt: string | null;
-  autoRenew: boolean;
-  notes: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
 
-export interface SubscriptionPayment {
-  id: string;
-  subscriptionId: string;
-  accountId: string;
-  amount: string;
-  currency: string;
-  paymentDate: string;
-  periodStart: string;
-  periodEnd: string;
-  paymentMethod: PaymentMethodType;
-  referenceNote: string | null;
-  receiptNumber: string;
-  createdAt: string;
-}
-
-export interface BillingSummary {
-  mrr: string;
-  totalCollected: string;
-  activeSubscriptions: number;
-  trialSubscriptions: number;
-  dueSoon: number;
-  overdue: number;
-}
 
 // ==================== Catalog ====================
 
@@ -418,14 +391,32 @@ export type EnquiryType =
   | "demo"
   | "custom_quote"
   | "partnership"
+  | "enterprise"
   | "other";
+
+/**
+ * Where a lead stands in the sales inbox. Keep in sync with the backend's
+ * ENQUIRY_STATUSES — any status may follow any other.
+ */
+export type EnquiryStatus = "new" | "contacted" | "converted" | "closed";
 
 /** A landing-page enquiry (phone-number lead capture, super admin only). */
 export interface Enquiry {
   id: string;
   phone: string;
   type: EnquiryType;
+  status: EnquiryStatus;
+  /** Null until someone first moves it out of `new`. */
+  statusUpdatedAt: string | null;
   createdAt: string;
+  /* Everything below arrives with enterprise briefs; null on landing-page
+     leads, which only ever carry a phone number. */
+  name: string | null;
+  email: string | null;
+  shopName: string | null;
+  message: string | null;
+  /** Structured sales-intake answers — branch band, volume, features wanted. */
+  details: Record<string, unknown> | null;
 }
 
 /** A new enquiry pushed over SSE (`GET /enquiries/stream`). */
