@@ -36,8 +36,29 @@ export interface UpdateAccountBody {
   currentPlanId?: string;
 }
 
+export interface RegisterAccountBody {
+  /** Shop/brand name. */
+  name: string;
+  ownerName: string;
+  ownerPhone: string;
+  ownerEmail: string;
+  /** URL identity — becomes the storefront subdomain and tenant schema. */
+  appSlug: string;
+  password: string;
+}
+
 export const accountsApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
+    /**
+     * Public self-registration. Creates the account plus its owner user, both
+     * pending — the account only goes active once onboarding completes.
+     *
+     * Deliberately tag-free: nothing is cached before you have a session.
+     */
+    registerAccount: build.mutation<Account, RegisterAccountBody>({
+      query: (body) => ({ url: "/accounts/register", method: "POST", body }),
+    }),
+
     listAccounts: build.query<Paginated<Account>, AccountsQuery | void>({
       query: (params) => ({
         url: "/accounts",
@@ -139,6 +160,7 @@ export const accountsApi = baseApi.injectEndpoints({
 });
 
 export const {
+  useRegisterAccountMutation,
   useListAccountsQuery,
   useGetAccountQuery,
   useMyAccountQuery,
