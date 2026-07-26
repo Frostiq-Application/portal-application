@@ -1,296 +1,478 @@
-import { useMemo, useState } from "react";
-import { Check, MoreHorizontal, X } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
+import { Archive, ArchiveRestore, EyeOff, Gift, Pencil, Plus, Ticket, Users } from "@/components/ui/icons";
 import {
+  useAdminCyclesQuery,
+  useAdminFeaturesQuery,
+  useAdminPlansQuery,
   useArchivePlanMutation,
-  useDeletePlanMutation,
-  useListPlansQuery,
-  useUnarchivePlanMutation,
-} from "@/features/api/plansApi";
-import { apiError } from "@/lib/apiError";
-import { annualSavingsPct } from "@/lib/subscriptions";
+  useSetCycleActiveMutation,
+  useSetFeatureActiveMutation,
+} from "@/features/api/billingAdminApi";
+import { useListAccountsQuery } from "@/features/api/accountsApi";
+import { inr, inrShort } from "@/lib/billing";
 import { cn } from "@/lib/utils";
-import type { Plan } from "@/types";
+import type { AdminPlan, BillingCycle, BillingFeature } from "@/types/billing";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { PlanDialog } from "@/components/plans/PlanDialog";
-import { Badge } from "@/components/ui/badge";
+import { PlanEditorDialog } from "@/components/billing/PlanEditorDialog";
+import { FeatureEditorDialog } from "@/components/billing/FeatureEditorDialog";
+import { CycleEditorDialog } from "@/components/billing/CycleEditorDialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 /**
- * Comparison-matrix rows. Each row reads a value off a plan and renders the
- * per-column cell — a check/cross for booleans, or a formatted value/limit.
+ * The plan row scrolls sideways instead of wrapping. `pb-2` keeps the cards'
+ * shadow from being shaved off by the scroll container's clip.
  */
-type Row = {
-  label: string;
-  render: (plan: Plan) => React.ReactNode;
-};
+const PLAN_ROW_CLASS = "flex gap-4 overflow-x-auto pb-2";
 
-function Yes() {
-  return <Check className="mx-auto h-5 w-5 text-emerald-600" />;
-}
-function No() {
-  return <X className="mx-auto h-5 w-5 text-muted-foreground/30" />;
-}
-function bool(plan: Plan, key: string) {
-  return (plan.features as Record<string, boolean>)?.[key] ? <Yes /> : <No />;
-}
-function limit(value: number | null | undefined) {
-  return (
-    <span className="text-sm">{value == null ? "Unlimited" : value}</span>
-  );
-}
+/**
+ * `shrink-0` is what forces the overflow: cards hold their floor width instead
+ * of squeezing, so the row scrolls. `grow basis-*` still lets a short catalogue
+ * spread across the full width.
+ */
+const PLAN_CARD_CLASS = "shrink-0 grow basis-[19rem]";
 
-const ROWS: Row[] = [
-  { label: "Branches", render: (p) => limit(p.maxShops) },
-  { label: "Products / branch", render: (p) => limit(p.maxProductsPerShop) },
-  {
-    label: "Team members",
-    render: (p) =>
-      limit(
-        (p.features as unknown as Record<string, number | null>)
-          ?.max_team_seats ?? null,
-      ),
-  },
-  { label: "Coupons", render: (p) => bool(p, "can_use_coupons") },
-  { label: "CMS", render: (p) => bool(p, "can_use_cms") },
-  { label: "Catalog cloning", render: (p) => bool(p, "can_clone_catalog") },
-  { label: "Realtime orders", render: (p) => bool(p, "can_use_realtime") },
-  { label: "Analytics", render: (p) => bool(p, "can_use_analytics") },
-  {
-    label: "Wishlist analytics",
-    render: (p) => bool(p, "can_use_wishlist_analytics"),
-  },
-  {
-    label: "Advanced analytics",
-    render: (p) => bool(p, "can_use_advanced_analytics"),
-  },
-  { label: "Audit log", render: (p) => bool(p, "can_use_audit_log") },
-  { label: "Custom cake", render: (p) => bool(p, "can_use_custom_cake") },
-  {
-    label: "WhatsApp checkout",
-    render: (p) => bool(p, "can_use_whatsapp_checkout"),
-  },
-  { label: "Customer data", render: (p) => bool(p, "can_use_customer_data") },
-  { label: "Priority support", render: (p) => bool(p, "priority_support") },
-];
-
+/**
+ * The Super Admin catalogue (SA-01 … SA-10): what is sold, at what price, on
+ * what cycles.
+ *
+ * Three tabs because they're three different jobs — plans are the packaging,
+ * features are the building blocks, cycles are the billing rhythm.
+ */
 export function PlansPage() {
-  const { data, isLoading } = useListPlansQuery({ page: 1, limit: 50 });
+  const { data: plans, isLoading } = useAdminPlansQuery();
+  const { data: features } = useAdminFeaturesQuery();
+  const { data: cycles } = useAdminCyclesQuery();
+  const { data: accounts } = useListAccountsQuery({ page: 1, limit: 200 });
+
   const [archivePlan] = useArchivePlanMutation();
-  const [unarchivePlan] = useUnarchivePlanMutation();
-  const [deletePlan] = useDeletePlanMutation();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<Plan | null>(null);
+  const [setFeatureActive] = useSetFeatureActiveMutation();
+  const [setCycleActive] = useSetCycleActiveMutation();
 
-  const openNew = () => {
-    setEditing(null);
-    setDialogOpen(true);
-  };
-  const openEdit = (plan: Plan) => {
-    setEditing(plan);
-    setDialogOpen(true);
-  };
+  const [editing, setEditing] = useState<AdminPlan | null>(null);
+  const [planOpen, setPlanOpen] = useState(false);
+  const [featureEditing, setFeatureEditing] = useState<BillingFeature | null>(
+    null,
+  );
+  const [featureOpen, setFeatureOpen] = useState(false);
+  const [cycleOpen, setCycleOpen] = useState(false);
+  const [cycleEditing, setCycleEditing] = useState<BillingCycle | null>(null);
 
-  // Ordered by the plan's sortOrder (API already sorts, but keep it robust).
-  const plans = useMemo(
-    () =>
-      [...(data?.data ?? [])].sort(
-        (a, b) => a.sortOrder - b.sortOrder || Number(a.priceMonthly) - Number(b.priceMonthly),
-      ),
-    [data],
+  const countFeatures = (features ?? []).filter((f) => f.dataType === "count");
+  const unpricedAddons = countFeatures.filter(
+    (f) => f.addonPriceMonthly == null,
   );
 
-  const doArchive = async (id: string) => {
-    try {
-      await archivePlan(id).unwrap();
-      toast.success("Plan archived");
-    } catch (err) {
-      toast.error(apiError(err));
-    }
-  };
-  const doUnarchive = async (id: string) => {
-    try {
-      await unarchivePlan(id).unwrap();
-      toast.success("Plan unarchived");
-    } catch (err) {
-      toast.error(apiError(err));
-    }
-  };
-  const doDelete = async (id: string) => {
-    try {
-      await deletePlan(id).unwrap();
-      toast.success("Plan deleted");
-    } catch (err) {
-      toast.error(apiError(err));
-    }
-  };
-
-  // Highlight the mid tier as "popular" (visual accent only).
-  const popularId = plans.length ? plans[Math.floor((plans.length - 1) / 2)].id : null;
-
   return (
-    <>
+    <div className="space-y-6">
       <PageHeader
-        title="Plans"
-        description="Subscription tiers & feature gating"
-        actions={<Button onClick={openNew}>New plan</Button>}
+        title="Catalogue"
+        description="Plans, features and billing cycles — everything that defines what accounts can buy."
       />
 
-      {isLoading ? (
-        <div className="rounded-lg border bg-background p-6">
-          <div className="grid grid-cols-4 gap-4">
-            {[0, 1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-64 w-full" />
-            ))}
+      <Tabs defaultValue="plans">
+        <TabsList>
+          <TabsTrigger value="plans">Plans</TabsTrigger>
+          <TabsTrigger value="features">Features</TabsTrigger>
+          <TabsTrigger value="cycles">Billing cycles</TabsTrigger>
+        </TabsList>
+
+        {/* ================================================== plans ======== */}
+        <TabsContent value="plans" className="mt-4 space-y-4">
+          <div className="flex justify-end">
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setPlanOpen(true);
+              }}
+            >
+              <Plus className="size-4" />
+              New plan
+            </Button>
           </div>
-        </div>
-      ) : plans.length === 0 ? (
-        <div className="rounded-lg border bg-background py-16 text-center text-sm text-muted-foreground">
-          No plans yet.
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border bg-background">
-          <table className="w-full min-w-[720px] border-collapse">
-            <thead>
-              <tr>
-                {/* Corner cell */}
-                <th className="w-56 border-b p-5 text-left align-bottom">
-                  <div className="text-lg font-semibold">Choose your plan</div>
-                  <p className="mt-1 text-xs font-normal text-muted-foreground">
-                    Columns are ordered by each plan's display order.
-                  </p>
-                </th>
-                {plans.map((p) => {
-                  const popular = p.id === popularId;
-                  return (
-                    <th
-                      key={p.id}
-                      className={cn(
-                        "border-b border-l p-5 text-left align-top",
-                        popular && "bg-emerald-50/60 dark:bg-emerald-950/20",
-                        !p.isActive && "opacity-60",
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-base font-semibold">
-                              {p.name}
-                            </span>
-                            {popular && (
-                              <Badge className="border-transparent bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-200">
-                                Popular
-                              </Badge>
-                            )}
-                            {!p.isActive && (
-                              <Badge variant="secondary">Archived</Badge>
-                            )}
-                          </div>
-                          {p.description && (
-                            <p className="mt-1 max-w-[13rem] text-xs font-normal text-muted-foreground">
-                              {p.description}
-                            </p>
-                          )}
-                        </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="-mr-2 -mt-2 shrink-0">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openEdit(p)}>
-                              Edit
-                            </DropdownMenuItem>
-                            {p.isActive ? (
-                              <DropdownMenuItem onClick={() => doArchive(p.id)}>
-                                Archive
-                              </DropdownMenuItem>
-                            ) : (
-                              <DropdownMenuItem onClick={() => doUnarchive(p.id)}>
-                                Unarchive
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => doDelete(p.id)}
-                            >
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
 
-                      <div className="mt-4 flex items-baseline gap-1">
-                        <span className="text-2xl font-bold tracking-tight">
-                          ₹{Number(p.priceMonthly).toLocaleString("en-IN")}
-                        </span>
-                        <span className="text-xs font-normal text-muted-foreground">
-                          / mo
-                        </span>
-                      </div>
-                      {p.priceAnnual != null && (
-                        <div className="mt-0.5 text-xs text-muted-foreground">
-                          or ₹{Number(p.priceAnnual).toLocaleString("en-IN")}/yr
-                          {(() => {
-                            const pct = annualSavingsPct(
-                              p.priceMonthly,
-                              p.priceAnnual,
-                            );
-                            return pct != null ? (
-                              <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                                {" "}
-                                · save {pct}%
-                              </span>
-                            ) : null;
-                          })()}
-                        </div>
-                      )}
-                      <div className="mt-1 text-[11px] font-normal text-muted-foreground">
-                        Order #{p.sortOrder}
-                        {!p.isPublic && " · Hidden"}
-                      </div>
-                    </th>
-                  );
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {ROWS.map((row, i) => (
-                <tr key={row.label} className={cn(i % 2 === 1 && "bg-muted/30")}>
-                  <td className="border-b p-4 text-sm font-medium">
-                    {row.label}
-                  </td>
-                  {plans.map((p) => {
-                    const popular = p.id === popularId;
-                    return (
-                      <td
-                        key={p.id}
-                        className={cn(
-                          "border-b border-l p-4 text-center",
-                          popular && "bg-emerald-50/40 dark:bg-emerald-950/10",
-                          !p.isActive && "opacity-60",
+          {/*
+            One scrollable row rather than a wrapping grid: the catalogue grows a
+            plan at a time, and side-by-side comparison is the whole point of this
+            screen. Cards never go below PLAN_CARD_MIN — they grow to fill the row
+            while they fit, and overflow into a horizontal scroll once they don't.
+          */}
+          {isLoading ? (
+            <div className={PLAN_ROW_CLASS}>
+              <Skeleton className={cn(PLAN_CARD_CLASS, "h-56 rounded-xl")} />
+              <Skeleton className={cn(PLAN_CARD_CLASS, "h-56 rounded-xl")} />
+              <Skeleton className={cn(PLAN_CARD_CLASS, "h-56 rounded-xl")} />
+            </div>
+          ) : (
+            <div className={PLAN_ROW_CLASS}>
+              {(plans ?? []).map((plan) => (
+                <Card
+                  key={plan.id}
+                  className={cn(
+                    PLAN_CARD_CLASS,
+                    plan.isArchived && "opacity-60",
+                  )}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="min-w-0">
+                      <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
+                        {plan.name}
+                        {plan.badge && (
+                          <Badge variant="secondary">{plan.badge}</Badge>
                         )}
-                      >
-                        {row.render(p)}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                        {plan.trialDays > 0 && (
+                          <Badge
+                            variant="outline"
+                            className="gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400"
+                          >
+                            <Gift className="size-3" />
+                            {plan.trialDays}-day trial
+                          </Badge>
+                        )}
+                        {plan.visibility === "hidden" && (
+                          <Badge variant="outline" className="gap-1">
+                            <EyeOff className="size-3" />
+                            Hidden
+                          </Badge>
+                        )}
+                        {plan.isArchived && (
+                          <Badge variant="outline">Archived</Badge>
+                        )}
+                      </CardTitle>
+                      {plan.tagline && (
+                        <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                          {plan.tagline}
+                        </p>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <p className="text-2xl font-bold tabular-nums">
+                        {inrShort(plan.priceMonthly)}
+                        <span className="text-sm font-normal text-muted-foreground">
+                          /mo
+                        </span>
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {plan.cyclePrices.map((c) => (
+                          <span
+                            key={c.code}
+                            className="rounded-md bg-muted px-2 py-0.5 text-xs tabular-nums"
+                            title={`${c.payableMonths}× monthly`}
+                          >
+                            {c.name}: {inrShort(c.price)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
 
-      <PlanDialog open={dialogOpen} onOpenChange={setDialogOpen} plan={editing} />
-    </>
+                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <Users className="size-3.5" />
+                      {plan.subscriberCount} subscriber
+                      {plan.subscriberCount === 1 ? "" : "s"}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => {
+                          setEditing({
+                            ...plan,
+                            planFeatures:
+                              plan.features as unknown as AdminPlan["planFeatures"],
+                          });
+                          setPlanOpen(true);
+                        }}
+                      >
+                        <Pencil className="size-3.5" />
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        title={plan.isArchived ? "Restore" : "Archive"}
+                        onClick={async () => {
+                          try {
+                            await archivePlan({
+                              id: plan.id,
+                              archived: !plan.isArchived,
+                            }).unwrap();
+                            toast.success(
+                              plan.isArchived
+                                ? `${plan.name} is back on sale.`
+                                : `${plan.name} archived. Existing subscribers keep it; new signups can't pick it.`,
+                            );
+                          } catch {
+                            toast.error("Couldn't update that plan.");
+                          }
+                        }}
+                      >
+                        {plan.isArchived ? (
+                          <ArchiveRestore className="size-3.5" />
+                        ) : (
+                          <Archive className="size-3.5" />
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          <p className="text-xs text-muted-foreground">
+            Plans are never deleted. Archiving takes one off sale while every
+            existing subscription carries on untouched.
+          </p>
+        </TabsContent>
+
+        {/* ================================================ features ======= */}
+        <TabsContent value="features" className="mt-4 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              Boolean features are obtained by upgrading a plan — they're never
+              sold as add-ons. Count features are numeric limits, extendable with
+              add-ons on any plan.
+            </p>
+            <Button
+              onClick={() => {
+                setFeatureEditing(null);
+                setFeatureOpen(true);
+              }}
+            >
+              <Plus className="size-4" />
+              New feature
+            </Button>
+          </div>
+
+          {unpricedAddons.length > 0 && (
+            <Card className="border-amber-500/40 bg-amber-500/5">
+              <CardContent className="flex items-start gap-3 py-4">
+                <Ticket className="mt-0.5 size-4 shrink-0 text-amber-600" />
+                <p className="text-sm text-amber-800 dark:text-amber-300">
+                  <strong className="font-semibold">
+                    Add-on prices aren't set yet
+                  </strong>{" "}
+                  for {unpricedAddons.map((f) => f.label).join(", ")}. Until a
+                  per-step price is configured, accounts can't buy extra capacity
+                  for those.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardContent className="px-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Feature</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Add-on</TableHead>
+                      <TableHead>Trial cap</TableHead>
+                      <TableHead>Active</TableHead>
+                      <TableHead className="w-10" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(features ?? []).map((f) => (
+                      <TableRow key={f.key}>
+                        <TableCell>
+                          <p className="font-medium">{f.label}</p>
+                          <p className="font-mono text-xs text-muted-foreground">
+                            {f.key}
+                          </p>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              f.dataType === "count" ? "secondary" : "outline"
+                            }
+                          >
+                            {f.dataType === "count" ? "Count" : "Boolean"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {f.category}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {f.dataType !== "count" ? (
+                            <span className="text-xs text-muted-foreground">
+                              Plan only
+                            </span>
+                          ) : f.addonPriceMonthly == null ? (
+                            <span className="text-xs text-amber-600 dark:text-amber-400">
+                              Not on sale
+                            </span>
+                          ) : (
+                            <span className="text-sm tabular-nums">
+                              {inr(f.addonPriceMonthly)} / +{f.addonStep}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="tabular-nums">
+                          {f.dataType === "count" ? (f.trialLimit ?? "—") : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Switch
+                            checked={f.isActive}
+                            onCheckedChange={(v) =>
+                              setFeatureActive({ key: f.key, isActive: v })
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="size-8"
+                            onClick={() => {
+                              setFeatureEditing(f);
+                              setFeatureOpen(true);
+                            }}
+                          >
+                            <Pencil className="size-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ================================================== cycles ======= */}
+        <TabsContent value="cycles" className="mt-4 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              A cycle is total months plus free months — nothing else. The
+              discount is always expressed as months free rather than a
+              percentage, so it can never stack with itself. Adding a cycle needs
+              no code change.
+            </p>
+            <Button
+              onClick={() => {
+                setCycleEditing(null);
+                setCycleOpen(true);
+              }}
+            >
+              <Plus className="size-4" />
+              New cycle
+            </Button>
+          </div>
+
+          <Card>
+            <CardContent className="px-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Cycle</TableHead>
+                      <TableHead>Months</TableHead>
+                      <TableHead>Free</TableHead>
+                      <TableHead>Multiplier</TableHead>
+                      <TableHead>At ₹2,499/mo</TableHead>
+                      <TableHead>Active</TableHead>
+                      <TableHead className="w-10" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(cycles ?? []).map((c) => {
+                      const payable = c.months - c.freeMonths;
+                      return (
+                        <TableRow key={c.code}>
+                          <TableCell>
+                            <p className="font-medium">{c.name}</p>
+                            <p className="font-mono text-xs text-muted-foreground">
+                              {c.code}
+                            </p>
+                          </TableCell>
+                          <TableCell className="tabular-nums">
+                            {c.months}
+                          </TableCell>
+                          <TableCell className="tabular-nums">
+                            {c.freeMonths}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{payable}×</Badge>
+                          </TableCell>
+                          <TableCell className="tabular-nums">
+                            {inrShort(2499 * payable)}
+                          </TableCell>
+                          <TableCell>
+                            <Switch
+                              checked={c.isActive}
+                              onCheckedChange={(v) =>
+                                setCycleActive({ code: c.code, isActive: v })
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="size-8"
+                              title={`Edit ${c.name}`}
+                              onClick={() => {
+                                setCycleEditing(c);
+                                setCycleOpen(true);
+                              }}
+                            >
+                              <Pencil className="size-3.5" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <PlanEditorDialog
+        open={planOpen}
+        onOpenChange={setPlanOpen}
+        plan={editing}
+        features={features ?? []}
+        cycles={cycles ?? []}
+        accounts={(accounts?.data ?? []).map((a) => ({
+          id: a.id,
+          name: a.name,
+        }))}
+      />
+      <FeatureEditorDialog
+        open={featureOpen}
+        onOpenChange={setFeatureOpen}
+        feature={featureEditing}
+      />
+      <CycleEditorDialog
+        open={cycleOpen}
+        onOpenChange={setCycleOpen}
+        cycle={cycleEditing}
+      />
+    </div>
   );
 }
