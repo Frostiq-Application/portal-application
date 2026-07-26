@@ -2,9 +2,11 @@ import { useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { useAppSelector } from "@/app/hooks";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
+import { OnboardingGate } from "@/routes/OnboardingGate";
 import { FeatureRoute } from "@/routes/FeatureRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { LoginPage } from "@/pages/LoginPage";
+import { RegisterPage } from "@/pages/RegisterPage";
 import { SetPasswordPage } from "@/pages/SetPasswordPage";
 import { DemoDashboardPage } from "@/pages/DemoDashboardPage";
 import { DashboardPage } from "@/pages/DashboardPage";
@@ -12,7 +14,11 @@ import { AccountsPage } from "@/pages/AccountsPage";
 import { PlansPage } from "@/pages/PlansPage";
 import { SubscriptionsPage } from "@/pages/SubscriptionsPage";
 import { QueriesPage } from "@/pages/QueriesPage";
+import { SubscriptionCouponsPage } from "@/pages/SubscriptionCouponsPage";
+import { BillingSettingsPage } from "@/pages/BillingSettingsPage";
 import { MySubscriptionPage } from "@/pages/MySubscriptionPage";
+import { CheckoutPage } from "@/pages/CheckoutPage";
+import { OnboardingPage } from "@/pages/OnboardingPage";
 import { ShopsPage } from "@/pages/ShopsPage";
 import { UsersPage } from "@/pages/UsersPage";
 import { RolesPage } from "@/pages/RolesPage";
@@ -49,11 +55,30 @@ export default function App() {
       <Toaster richColors position="top-right" />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        {/* Public self-serve signup — the way a new bakery gets in. */}
+        <Route path="/register" element={<RegisterPage />} />
         <Route path="/set-password" element={<SetPasswordPage />} />
         {/* Public, backend-free replica of the owner dashboard — for marketing screenshots only */}
         <Route path="/demo-dashboard" element={<DemoDashboardPage />} />
 
+        {/* Setup lives outside AppLayout: a half-configured account has no
+            branches or plan yet, so the sidebar would be mostly locked doors. */}
+        {/*
+          Setup and checkout both sit OUTSIDE AppLayout.
+
+          Not just for focus — AppLayout gates on having an active subscription,
+          and renders "choose a plan" when there isn't one. Checkout is the
+          screen you use to *get* a subscription, so leaving it inside meant the
+          gate hid the cure: clicking "Go to checkout" showed "Start free"
+          instead of a payment form.
+        */}
+        <Route element={<ProtectedRoute roles={["account_super_admin"]} />}>
+          <Route path="/onboarding" element={<OnboardingPage />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
+        </Route>
+
         <Route element={<ProtectedRoute />}>
+          <Route element={<OnboardingGate />}>
           <Route element={<AppLayout />}>
             <Route index element={<HomeRoute />} />
             <Route path="/profile" element={<ProfilePage />} />
@@ -74,6 +99,14 @@ export default function App() {
               <Route path="/accounts" element={<AccountsPage />} />
               <Route path="/plans" element={<PlansPage />} />
               <Route path="/subscriptions" element={<SubscriptionsPage />} />
+              <Route
+                path="/subscription-coupons"
+                element={<SubscriptionCouponsPage />}
+              />
+              <Route
+                path="/billing-settings"
+                element={<BillingSettingsPage />}
+              />
               <Route path="/queries" element={<QueriesPage />} />
             </Route>
 
@@ -160,6 +193,7 @@ export default function App() {
                 element={<MySubscriptionPage />}
               />
             </Route>
+          </Route>
           </Route>
         </Route>
 
