@@ -1,66 +1,29 @@
-import { Check, LogOut, Mail, MessageCircle, Sparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowRight, Lock, LogOut, Mail, MessageCircle, Sparkles } from "@/components/ui/icons";
 import { useAppDispatch } from "@/app/hooks";
 import { logout } from "@/features/auth/authSlice";
-import { useNavigate } from "react-router-dom";
-import { usePublicPlansQuery } from "@/features/api/plansApi";
+import { useAuth } from "@/hooks/useAuth";
+import { useMySubscriptionQuery } from "@/features/api/billingApi";
+import {
+  SUBSCRIPTION_STATUS_HELP,
+  SUBSCRIPTION_STATUS_LABEL,
+} from "@/lib/billing";
+import { formatDate } from "@/lib/utils";
+import type { Entitlements } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import type { Entitlements, Plan } from "@/types";
-
-const FEATURE_LABELS: Record<string, string> = {
-  can_use_coupons: "Coupons",
-  can_use_analytics: "Analytics",
-  can_use_cms: "Content management",
-  can_clone_catalog: "Catalog cloning",
-  priority_support: "Priority support",
-};
-
-function planFeatureLabels(plan: Plan): string[] {
-  return Object.entries(plan.features ?? {})
-    .filter(([, on]) => on)
-    .map(([key]) => FEATURE_LABELS[key] ?? key);
-}
-
-function PlanCard({ plan }: { plan: Plan }) {
-  const features = planFeatureLabels(plan);
-  return (
-    <div className="flex flex-col rounded-xl border bg-background p-6 text-left shadow-sm">
-      <h3 className="text-lg font-semibold">{plan.name}</h3>
-      {plan.description && (
-        <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
-      )}
-      <div className="mt-4">
-        <span className="text-2xl font-bold">₹{plan.priceMonthly}</span>
-        <span className="text-sm text-muted-foreground"> / month</span>
-      </div>
-      <ul className="mt-4 flex flex-col gap-2 text-sm">
-        <li className="flex items-center gap-2">
-          <Check className="h-4 w-4 text-emerald-600" />
-          {plan.maxShops == null
-            ? "Unlimited branches"
-            : `Up to ${plan.maxShops} branch${plan.maxShops === 1 ? "" : "es"}`}
-        </li>
-        <li className="flex items-center gap-2">
-          <Check className="h-4 w-4 text-emerald-600" />
-          {plan.maxProductsPerShop == null
-            ? "Unlimited products per branch"
-            : `${plan.maxProductsPerShop} products per branch`}
-        </li>
-        {features.map((label) => (
-          <li key={label} className="flex items-center gap-2">
-            <Check className="h-4 w-4 text-emerald-600" />
-            {label}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
+import { Badge } from "@/components/ui/badge";
 
 /**
- * Full-screen screen shown to brand/shop admins whose account is active but has
- * no usable subscription. Presents the available plans; activation is done by
- * the platform admin, so the admin is directed to get in touch to subscribe.
+ * Shown to brand/shop admins whose account is active but whose subscription
+ * can't be used — no plan yet, or `locked`/`cancelled`.
+ *
+ * This screen used to be a dead end: only a platform admin could record a
+ * payment, so the copy said "get in touch". Self-serve billing changes that
+ * completely — the **owner** can fix this in about ninety seconds, so the
+ * screen's whole job is now to hand them the button.
+ *
+ * Shop admins and staff still can't buy anything (billing is the owner's
+ * decision), so they get the honest version: ask the owner.
  */
 export function NoSubscriptionGate({
   support,
@@ -69,82 +32,132 @@ export function NoSubscriptionGate({
 }) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const { data: plans, isLoading } = usePublicPlansQuery();
+  const { role } = useAuth();
+  const isOwner = role === "account_super_admin";
+  const { data } = useMySubscriptionQuery(undefined, { skip: !isOwner });
 
+  const sub = data?.subscription;
+  /** Non-null only while the account can still take the free trial. */
+  const trial = !sub ? (data?.trialOffer ?? null) : null;
   const doLogout = () => {
     dispatch(logout());
     navigate("/login", { replace: true });
   };
 
-  return (
-    <div className="min-h-screen bg-muted/30 px-4 py-10">
-      <div className="mx-auto max-w-5xl">
-        <div className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <Sparkles className="h-6 w-6 text-primary" />
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Choose a subscription plan
-          </h1>
-          <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-            Your brand doesn’t have a subscription yet. Pick the plan that fits
-            your business and get in touch to activate it — you’ll have full
-            access to the portal once a plan is active.
-          </p>
-        </div>
+  const headline = !sub
+    ? isOwner
+      ? trial
+        ? `Try ${trial.planName} free for ${trial.days} days`
+        : data?.freePlanAvailable
+          ? "Get your storefront online"
+          : "Choose a plan to get started"
+      : "This brand doesn't have a plan yet"
+    : sub.status === "locked"
+      ? "Your storefront is offline"
+      : "Your subscription has ended";
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {isLoading ? (
-            Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-64 rounded-xl" />
-            ))
-          ) : plans && plans.length > 0 ? (
-            plans.map((plan) => <PlanCard key={plan.id} plan={plan} />)
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4 py-10">
+      <div className="w-full max-w-lg text-center">
+        <div className="mx-auto mb-5 flex size-12 items-center justify-center rounded-full bg-primary/10">
+          {sub ? (
+            <Lock className="size-6 text-primary" />
           ) : (
-            <p className="col-span-full text-center text-sm text-muted-foreground">
-              No plans are available right now. Please contact support to get
-              set up.
-            </p>
+            <Sparkles className="size-6 text-primary" />
           )}
         </div>
 
-        {(support?.email || support?.whatsapp) && (
-          <div className="mx-auto mt-8 flex max-w-md flex-col items-center gap-3">
-            <p className="text-sm text-muted-foreground">
-              Ready to subscribe? Contact us to activate your plan:
-            </p>
-            <div className="flex flex-wrap justify-center gap-2">
-              {support?.email && (
-                <Button asChild variant="outline">
-                  <a href={`mailto:${support.email}`}>
-                    <Mail className="mr-2 h-4 w-4" />
-                    {support.email}
-                  </a>
-                </Button>
-              )}
-              {support?.whatsapp && (
-                <Button asChild variant="outline">
-                  <a
-                    href={`https://wa.me/${support.whatsapp.replace(/[^\d]/g, "")}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <MessageCircle className="mr-2 h-4 w-4" />
-                    {support.whatsapp}
-                  </a>
-                </Button>
-              )}
-            </div>
-          </div>
+        <h1 className="text-2xl font-semibold tracking-tight">{headline}</h1>
+
+        {sub && (
+          <Badge className="mt-3">{SUBSCRIPTION_STATUS_LABEL[sub.status]}</Badge>
         )}
 
-        <div className="mt-8 text-center">
-          <Button
-            variant="ghost"
-            className="text-muted-foreground"
-            onClick={doLogout}
-          >
-            <LogOut className="mr-2 h-4 w-4" />
+        <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
+          {sub ? (
+            <>
+              {SUBSCRIPTION_STATUS_HELP[sub.status]}
+              {sub.deleteReadyAt && (
+                <>
+                  {" "}
+                  Your data is kept until {formatDate(sub.deleteReadyAt)} —
+                  subscribe again before then and everything comes straight
+                  back.
+                </>
+              )}
+            </>
+          ) : isOwner ? (
+            trial ? (
+              <>
+                No card, nothing charged automatically. Your storefront goes
+                live immediately and takes real orders from day one — after{" "}
+                {trial.days} days you choose a plan to carry on.
+              </>
+            ) : data?.freePlanAvailable ? (
+              <>
+                Free to start, no card required and nothing expires. Your
+                storefront goes live immediately and takes real orders from day
+                one.
+              </>
+            ) : (
+              <>
+                Pick a plan and your storefront is back online the moment payment
+                clears.
+              </>
+            )
+          ) : (
+            <>
+              The account owner needs to choose a plan before the portal unlocks.
+              Ask them to open Subscription in their sidebar.
+            </>
+          )}
+        </p>
+
+        <div className="mt-7 flex flex-col items-center gap-3">
+          {isOwner ? (
+            <Button
+              size="lg"
+              className="w-full sm:w-auto"
+              onClick={() => navigate("/my-subscription")}
+            >
+              {sub
+                ? "Reactivate my subscription"
+                : trial
+                  ? `Start my ${trial.days}-day free trial`
+                  : data?.freePlanAvailable
+                    ? "Start free"
+                    : "View plans"}
+              <ArrowRight className="size-4" />
+            </Button>
+          ) : (
+            (support?.email || support?.whatsapp) && (
+              <div className="flex flex-wrap justify-center gap-2">
+                {support?.email && (
+                  <Button variant="outline" asChild>
+                    <a href={`mailto:${support.email}`}>
+                      <Mail className="size-4" />
+                      {support.email}
+                    </a>
+                  </Button>
+                )}
+                {support?.whatsapp && (
+                  <Button variant="outline" asChild>
+                    <a
+                      href={`https://wa.me/${support.whatsapp.replace(/\D/g, "")}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <MessageCircle className="size-4" />
+                      WhatsApp
+                    </a>
+                  </Button>
+                )}
+              </div>
+            )
+          )}
+
+          <Button variant="ghost" size="sm" onClick={doLogout}>
+            <LogOut className="size-4" />
             Sign out
           </Button>
         </div>
