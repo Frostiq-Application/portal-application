@@ -1,44 +1,34 @@
-import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import {
-  ArrowLeft,
-  ArrowLeftRight,
-  CreditCard,
-  MoreHorizontal,
-  Receipt,
-  Store,
-  XCircle,
-} from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
-import { formatDate, cn } from "@/lib/utils";
-import { apiError } from "@/lib/apiError";
+import { AlertTriangle, CalendarClock, Loader2, PlayCircle, RefreshCw, Search, Zap } from "@/components/ui/icons";
 import {
-  BILLING_CYCLE_SHORT,
-  RENEWAL_TONE,
+  useAdminSubscriptionsQuery,
+  useBillingReportsQuery,
+  useRunBillingCycleMutation,
+} from "@/features/api/billingAdminApi";
+import {
   SUBSCRIPTION_STATUS_LABEL,
   SUBSCRIPTION_STATUS_TONE,
-  getRenewalInfo,
-} from "@/lib/subscriptions";
-import {
-  useBillingSummaryQuery,
-  useCancelSubscriptionMutation,
-  useListSubscriptionsQuery,
-} from "@/features/api/subscriptionsApi";
-import {
-  useGetAccountQuery,
-  useListAccountsQuery,
-} from "@/features/api/accountsApi";
-import { useListPlansQuery } from "@/features/api/plansApi";
-import type { Account, Subscription, SubscriptionStatus } from "@/types";
+  inr,
+  inrShort,
+  relativeDays,
+} from "@/lib/billing";
+import { cn, formatDate } from "@/lib/utils";
+import type { SubscriptionStatus } from "@/types";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { ChangePlanDialog } from "@/components/subscriptions/ChangePlanDialog";
-import { CreateSubscriptionDialog } from "@/components/subscriptions/CreateSubscriptionDialog";
-import { MarkPaidDialog } from "@/components/subscriptions/MarkPaidDialog";
-import { RenewalAlerts } from "@/components/subscriptions/RenewalAlerts";
-import { SubscriptionDetailSheet } from "@/components/subscriptions/SubscriptionDetailSheet";
+import { SubscriptionDetailSheet } from "@/components/billing/SubscriptionDetailSheet";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -47,38 +37,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
-type FilterKey = "all" | "active" | "trial" | "due_soon" | "overdue";
-
-const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "active", label: "Active" },
-  { key: "trial", label: "Trial" },
-  { key: "due_soon", label: "Due soon" },
-  { key: "overdue", label: "Overdue" },
+const STATUSES: SubscriptionStatus[] = [
+  "trial",
+  "active",
+  "grace",
+  "locked",
+  "cancelled",
 ];
 
-function money(value: string | number): string {
-  return `₹${Number(value).toLocaleString("en-IN")}`;
-}
-
-function StatCard({
+function Stat({
   label,
   value,
   hint,
@@ -87,416 +55,391 @@ function StatCard({
   label: string;
   value: string | number;
   hint?: string;
-  tone?: "warn" | "danger";
+  tone?: "warn" | "bad";
 }) {
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
-          {label}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div
+      <CardContent className="py-4">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p
           className={cn(
-            "text-2xl font-bold",
+            "mt-1 text-2xl font-bold tabular-nums",
             tone === "warn" && "text-amber-600 dark:text-amber-400",
-            tone === "danger" && "text-red-600 dark:text-red-400",
+            tone === "bad" && "text-destructive",
           )}
         >
           {value}
-        </div>
-        {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
+        </p>
+        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
       </CardContent>
     </Card>
   );
 }
 
+/**
+ * Subscription oversight (SA-15/18).
+ *
+ * The table leads with what a platform admin actually scans for: who's about to
+ * renew, who's in dunning, and who has a change queued. Money summaries sit on
+ * top so the health of the book is legible before any row is read.
+ */
 export function SubscriptionsPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const scopedAccountId = searchParams.get("accountId") ?? undefined;
+  const [status, setStatus] = useState<SubscriptionStatus | "all">("all");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
-  const [filter, setFilter] = useState<FilterKey>("all");
-
-  const { data: summary } = useBillingSummaryQuery();
-  const { data, isLoading } = useListSubscriptionsQuery({
-    page: 1,
-    limit: 100,
-    accountId: scopedAccountId,
+  const { data, isLoading, isFetching } = useAdminSubscriptionsQuery({
+    page,
+    limit: 20,
+    ...(status !== "all" ? { status } : {}),
+    ...(search.trim() ? { search: search.trim() } : {}),
   });
-  const { data: accounts } = useListAccountsQuery({ page: 1, limit: 100 });
-  const { data: plans } = useListPlansQuery({ page: 1, limit: 100 });
-  const { data: scopedAccount } = useGetAccountQuery(scopedAccountId ?? "", {
-    skip: !scopedAccountId,
-  });
+  const { data: reports } = useBillingReportsQuery();
+  const [runCycle, { isLoading: running }] = useRunBillingCycleMutation();
 
-  const [cancelSub] = useCancelSubscriptionMutation();
-  const [payTarget, setPayTarget] = useState<Subscription | null>(null);
-  const [detailTarget, setDetailTarget] = useState<Subscription | null>(null);
-  const [cancelTarget, setCancelTarget] = useState<Subscription | null>(null);
-  const [changePlanTarget, setChangePlanTarget] = useState<Subscription | null>(
-    null,
+  const mrr = (reports?.revenueByPlan ?? []).reduce(
+    (s, r) => s + Number(r.mrr),
+    0,
   );
-
-  const accountName = useMemo(() => {
-    const m = new Map((accounts?.data ?? []).map((a) => [a.id, a.name]));
-    return (id: string) => m.get(id) ?? id.slice(0, 8);
-  }, [accounts]);
-  const accountLogo = useMemo(() => {
-    const m = new Map(
-      (accounts?.data ?? []).map((a) => [a.id, a.logoUrl] as const),
-    );
-    return (id: string) => m.get(id) ?? null;
-  }, [accounts]);
-  const planName = useMemo(() => {
-    const m = new Map((plans?.data ?? []).map((p) => [p.id, p.name]));
-    return (id: string) => m.get(id) ?? id.slice(0, 8);
-  }, [plans]);
-
-  const allRows = data?.data ?? [];
-
-  const rows = useMemo(() => {
-    return allRows.filter((s) => {
-      const r = getRenewalInfo(s.status, s.nextBillingDate);
-      switch (filter) {
-        case "active":
-          return s.status === "active";
-        case "trial":
-          return s.status === "trial";
-        case "due_soon":
-          return r.urgency === "soon";
-        case "overdue":
-          return r.urgency === "overdue";
-        default:
-          return true;
-      }
-    });
-  }, [allRows, filter]);
-
-  const filterCounts = useMemo(() => {
-    const c: Record<FilterKey, number> = {
-      all: allRows.length,
-      active: 0,
-      trial: 0,
-      due_soon: 0,
-      overdue: 0,
-    };
-    for (const s of allRows) {
-      if (s.status === "active") c.active += 1;
-      if (s.status === "trial") c.trial += 1;
-      const r = getRenewalInfo(s.status, s.nextBillingDate);
-      if (r.urgency === "soon") c.due_soon += 1;
-      if (r.urgency === "overdue") c.overdue += 1;
-    }
-    return c;
-  }, [allRows]);
-
-  const clearScope = () => {
-    searchParams.delete("accountId");
-    setSearchParams(searchParams, { replace: true });
-  };
-
-  const doCancel = async (s: Subscription) => {
-    try {
-      await cancelSub(s.id).unwrap();
-      toast.success("Subscription cancelled");
-      setDetailTarget((d) => (d?.id === s.id ? null : d));
-    } catch (err) {
-      toast.error(apiError(err));
-    } finally {
-      setCancelTarget(null);
-    }
-  };
+  const counts = reports?.statusCounts ?? {};
+  const meta = data?.meta ?? { total: 0, page: 1, limit: 20, totalPages: 0 };
 
   return (
-    <>
+    <div className="space-y-6">
       <PageHeader
         title="Subscriptions"
-        description="Billing contracts, renewals & payments"
+        description="Every account's plan, renewal, dunning state and scheduled changes."
         actions={
-          <CreateSubscriptionDialog defaultAccountId={scopedAccountId} />
+          <Button
+          variant="outline"
+          disabled={running}
+          onClick={async () => {
+            try {
+              const result = await runCycle().unwrap();
+              toast.success(
+                `Sweep done: ${result.renewalsProcessed} renewal(s), ${result.charged} charged, ${result.movedToGrace} into grace, ${result.locked} locked, ${result.remindersSent} reminder(s).`,
+              );
+            } catch {
+              toast.error("Couldn't run the billing sweep.");
+            }
+          }}
+        >
+          {running ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <PlayCircle className="size-4" />
+          )}
+            Run billing sweep
+          </Button>
         }
       />
 
-      {/* Account-scoped banner (arrived from a shop) */}
-      {scopedAccountId && (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border bg-muted/40 px-4 py-2.5">
-          <div className="flex min-w-0 items-center gap-2 text-sm">
-            <Store className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="truncate">
-              Showing subscriptions for{" "}
-              <strong>
-                {(scopedAccount as Account | undefined)?.name ??
-                  accountName(scopedAccountId)}
-              </strong>
-            </span>
-          </div>
-          <Button variant="ghost" size="sm" onClick={clearScope}>
-            <ArrowLeft className="mr-1.5 h-4 w-4" />
-            All subscriptions
-          </Button>
-        </div>
-      )}
-
-      {!scopedAccountId && (
-        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatCard
-            label="MRR"
-            value={summary ? money(summary.mrr) : "—"}
-            hint="Monthly recurring revenue"
-          />
-          <StatCard
-            label="Collected"
-            value={summary ? money(summary.totalCollected) : "—"}
-            hint="All-time payments"
-          />
-          <StatCard
-            label="Due soon"
-            value={summary?.dueSoon ?? "—"}
-            hint="Renewing within 7 days"
-            tone={summary?.dueSoon ? "warn" : undefined}
-          />
-          <StatCard
-            label="Overdue"
-            value={summary?.overdue ?? "—"}
-            hint="Past renewal date"
-            tone={summary?.overdue ? "danger" : undefined}
-          />
-        </div>
-      )}
-
-      {/* Renewals needing attention */}
-      <RenewalAlerts
-        subscriptions={allRows}
-        accountName={accountName}
-        onRecordPayment={setPayTarget}
-        onOpen={setDetailTarget}
-      />
-
-      {/* Filter segmented control */}
-      <div className="mb-4 flex flex-wrap gap-1.5">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            type="button"
-            onClick={() => setFilter(f.key)}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-              filter === f.key
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-background text-muted-foreground hover:bg-muted",
-            )}
-          >
-            {f.label}
-            <span
-              className={cn(
-                "rounded-full px-1.5 text-xs tabular-nums",
-                filter === f.key
-                  ? "bg-primary-foreground/20"
-                  : "bg-muted text-muted-foreground",
-              )}
-            >
-              {filterCounts[f.key]}
-            </span>
-          </button>
-        ))}
+      {/* ---- health ------------------------------------------------------- */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <Stat
+          label="MRR"
+          value={inrShort(mrr)}
+          hint="Live subscriptions, normalised monthly"
+        />
+        <Stat label="Active" value={counts.active ?? 0} hint="Paying" />
+        <Stat label="Trials" value={counts.trial ?? 0} hint="No card yet" />
+        <Stat
+          label="In grace"
+          value={counts.grace ?? 0}
+          hint="Storefront still live"
+          tone={counts.grace ? "warn" : undefined}
+        />
+        <Stat
+          label="Locked"
+          value={counts.locked ?? 0}
+          hint="Storefront offline"
+          tone={counts.locked ? "bad" : undefined}
+        />
       </div>
 
-      <div className="rounded-lg border bg-background">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Shop</TableHead>
-              <TableHead>Plan</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Price</TableHead>
-              <TableHead>Renewal</TableHead>
-              <TableHead className="w-10" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              [0, 1, 2].map((i) => (
-                <TableRow key={i}>
-                  <TableCell colSpan={6}>
-                    <Skeleton className="h-6 w-full" />
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : rows.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="py-10 text-center text-sm text-muted-foreground"
-                >
-                  {allRows.length === 0
-                    ? "No subscriptions yet."
-                    : "No subscriptions match this filter."}
-                </TableCell>
-              </TableRow>
-            ) : (
-              rows.map((s) => {
-                const renewal = getRenewalInfo(s.status, s.nextBillingDate);
-                const logo = accountLogo(s.accountId);
-                return (
-                  <TableRow
-                    key={s.id}
-                    className="cursor-pointer"
-                    onClick={() => setDetailTarget(s)}
-                  >
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2.5">
-                        {logo ? (
-                          <img
-                            src={logo}
-                            alt=""
-                            className="h-7 w-7 shrink-0 rounded-full border object-cover"
-                          />
+      {(reports?.failedPayments30d ?? 0) > 0 && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="flex items-center gap-3 py-4">
+            <AlertTriangle className="size-4 shrink-0 text-amber-600" />
+            <p className="text-sm text-amber-800 dark:text-amber-300">
+              <strong className="font-semibold">
+                {reports!.failedPayments30d} failed payment
+                {reports!.failedPayments30d === 1 ? "" : "s"}
+              </strong>{" "}
+              in the last 30 days. Accounts in grace are still serving customers
+              — retries run on days 1, 3, 5 and 7.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ---- filters ------------------------------------------------------ */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative min-w-56 flex-1">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            placeholder="Search by account name"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+        <Select
+          value={status}
+          onValueChange={(v) => {
+            setStatus(v as SubscriptionStatus | "all");
+            setPage(1);
+          }}
+        >
+          <SelectTrigger className="w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {STATUSES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {SUBSCRIPTION_STATUS_LABEL[s]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {isFetching && (
+          <RefreshCw className="size-4 animate-spin text-muted-foreground" />
+        )}
+      </div>
+
+      {/* ---- table -------------------------------------------------------- */}
+      <Card>
+        <CardContent className="px-0">
+          {isLoading ? (
+            <div className="space-y-2 px-6 py-4">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : (data?.data ?? []).length === 0 ? (
+            <p className="px-6 py-10 text-center text-sm text-muted-foreground">
+              No subscriptions match those filters.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Account</TableHead>
+                    <TableHead>Plan</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Renews</TableHead>
+                    <TableHead className="text-right">Monthly</TableHead>
+                    <TableHead>Payment</TableHead>
+                    <TableHead>Flags</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data!.data.map((row) => (
+                    <TableRow
+                      key={row.id}
+                      className="cursor-pointer"
+                      onClick={() => setDetailId(row.id)}
+                    >
+                      <TableCell>
+                        <p className="font-medium">{row.accountName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {row.ownerEmail}
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        <p>{row.planName}</p>
+                        <p className="text-xs capitalize text-muted-foreground">
+                          {row.billingCycle}
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={SUBSCRIPTION_STATUS_TONE[row.status]}>
+                          {SUBSCRIPTION_STATUS_LABEL[row.status]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {formatDate(row.currentPeriodEnd)}
+                        <p className="text-xs text-muted-foreground">
+                          {relativeDays(row.currentPeriodEnd)}
+                        </p>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {inr(row.lockedMonthlyPrice)}
+                      </TableCell>
+                      <TableCell>
+                        {row.autopayEnabled ? (
+                          <span className="flex items-center gap-1 text-sm">
+                            <Zap className="size-3.5 text-amber-500" />
+                            Autopay
+                          </span>
                         ) : (
-                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold uppercase text-muted-foreground">
-                            {accountName(s.accountId).slice(0, 2)}
+                          <span className="text-sm text-muted-foreground">
+                            Manual
                           </span>
                         )}
-                        <span className="truncate">
-                          {accountName(s.accountId)}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{planName(s.planId)}</TableCell>
-                    <TableCell>
-                      <span
-                        className={cn(
-                          "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-                          SUBSCRIPTION_STATUS_TONE[s.status],
-                        )}
-                      >
-                        {SUBSCRIPTION_STATUS_LABEL[s.status]}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {row.dunningAttempt > 0 && (
+                            <Badge variant="destructive" className="text-xs">
+                              Retry {row.dunningAttempt}
+                            </Badge>
+                          )}
+                          {row.hasScheduledChange && (
+                            <Badge variant="outline" className="gap-1 text-xs">
+                              <CalendarClock className="size-3" />
+                              Change queued
+                            </Badge>
+                          )}
+                          {row.cancelAtPeriodEnd && (
+                            <Badge variant="outline" className="text-xs">
+                              Cancelling
+                            </Badge>
+                          )}
+                          {row.deleteReadyAt && (
+                            <Badge variant="destructive" className="text-xs">
+                              Delete-ready
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Read defensively: a pagination footer is never worth white-screening
+          the whole page over if the envelope shape ever shifts again. */}
+      {meta.totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Page {meta.page} of {meta.totalPages} · {meta.total} subscriptions
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= meta.totalPages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ---- reports ------------------------------------------------------ */}
+      {reports && (
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Revenue by plan</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {reports.revenueByPlan.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No live subscriptions yet.
+                </p>
+              ) : (
+                reports.revenueByPlan.map((r, i) => (
+                  <div
+                    key={`${r.plan}-${r.cycle}-${i}`}
+                    className="flex items-center justify-between gap-2 text-sm"
+                  >
+                    <span className="min-w-0 truncate">
+                      {r.plan}
+                      <span className="ml-1 text-xs capitalize text-muted-foreground">
+                        {r.cycle}
                       </span>
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      {money(s.priceAtSubscription)}
-                      <span className="text-xs text-muted-foreground">
-                        /{BILLING_CYCLE_SHORT[s.billingCycle]}
+                    </span>
+                    <span className="shrink-0 tabular-nums">
+                      {inrShort(r.mrr)}
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        · {r.subscribers}
                       </span>
-                    </TableCell>
-                    <TableCell>
-                      {renewal.urgency === "none" ? (
-                        <span className="text-sm text-muted-foreground">—</span>
-                      ) : (
-                        <span
-                          className={cn(
-                            "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-                            RENEWAL_TONE[renewal.urgency],
-                          )}
-                          title={formatDate(s.nextBillingDate)}
-                        >
-                          {renewal.label}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setDetailTarget(s)}>
-                            <Receipt className="mr-2 h-4 w-4" />
-                            View history
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setPayTarget(s)}>
-                            <CreditCard className="mr-2 h-4 w-4" />
-                            Record payment
-                          </DropdownMenuItem>
-                          {s.status !== "cancelled" && (
-                            <DropdownMenuItem
-                              onClick={() => setChangePlanTarget(s)}
-                            >
-                              <ArrowLeftRight className="mr-2 h-4 w-4" />
-                              Change plan
-                            </DropdownMenuItem>
-                          )}
-                          {s.status !== "cancelled" && (
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => setCancelTarget(s)}
-                            >
-                              <XCircle className="mr-2 h-4 w-4" />
-                              Cancel
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                    </span>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Coupon performance</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {reports.couponPerformance.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No coupons created yet.
+                </p>
+              ) : (
+                reports.couponPerformance.slice(0, 8).map((c) => (
+                  <div
+                    key={c.code}
+                    className="flex items-center justify-between gap-2 text-sm"
+                  >
+                    <span className="truncate font-mono text-xs">{c.code}</span>
+                    <span className="shrink-0 tabular-nums text-muted-foreground">
+                      {c.redemptions} used · {inrShort(c.discountGiven)} given
+                    </span>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Why accounts leave</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {reports.cancellations.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No cancellations. Good.
+                </p>
+              ) : (
+                reports.cancellations.map((c) => (
+                  <div
+                    key={c.reason}
+                    className="flex items-center justify-between gap-2 text-sm"
+                  >
+                    <span className="truncate capitalize">
+                      {c.reason.replace(/_/g, " ")}
+                    </span>
+                    <span className="shrink-0 tabular-nums text-muted-foreground">
+                      {c.count}
+                    </span>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <SubscriptionDetailSheet
-        subscription={detailTarget}
-        accountName={detailTarget ? accountName(detailTarget.accountId) : ""}
-        planName={detailTarget ? planName(detailTarget.planId) : ""}
-        onOpenChange={(o) => !o && setDetailTarget(null)}
-        onRecordPayment={setPayTarget}
-        onChangePlan={setChangePlanTarget}
-        onCancel={setCancelTarget}
+        subscriptionId={detailId}
+        onOpenChange={(o) => !o && setDetailId(null)}
       />
-
-      <ChangePlanDialog
-        subscription={changePlanTarget}
-        accountName={
-          changePlanTarget ? accountName(changePlanTarget.accountId) : ""
-        }
-        currentPlanName={
-          changePlanTarget ? planName(changePlanTarget.planId) : ""
-        }
-        onOpenChange={(o) => !o && setChangePlanTarget(null)}
-        onSuccess={(s) =>
-          setDetailTarget((d) => (d?.id === s.id ? s : d))
-        }
-      />
-
-      <MarkPaidDialog
-        subscription={payTarget}
-        onOpenChange={(o) => !o && setPayTarget(null)}
-        onSuccess={(s) =>
-          setDetailTarget((d) => (d?.id === s.id ? null : d))
-        }
-      />
-
-      <AlertDialog
-        open={!!cancelTarget}
-        onOpenChange={(o) => !o && setCancelTarget(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cancel subscription?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This cancels{" "}
-              <strong>
-                {cancelTarget ? accountName(cancelTarget.accountId) : ""}
-              </strong>
-              &rsquo;s subscription and turns off auto-renew. Their app access
-              may be blocked until a new subscription is created.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep subscription</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => cancelTarget && doCancel(cancelTarget)}
-            >
-              Cancel subscription
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+    </div>
   );
 }
