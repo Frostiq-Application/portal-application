@@ -19,7 +19,9 @@ export function FeatureRoute({
 
   if (isLoading) return null;
   if (!hasFeature(feature)) {
-    return <LockedFeature featureLabel={featureLabel} />;
+    // Pass the failing gate through so the card can name the cheapest plan
+    // that actually unlocks it, rather than a generic "upgrade" message.
+    return <LockedFeature feature={feature} featureLabel={featureLabel} />;
   }
   return <Outlet />;
 }
