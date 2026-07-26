@@ -1,28 +1,10 @@
-import {
-  LayoutDashboard,
-  Building2,
-  Store,
-  Users as UsersIcon,
-  Contact,
-  CalendarClock,
-  ShieldCheck,
-  BarChart3,
-  CreditCard,
-  Tags,
-  Image as ImageIcon,
-  ScrollText,
-  ShoppingBag,
-  Cake,
-  CakeSlice,
-  Phone,
-  type LucideIcon,
-} from "lucide-react";
+import { LayoutDashboard, Building2, Store, Users as UsersIcon, Contact, CalendarClock, ShieldCheck, BarChart3, CreditCard, Tags, Image as ImageIcon, ScrollText, ShoppingBag, Cake, CakeSlice, Phone, BadgePercent, Settings2, type IconComponent } from "@/components/ui/icons";
 import type { PlanFeatureKey, Role } from "@/types";
 
 export interface NavItem {
   label: string;
   path: string;
-  icon: LucideIcon;
+  icon: IconComponent;
   /** roles allowed to see this item; omit for all authenticated admins */
   roles?: Role[];
   /** plan feature that must be unlocked for this item to appear (gated roles) */
@@ -85,7 +67,7 @@ export const NAV_ITEMS: NavItem[] = [
     group: "Platform",
   },
   {
-    label: "Plans",
+    label: "Catalogue",
     path: "/plans",
     icon: CreditCard,
     roles: ["platform_super_admin"],
@@ -95,6 +77,22 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Subscriptions",
     path: "/subscriptions",
     icon: ScrollText,
+    roles: ["platform_super_admin"],
+    group: "Platform",
+  },
+  {
+    // Platform coupons discount a bakery's SUBSCRIPTION bill — a different
+    // animal entirely from the /coupons page a bakery uses for its customers.
+    label: "Sub. coupons",
+    path: "/subscription-coupons",
+    icon: BadgePercent,
+    roles: ["platform_super_admin"],
+    group: "Platform",
+  },
+  {
+    label: "Billing settings",
+    path: "/billing-settings",
+    icon: Settings2,
     roles: ["platform_super_admin"],
     group: "Platform",
   },
