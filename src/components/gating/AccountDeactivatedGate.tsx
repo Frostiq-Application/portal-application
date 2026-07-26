@@ -1,4 +1,4 @@
-import { LogOut, Mail, MessageCircle, ShieldAlert } from "lucide-react";
+import { LogOut, Mail, MessageCircle, ShieldAlert } from "@/components/ui/icons";
 import { useAppDispatch } from "@/app/hooks";
 import { logout } from "@/features/auth/authSlice";
 import { useNavigate } from "react-router-dom";
