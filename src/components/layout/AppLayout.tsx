@@ -1,15 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import {
-  Cake,
-  LogOut,
-  Menu,
-  Moon,
-  Plus,
-  Sun,
-  UserRound,
-  X,
-} from "lucide-react";
+import { Crown, LogOut, Menu, Moon, Plus, Sun, UserRound, X } from "@/components/ui/icons";
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import { logout } from "@/features/auth/authSlice";
 import { toggleTheme } from "@/features/ui/uiSlice";
@@ -19,6 +10,7 @@ import {
   selectHasUnseenOrders,
   selectHasUnseenEnquiries,
 } from "@/features/notifications/notificationsSlice";
+import { FrostiqueMark } from "@/components/common/FrostiqueMark";
 import { OrderNotifications } from "@/components/orders/OrderNotifications";
 import { EnquiryNotifications } from "@/components/enquiries/EnquiryNotifications";
 import { AccountDeactivatedGate } from "@/components/gating/AccountDeactivatedGate";
@@ -49,14 +41,26 @@ const GROUP_ORDER: NavItem["group"][] = [
   "Configuration",
 ];
 
-function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
+/**
+ * The sidebar. Exported so its plan-gating behaviour can be tested directly —
+ * locking the wrong item is a silent revenue bug, not a visual one.
+ */
+export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const { role } = useAuth();
   const { hasFeature } = useEntitlements();
   const hasUnseenOrders = useAppSelector(selectHasUnseenOrders);
   const hasUnseenEnquiries = useAppSelector(selectHasUnseenEnquiries);
-  const items = navForRole(role).filter(
-    (i) => !i.feature || hasFeature(i.feature),
-  );
+  // Plan-gated items are shown, not hidden. A feature the bakery can't see is a
+  // feature it will never buy — and a menu that silently changes shape after an
+  // upgrade is disorienting.
+  //
+  // They're marked with a crown, not a lock, and keep normal text colour. A
+  // padlock beside greyed-out text reads as "broken" or "not for you"; a gold
+  // crown beside a live-looking item reads as "this is the good stuff" — which
+  // is the feeling that actually sells an upgrade. The route still works and
+  // still lands on the upgrade card.
+  const items = navForRole(role);
+  const isLocked = (i: NavItem) => Boolean(i.feature) && !hasFeature(i.feature!);
 
   return (
     <nav className="flex flex-col gap-6 px-3 py-4">
@@ -86,12 +90,22 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                     </span>
                   );
                 }
+                const locked = isLocked(item);
                 return (
                   <NavLink
                     key={item.path}
                     to={item.path}
                     end={item.path === "/"}
                     onClick={onNavigate}
+                    aria-label={
+                      locked ? `${item.label} — not in your plan` : undefined
+                    }
+                    data-locked={locked || undefined}
+                    title={
+                      locked
+                        ? `${item.label} isn't in your plan — tap to see upgrade options`
+                        : undefined
+                    }
                     className={({ isActive }) =>
                       cn(
                         "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
@@ -101,19 +115,42 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                       )
                     }
                   >
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                    {item.path === "/orders" && hasUnseenOrders && (
-                      <span
-                        className="ml-auto h-2 w-2 shrink-0 rounded-full bg-red-500"
-                        title="New orders"
-                      />
-                    )}
-                    {item.path === "/queries" && hasUnseenEnquiries && (
-                      <span
-                        className="ml-auto h-2 w-2 shrink-0 rounded-full bg-red-500"
-                        title="New queries"
-                      />
+                    {/* Render-prop children so the crown can react to the
+                        active row, where amber on the brand fill would clash. */}
+                    {({ isActive }) => (
+                      <>
+                        <Icon className="h-4 w-4" />
+                        {item.label}
+                        {locked && (
+                          /* Contained rather than a bare glyph: a floating
+                             icon at the row's edge reads as stray decoration,
+                             while a tinted chip reads as a deliberate mark and
+                             gives the amber somewhere to sit. */
+                          <span
+                            className={cn(
+                              "ml-auto flex size-5 shrink-0 items-center justify-center rounded-md",
+                              isActive
+                                ? "bg-primary-foreground/15 text-primary-foreground"
+                                : "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+                            )}
+                            aria-hidden
+                          >
+                            <Crown className="size-3" />
+                          </span>
+                        )}
+                        {item.path === "/orders" && hasUnseenOrders && (
+                          <span
+                            className="ml-auto h-2 w-2 shrink-0 rounded-full bg-red-500"
+                            title="New orders"
+                          />
+                        )}
+                        {item.path === "/queries" && hasUnseenEnquiries && (
+                          <span
+                            className="ml-auto h-2 w-2 shrink-0 rounded-full bg-red-500"
+                            title="New queries"
+                          />
+                        )}
+                      </>
                     )}
                   </NavLink>
                 );
@@ -138,17 +175,17 @@ function Brand({
 }) {
   return (
     <div className="flex items-center gap-2 px-5 py-4">
-      <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-primary text-primary-foreground">
-        {brand?.logoUrl ? (
+      {brand?.logoUrl ? (
+        <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-primary text-primary-foreground">
           <img
             src={brand.logoUrl}
             alt={brand.name}
             className="h-full w-full object-cover"
           />
-        ) : (
-          <Cake className="h-5 w-5" />
-        )}
-      </div>
+        </div>
+      ) : (
+        <FrostiqueMark className="h-8 w-8" />
+      )}
       <div className="leading-tight">
         <p className="text-sm font-semibold">{brand?.name ?? "Frostique"}</p>
         <p className="text-xs text-muted-foreground">Admin Portal</p>
