@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Copy, Loader2, Lock, Sparkles } from "lucide-react";
+import { ArrowRight, Copy, Loader2, Lock, Sparkles } from "@/components/ui/icons";
 import { toast } from "sonner";
 import {
   useCloneCatalogMutation,
