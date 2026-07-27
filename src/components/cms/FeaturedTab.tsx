@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Sparkles, Search } from "lucide-react";
+import { Plus, Sparkles, Search } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { apiError } from "@/lib/apiError";

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Facebook, Instagram, Loader2, MessageCircle, Quote } from "lucide-react";
+import { Facebook, Instagram, Loader2, MessageCircle, Quote } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { apiError } from "@/lib/apiError";
 import {

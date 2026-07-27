@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ImageIcon, Images, Loader2, Plus, Trash2 } from "lucide-react";
+import { ImageIcon, Images, Loader2, Plus, Trash2 } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { apiError } from "@/lib/apiError";
 import { cn } from "@/lib/utils";

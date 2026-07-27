@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Loader2, Megaphone, Plus, Trash2 } from "lucide-react";
+import { Check, Loader2, Megaphone, Plus, Trash2 } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { apiError } from "@/lib/apiError";
 import { cn } from "@/lib/utils";
