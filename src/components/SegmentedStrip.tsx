@@ -1,10 +1,10 @@
-import type { LucideIcon } from "lucide-react";
+import type { IconComponent } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 
 export interface SegmentedItem<T extends string> {
   value: T;
   label: string;
-  icon?: LucideIcon;
+  icon?: IconComponent;
   /** Raw hex accent used to tint the active chip's icon, underline and count pill. */
   accent?: string;
   /** Optional count pill. */

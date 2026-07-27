@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Phone } from "lucide-react";
+import { Phone } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { useAppDispatch } from "@/app/hooks";
 import { useAuth } from "@/hooks/useAuth";

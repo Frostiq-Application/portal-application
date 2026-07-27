@@ -1,4 +1,4 @@
-import { BarChart3, Check, Heart, Lock, Mail, MessageCircle, Sparkles, TrendingUp } from "lucide-react";
+import { BarChart3, Check, Heart, Lock, Mail, MessageCircle, Sparkles, TrendingUp } from "@/components/ui/icons";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { cn } from "@/lib/utils";
 import type { PlanFeatureKey } from "@/types";

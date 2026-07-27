@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { ImagePlus, Loader2, X } from "lucide-react";
+import { ImagePlus, Loader2, X } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { useUploadAssetMutation } from "@/features/api/uploadApi";
 import { apiError } from "@/lib/apiError";

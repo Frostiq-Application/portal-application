@@ -1,4 +1,4 @@
-import { Wifi, WifiOff } from "lucide-react";
+import { Wifi, WifiOff } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 import type { StreamStatus } from "@/hooks/useSseStream";
 

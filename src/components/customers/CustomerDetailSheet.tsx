@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MapPin, Phone, Mail, ShoppingBag, Wallet, Clock } from "lucide-react";
+import { MapPin, Phone, Mail, ShoppingBag, Wallet, Clock } from "@/components/ui/icons";
 import { cn, formatDate } from "@/lib/utils";
 import { ORDER_STATUS_LABEL, ORDER_STATUS_TONE } from "@/lib/orders";
 import { useGetCustomerQuery } from "@/features/api/customersApi";
