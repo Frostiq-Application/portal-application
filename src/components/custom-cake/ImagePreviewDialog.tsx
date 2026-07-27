@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "@/components/ui/icons";
 
 /** Full-screen lightbox for browsing a custom cake request's reference images. */
 export function ImagePreviewDialog({

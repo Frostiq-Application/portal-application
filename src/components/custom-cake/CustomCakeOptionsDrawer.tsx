@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ChevronDown, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Plus, Trash2 } from "@/components/ui/icons";
 import {
   useCreateCustomCakeOptionMutation,
   useDeleteCustomCakeOptionMutation,

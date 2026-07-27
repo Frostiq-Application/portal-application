@@ -1,12 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import {
-  MessageCircle,
-  Phone,
-  Receipt,
-  ShoppingBag,
-  StickyNote,
-} from "lucide-react";
+import { MessageCircle, Phone, Receipt, ShoppingBag, StickyNote } from "@/components/ui/icons";
 import {
   useConvertCustomCakeMutation,
   useGetCustomCakeEventsQuery,

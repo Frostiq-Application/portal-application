@@ -1,10 +1,4 @@
-import {
-  CakeSlice,
-  MessageCircle,
-  Receipt,
-  Settings2,
-  ShoppingBag,
-} from "lucide-react";
+import { CakeSlice, MessageCircle, Receipt, Settings2, ShoppingBag } from "@/components/ui/icons";
 import {
   Dialog,
   DialogContent,
