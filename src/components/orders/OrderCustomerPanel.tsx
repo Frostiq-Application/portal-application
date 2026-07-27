@@ -1,15 +1,4 @@
-import {
-  Clock,
-  Copy,
-  Mail,
-  MapPin,
-  MessageCircle,
-  Navigation,
-  Phone,
-  ShoppingBag,
-  Store,
-  Wallet,
-} from "lucide-react";
+import { Clock, Copy, Mail, MapPin, MessageCircle, Navigation, Phone, ShoppingBag, Store, Wallet } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { cn, formatDate } from "@/lib/utils";
 import { ORDER_STATUS_LABEL, ORDER_STATUS_TONE } from "@/lib/orders";
