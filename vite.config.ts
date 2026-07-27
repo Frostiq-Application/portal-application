@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
@@ -11,5 +12,12 @@ export default defineConfig({
   },
   server: {
     port: 5174,
+  },
+  test: {
+    environment: "jsdom",
+    globals: true,
+    setupFiles: ["./src/test/setup.ts"],
+    // Only our own specs — never node_modules or the build output.
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
 });
