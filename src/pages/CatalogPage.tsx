@@ -1,17 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  Boxes,
-  Cake,
-  CheckCircle2,
-  Copy,
-  EyeOff,
-  LayoutGrid,
-  Layers,
-  Lock,
-  MoreHorizontal,
-  Search,
-  X,
-} from "lucide-react";
+import { Boxes, Cake, CheckCircle2, Copy, EyeOff, LayoutGrid, Layers, Lock, MoreHorizontal, Search, X } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { apiError } from "@/lib/apiError";
 import { cn } from "@/lib/utils";
@@ -39,6 +27,11 @@ import { ShopSelect } from "@/components/ShopSelect";
 import { SegmentedStrip } from "@/components/SegmentedStrip";
 import { ProductDialog } from "@/components/catalog/ProductDialog";
 import { AddonDialog } from "@/components/catalog/AddonDialog";
+import {
+  LimitCounter,
+  LimitNotice,
+  useLimitState,
+} from "@/components/gating/LimitNotice";
 import { CategoryDialog } from "@/components/catalog/CategoryDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,7 +76,9 @@ function ProductsTab({
   const [categoryId, setCategoryId] = useState<string | "all">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "hidden">("all");
   const debouncedSearch = useDebouncedValue(search, 350);
-  const atCap = cap != null && used >= cap;
+  // Effective per-branch product limit (plan + add-ons), as enforced server-side.
+  const productLimit = useLimitState(used, cap);
+  const atCap = productLimit.atLimit;
 
   const { data, isLoading } = useListProductsQuery(
     shopId
@@ -227,16 +222,7 @@ function ProductsTab({
         )}
 
         <div className="ml-auto flex items-center gap-3">
-          {cap != null && (
-            <span
-              className={cn(
-                "text-xs font-medium",
-                atCap ? "text-destructive" : "text-muted-foreground",
-              )}
-            >
-              {used} / {cap} products
-            </span>
-          )}
+          <LimitCounter state={productLimit} unit="products" />
           <Button
             onClick={() => {
               setEditing(null);
@@ -245,7 +231,7 @@ function ProductsTab({
             disabled={!shopId || atCap}
             title={
               atCap
-                ? `Your plan allows up to ${cap} products per branch. Upgrade to add more.`
+                ? `Your plan allows ${cap} products per branch. Upgrade or add capacity to list more.`
                 : undefined
             }
           >
@@ -253,12 +239,12 @@ function ProductsTab({
           </Button>
         </div>
       </div>
-      {atCap && (
-        <p className="mb-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-          You’ve reached your plan’s limit of {cap} products for this branch.
-          Upgrade to Growth or Pro to add more.
-        </p>
-      )}
+
+      <LimitNotice
+        state={productLimit}
+        label="products in this branch"
+        unit="products"
+      />
       <div className="rounded-lg border bg-background">
         <Table>
           <TableHeader>
