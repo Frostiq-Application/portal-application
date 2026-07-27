@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Clock, Copy, Loader2, Mail, MapPin, Store, User as UserIcon } from "lucide-react";
+import { Clock, Copy, Loader2, Mail, MapPin, Store, User as UserIcon, Check } from "@/components/ui/icons";
 import { toast } from "sonner";
 import {
   useCreateShopMutation,
@@ -7,14 +7,24 @@ import {
   type CreateShopBody,
 } from "@/features/api/shopsApi";
 import {
+  useAssignShopMutation,
   useCreateUserMutation,
+  useListUsersQuery,
   useResetUserPasswordMutation,
 } from "@/features/api/usersApi";
+import { BranchTeamAccess } from "@/components/shops/BranchTeamAccess";
 import { useListAccountsQuery } from "@/features/api/accountsApi";
 import { useAuth } from "@/hooks/useAuth";
 import { isPlatformAdmin } from "@/lib/roles";
 import { apiError } from "@/lib/apiError";
 import { cn, slugify } from "@/lib/utils";
+import {
+  TIME_SLOTS,
+  WEEKDAYS,
+  formatCoordinates,
+  formatTimeLabel,
+  parseCoordinates,
+} from "@/lib/branch";
 import type { Shop } from "@/types";
 import { ImageUploader } from "@/components/ImageUploader";
 import { Button } from "@/components/ui/button";
@@ -39,55 +49,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 
-const WEEKDAYS = [
-  "sunday",
-  "monday",
-  "tuesday",
-  "wednesday",
-  "thursday",
-  "friday",
-  "saturday",
-];
-
-/** "09:30" -> "9:30 AM", for the time selects. */
-function formatTimeLabel(value: string): string {
-  const [h, m] = value.split(":").map(Number);
-  const period = h < 12 ? "AM" : "PM";
-  const hour = h % 12 === 0 ? 12 : h % 12;
-  return `${hour}:${String(m).padStart(2, "0")} ${period}`;
-}
-
-/**
- * Pulls a "lat,lng" pair out of a pasted Google Maps URL (or a bare
- * "lat, lng" string). Handles the common `@lat,lng`, `?q=lat,lng`, and
- * `!3dlat!4dlng` shapes. Returns null when no plausible coordinates are found.
- */
-function parseCoordinates(input: string): { lat: number; lng: number } | null {
-  const text = input.trim();
-  if (!text) return null;
-
-  // `!3d<lat>!4d<lng>` (place URLs) is the most precise when present.
-  const dm = text.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
-  if (dm) return { lat: Number(dm[1]), lng: Number(dm[2]) };
-
-  // `@lat,lng` (map view) or `q=lat,lng` / a bare "lat, lng" paste.
-  const m =
-    text.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/) ??
-    text.match(/[?&]q=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/) ??
-    text.match(/^(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)$/);
-  if (!m) return null;
-
-  const lat = Number(m[1]);
-  const lng = Number(m[2]);
-  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
-  return { lat, lng };
-}
-
-/** Half-hour slots across the day: 00:00, 00:30, … 23:30. */
-const TIME_SLOTS = Array.from({ length: 48 }, (_, i) => {
-  const value = `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`;
-  return { value, label: formatTimeLabel(value) };
-});
 
 interface Props {
   open: boolean;
@@ -118,6 +79,13 @@ export function ShopDialog({
   const [createShop, { isLoading: creating }] = useCreateShopMutation();
   const [updateShop, { isLoading: updating }] = useUpdateShopMutation();
   const [createUser, { isLoading: invitingOwner }] = useCreateUserMutation();
+  const [assignShop, { isLoading: assigning }] = useAssignShopMutation();
+  // Only the account's own staff can be assigned, so platform admins editing
+  // someone else's branch see the list for that account.
+  const { data: teamPage } = useListUsersQuery(
+    { page: 1, limit: 100 },
+    { skip: !open },
+  );
   const [resetPassword, { isLoading: resetting }] = useResetUserPasswordMutation();
 
   // Shop Owners can hand a brand-new branch straight to a Branch Owner. Platform
@@ -221,6 +189,35 @@ export function ShopDialog({
 
   // The associated user is optional: a branch owner is invited only when their
   // details are supplied. Any filled field opts in and makes name + email required.
+  /** Account staff who could be given access to this branch. */
+  const assignable = (teamPage?.data ?? []).map((u) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    isOwner: u.role === "account_super_admin",
+    pending: u.isActive === false,
+  }));
+  /** Who can already see this branch — the baseline the form diffs against. */
+  const currentlyAssigned = shop
+    ? (teamPage?.data ?? [])
+        .filter((u) => (u.shopIds ?? []).includes(shop.id))
+        .map((u) => u.id)
+    : [];
+  const [assignedUserIds, setAssignedUserIds] = useState<string[]>([]);
+
+  // Seed from current access whenever the drawer opens on an existing branch.
+  useEffect(() => {
+    if (!open) return;
+    setAssignedUserIds(
+      shop
+        ? (teamPage?.data ?? [])
+            .filter((u) => (u.shopIds ?? []).includes(shop.id))
+            .map((u) => u.id)
+        : [],
+    );
+  }, [open, shop, teamPage]);
+
   const ownerRequested =
     canAddOwner &&
     Boolean(ownerName.trim() || ownerEmail.trim() || ownerPhone.trim());
@@ -246,6 +243,24 @@ export function ShopDialog({
       setTab("owner");
       return toast.error("Branch owner needs a name and email");
     }
+    /**
+     * Grant access to everyone ticked. Runs after the branch is saved, since
+     * an assignment needs a branch id — and it's deliberately non-fatal: the
+     * branch is the thing being created, and losing it because one permission
+     * grant failed would be a far worse outcome than a warning toast.
+     */
+    const syncAssignments = async (shopId: string) => {
+      const toAdd = assignedUserIds.filter(
+        (id) => !currentlyAssigned.includes(id),
+      );
+      if (toAdd.length === 0) return;
+      try {
+        for (const id of toAdd) await assignShop({ id, shopId }).unwrap();
+      } catch (err) {
+        toast.error(apiError(err, "Branch saved, but team access didn't apply"));
+      }
+    };
+
     const body: CreateShopBody = {
       branchName: branchName.trim(),
       slug: slug.trim(),
@@ -265,12 +280,14 @@ export function ShopDialog({
         const { slug: _s, ...rest } = body;
         void _s;
         await updateShop({ id: shop.id, body: rest }).unwrap();
+        await syncAssignments(shop.id);
         toast.success("Branch updated");
       } else {
         const created = await createShop({
           ...body,
           ...(platform && accountId ? { accountId } : {}),
         }).unwrap();
+        await syncAssignments(created.id);
         toast.success("Branch created");
 
         // Optionally hand the fresh branch to a Branch Owner. The branch is
@@ -424,38 +441,35 @@ export function ShopDialog({
                 }
               />
             </div>
-            <p className="text-xs text-muted-foreground">
-              Paste a Google Maps link (or type coordinates below). Used to detect
-              the nearest branch for customers.
-            </p>
+            {latitude && longitude && !coordsInvalid ? (
+              <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                <Check className="h-3.5 w-3.5" />
+                Location set — {formatCoordinates(latitude, longitude)}
+                <button
+                  type="button"
+                  className="ml-1 font-normal text-muted-foreground underline-offset-2 hover:underline"
+                  onClick={() => {
+                    setLatitude("");
+                    setLongitude("");
+                  }}
+                >
+                  clear
+                </button>
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Open the branch in Google Maps, tap Share, and paste the link.
+                Used to show customers their nearest branch.
+              </p>
+            )}
+            {coordsInvalid && (
+              <p className="text-xs text-destructive">
+                That link didn't contain a usable location. Try the Share link
+                from Google Maps.
+              </p>
+            )}
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="latitude">Latitude</Label>
-            <Input
-              id="latitude"
-              inputMode="decimal"
-              value={latitude}
-              onChange={(e) => setLatitude(e.target.value)}
-              placeholder="18.5074"
-              aria-invalid={coordsInvalid}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="longitude">Longitude</Label>
-            <Input
-              id="longitude"
-              inputMode="decimal"
-              value={longitude}
-              onChange={(e) => setLongitude(e.target.value)}
-              placeholder="73.8077"
-              aria-invalid={coordsInvalid}
-            />
-          </div>
-          {coordsInvalid && (
-            <p className="text-xs text-destructive sm:col-span-2 -mt-2">
-              Enter both latitude (−90 to 90) and longitude (−180 to 180).
-            </p>
-          )}
+
           <div className="flex flex-col gap-1.5 sm:col-span-2">
             <Label>Banner image</Label>
             <ImageUploader
@@ -589,10 +603,18 @@ export function ShopDialog({
           onChange={(v) => setOwnerPhone(v ?? "")}
         />
       </div>
+
+      <BranchTeamAccess
+        users={assignable}
+        selected={assignedUserIds}
+        onChange={setAssignedUserIds}
+        className="border-t pt-5 sm:col-span-2"
+      />
     </div>
   );
 
-  const saving = creating || updating || invitingOwner || resetting;
+  const saving =
+    creating || updating || invitingOwner || resetting || assigning;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

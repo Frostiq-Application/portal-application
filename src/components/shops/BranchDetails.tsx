@@ -1,13 +1,4 @@
-import {
-  CalendarOff,
-  Clock,
-  Hash,
-  MapPin,
-  Pencil,
-  Phone,
-  ShieldCheck,
-  Store,
-} from "lucide-react";
+import { CalendarOff, Clock, Hash, MapPin, Pencil, Phone, ShieldCheck, Store } from "@/components/ui/icons";
 import type { Shop } from "@/types";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ShopStatusBadge } from "@/components/StatusBadge";
