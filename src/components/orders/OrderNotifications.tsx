@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ShoppingBag } from "lucide-react";
+import { ShoppingBag } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { useAppDispatch } from "@/app/hooks";
 import { useEntitlements } from "@/hooks/useEntitlements";

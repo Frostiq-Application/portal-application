@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Plus, Search, Trash2, UserRound } from "lucide-react";
+import { Loader2, Plus, Search, Trash2, UserRound } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { apiError } from "@/lib/apiError";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";

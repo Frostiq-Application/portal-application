@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ImageOff } from "lucide-react";
+import { ImageOff } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { formatDate, cn } from "@/lib/utils";
 import { apiError } from "@/lib/apiError";
