@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Copy, Loader2, Mail, User as UserIcon } from "lucide-react";
+import { Check, Copy, Loader2, Mail, User as UserIcon } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { useCreateUserMutation, type CreateUserBody } from "@/features/api/usersApi";
 import { useListAccountsQuery } from "@/features/api/accountsApi";

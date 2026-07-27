@@ -1,4 +1,4 @@
-import { Check, Loader2, Sparkles } from "lucide-react";
+import { Check, Loader2, Sparkles } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { apiError } from "@/lib/apiError";
 import {
