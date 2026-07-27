@@ -1,13 +1,4 @@
-import {
-  Ban,
-  Check,
-  CreditCard,
-  MoreHorizontal,
-  Pencil,
-  RotateCcw,
-  Store,
-  X,
-} from "lucide-react";
+import { Ban, Check, CreditCard, MoreHorizontal, Pencil, RotateCcw, Store, X } from "@/components/ui/icons";
 import { formatDate } from "@/lib/utils";
 import { useListShopsQuery } from "@/features/api/shopsApi";
 import type { Account } from "@/types";

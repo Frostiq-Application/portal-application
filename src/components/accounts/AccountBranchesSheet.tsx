@@ -1,17 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import {
-  Ban,
-  CalendarOff,
-  Check,
-  Clock,
-  MapPin,
-  MoreHorizontal,
-  Pencil,
-  Phone,
-  Plus,
-  Store,
-} from "lucide-react";
+import { Ban, CalendarOff, Check, Clock, MapPin, MoreHorizontal, Pencil, Phone, Plus, Store } from "@/components/ui/icons";
 import { apiError } from "@/lib/apiError";
 import {
   useActivateShopMutation,
