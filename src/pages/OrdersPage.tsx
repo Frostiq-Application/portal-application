@@ -1,18 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
-import {
-  Ban,
-  CheckCircle2,
-  ChefHat,
-  Eye,
-  Inbox,
-  Loader2,
-  PackageCheck,
-  Plus,
-  Search,
-  Truck,
-  X,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { Ban, CheckCircle2, ChefHat, Eye, Inbox, Loader2, PackageCheck, Plus, Search, Truck, X } from "@/components/ui/icons";
+import type { IconComponent } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { formatDate, cn } from "@/lib/utils";
 import { apiError } from "@/lib/apiError";
@@ -117,7 +105,7 @@ const TEAM_ITEMS: { value: TeamView; label: string }[] = [
 ];
 
 /** Icon per status — gives each queue stage a quick visual anchor. */
-const STATUS_ICON: Record<OrderStatus, LucideIcon> = {
+const STATUS_ICON: Record<OrderStatus, IconComponent> = {
   placed: Inbox,
   confirmed: CheckCircle2,
   preparing: ChefHat,

@@ -1,14 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  MoreHorizontal,
-  Ticket,
-  Store,
-  CalendarRange,
-  Users,
-  Globe,
-  Lock,
-  ShoppingBag,
-} from "lucide-react";
+import { MoreHorizontal, Ticket, Store, CalendarRange, Users, Globe, Lock, ShoppingBag } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { cn, formatDate } from "@/lib/utils";
 import { apiError } from "@/lib/apiError";

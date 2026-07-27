@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Users, X } from "lucide-react";
+import { Search, Users, X } from "@/components/ui/icons";
 import { formatDate } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useListCustomersQuery } from "@/features/api/customersApi";

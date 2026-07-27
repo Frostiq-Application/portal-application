@@ -1,4 +1,4 @@
-import { Construction } from "lucide-react";
+import { Construction } from "@/components/ui/icons";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 

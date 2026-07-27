@@ -1,18 +1,10 @@
 import { useState } from "react";
-import {
-  Building2,
-  Mail,
-  Pencil,
-  Phone,
-  ShieldCheck,
-  Store,
-  User as UserIcon,
-} from "lucide-react";
+import { Building2, Mail, Pencil, Phone, ShieldCheck, Store, User as UserIcon } from "@/components/ui/icons";
 import { useMeQuery } from "@/features/api/authApi";
 import { EditMyBrandDialog } from "@/components/accounts/EditMyBrandDialog";
 import { Button } from "@/components/ui/button";
 import { useMyAccountQuery } from "@/features/api/accountsApi";
-import { useListPlansQuery } from "@/features/api/plansApi";
+import { useMySubscriptionQuery } from "@/features/api/billingApi";
 import { useAuth } from "@/hooks/useAuth";
 import { roleLabel } from "@/lib/roles";
 import { formatDate } from "@/lib/utils";
@@ -62,14 +54,12 @@ export function ProfilePage() {
     isError: accountError,
   } = useMyAccountQuery(undefined, { skip: !isAccountAdmin });
 
-  // Resolve the plan name from the cached plan list (avoids a per-id fetch).
-  const { data: plans } = useListPlansQuery(
-    { page: 1, limit: 100 },
-    { skip: !isAccountAdmin },
-  );
-  const planName =
-    account?.currentPlanId &&
-    plans?.data.find((p) => p.id === account.currentPlanId)?.name;
+  // The subscription dashboard already carries the plan name, so there's no
+  // reason to fetch the whole catalogue just to resolve one id.
+  const { data: subscription } = useMySubscriptionQuery(undefined, {
+    skip: !isAccountAdmin,
+  });
+  const planName = subscription?.subscription?.planName;
 
   const [editOpen, setEditOpen] = useState(false);
 

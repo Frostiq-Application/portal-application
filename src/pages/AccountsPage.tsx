@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Store } from "lucide-react";
+import { Search, Store } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {

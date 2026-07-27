@@ -1,16 +1,5 @@
 import { useState } from "react";
-import {
-  Check,
-  Lock,
-  Minus,
-  MoreHorizontal,
-  Pencil,
-  Plus,
-  ShieldCheck,
-  Sparkles,
-  Store,
-  Trash2,
-} from "lucide-react";
+import { Check, Lock, Minus, MoreHorizontal, Pencil, Plus, ShieldCheck, Sparkles, Store, Trash2 } from "@/components/ui/icons";
 import { toast } from "sonner";
 import {
   PERMISSION_CATALOG,

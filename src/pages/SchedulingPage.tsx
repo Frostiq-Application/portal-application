@@ -1,12 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  CalendarClock,
-  CalendarOff,
-  Clock,
-  Plus,
-  Sun,
-  Trash2,
-} from "lucide-react";
+import { CalendarClock, CalendarOff, Clock, Plus, Sun, Trash2 } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/utils";
 import { apiError } from "@/lib/apiError";

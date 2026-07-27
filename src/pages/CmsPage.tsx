@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Images, Megaphone, Palette, Sparkles } from "lucide-react";
+import { Images, Megaphone, Palette, Sparkles } from "@/components/ui/icons";
 import { useAuth } from "@/hooks/useAuth";
 import { isAccountAdmin } from "@/lib/roles";
 import {
