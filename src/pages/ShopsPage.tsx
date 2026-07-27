@@ -1,16 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  MoreHorizontal,
-  Search,
-  MapPin,
-  Clock,
-  Phone,
-  CalendarOff,
-  Store,
-} from "lucide-react";
+import { MoreHorizontal, Search, MapPin, Clock, Phone, CalendarOff, Store } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useEntitlements } from "@/hooks/useEntitlements";
+import {
+  LimitCounter,
+  LimitNotice,
+  useLimitState,
+} from "@/components/gating/LimitNotice";
 import { apiError } from "@/lib/apiError";
 import {
   useActivateShopMutation,
@@ -104,9 +101,13 @@ function BranchGrid() {
   const { isExempt, entitlements } = useEntitlements();
 
   // Plan branch cap (gated roles only). Platform admin is exempt → no cap.
-  const maxShops = isExempt ? null : entitlements?.maxShops ?? null;
+  // The EFFECTIVE limit (plan + purchased add-ons) — the same number the server
+  // enforces. Warning at the raw plan value would nag an account that already
+  // paid for extra branches.
+  const maxShops = isExempt ? null : (entitlements?.maxShops ?? null);
   const shopsUsed = entitlements?.shopsUsed ?? 0;
-  const atBranchLimit = maxShops != null && shopsUsed >= maxShops;
+  const branchLimit = useLimitState(shopsUsed, maxShops);
+  const atBranchLimit = branchLimit.atLimit;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Shop | null>(null);
 
@@ -171,18 +172,27 @@ function BranchGrid() {
             : "Outlets across your brand"
         }
         actions={
-          <Button
-            onClick={openNew}
-            disabled={atBranchLimit}
-            title={
-              atBranchLimit
-                ? "Branch limit reached for your plan — contact your administrator to upgrade"
-                : undefined
-            }
-          >
-            New branch
-          </Button>
+          <div className="flex items-center gap-3">
+            <LimitCounter state={branchLimit} unit="branches" />
+            <Button
+              onClick={openNew}
+              disabled={atBranchLimit}
+              title={
+                atBranchLimit
+                  ? `Your plan allows ${maxShops} branch(es). Upgrade or add capacity to open another.`
+                  : undefined
+              }
+            >
+              New branch
+            </Button>
+          </div>
         }
+      />
+
+      <LimitNotice
+        state={branchLimit}
+        label="branches"
+        unit="branches"
       />
 
       <div className="mb-4 relative max-w-sm">

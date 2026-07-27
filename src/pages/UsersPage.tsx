@@ -1,14 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  Copy,
-  KeyRound,
-  MapPin,
-  MoreHorizontal,
-  Search,
-  Store,
-  UserCog,
-  Users as UsersIcon,
-} from "lucide-react";
+import { Copy, KeyRound, MapPin, MoreHorizontal, Search, Store, UserCog, Users as UsersIcon } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useEntitlements } from "@/hooks/useEntitlements";
@@ -26,6 +17,11 @@ import type { Role, User } from "@/types";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { InviteUserDialog } from "@/components/users/InviteUserDialog";
+import {
+  LimitCounter,
+  LimitNotice,
+  useLimitState,
+} from "@/components/gating/LimitNotice";
 import { BranchAssignmentDialog } from "@/components/users/BranchAssignmentDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -130,7 +126,9 @@ export function UsersPage() {
   const { entitlements, isExempt } = useEntitlements();
   const seatCap = isExempt ? null : (entitlements?.maxTeamSeats ?? null);
   const seatsUsed = entitlements?.teamSeatsUsed ?? totalMembers;
-  const atSeatCap = seatCap != null && seatsUsed >= seatCap;
+  // Effective seat limit (plan + add-ons), matching what the server enforces.
+  const seatLimit = useLimitState(seatsUsed, seatCap);
+  const atSeatCap = seatLimit.atLimit;
 
   return (
     <>
@@ -145,23 +143,11 @@ export function UsersPage() {
         }
         actions={
           <div className="flex items-center gap-3">
-            {seatCap != null && (
-              <span
-                className={cn(
-                  "text-xs tabular-nums rounded-md border px-2 py-1",
-                  atSeatCap
-                    ? "border-destructive/40 text-destructive"
-                    : "text-muted-foreground",
-                )}
-                title="Team members used vs. your plan limit"
-              >
-                {seatsUsed} / {seatCap} seats
-              </span>
-            )}
+            <LimitCounter state={seatLimit} unit="seats" />
             {atSeatCap ? (
               <Button
                 disabled
-                title="You've reached your plan's team-seat limit. Upgrade to add more."
+                title={`Your plan allows ${seatCap} team member(s). Upgrade or add capacity to invite more.`}
               >
                 Invite member
               </Button>
@@ -171,6 +157,8 @@ export function UsersPage() {
           </div>
         }
       />
+
+      <LimitNotice state={seatLimit} label="team members" unit="seats" />
 
       <div className="mb-5 relative max-w-sm">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
