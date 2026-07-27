@@ -1,16 +1,9 @@
 import { Link } from "react-router-dom";
-import {
-  Building2,
-  CheckCircle2,
-  Clock,
-  IndianRupee,
-  PauseCircle,
-  TrendingUp,
-} from "lucide-react";
+import { Building2, CheckCircle2, Clock, IndianRupee, PauseCircle, TrendingUp } from "@/components/ui/icons";
 import { useAuth } from "@/hooks/useAuth";
 import { roleLabel, isPlatformAdmin } from "@/lib/roles";
 import { useListAccountsQuery } from "@/features/api/accountsApi";
-import { useBillingSummaryQuery } from "@/features/api/subscriptionsApi";
+import { useBillingReportsQuery } from "@/features/api/billingAdminApi";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -129,7 +122,17 @@ function PlatformDashboard() {
     limit: 5,
     status: "pending",
   });
-  const { data: billing } = useBillingSummaryQuery();
+    const { data: reports } = useBillingReportsQuery();
+  // MRR is the sum of every live subscription's locked monthly price — already
+  // normalised per month, because a plan stores exactly one price.
+  const mrr = (reports?.revenueByPlan ?? []).reduce(
+    (sum, r) => sum + Number(r.mrr),
+    0,
+  );
+  const collected = (reports?.collectedByMonth ?? []).reduce(
+    (sum, m) => sum + Number(m.gross),
+    0,
+  );
 
   return (
     <>
@@ -140,18 +143,23 @@ function PlatformDashboard() {
         <StatCard label="Suspended" value={suspended.total} icon={PauseCircle} loading={suspended.isLoading} />
         <StatCard
           label="MRR"
-          value={billing ? `₹${Number(billing.mrr).toLocaleString("en-IN")}` : "—"}
+          value={reports ? `₹${Math.round(mrr).toLocaleString("en-IN")}` : "—"}
           icon={TrendingUp}
-          loading={!billing}
+          loading={!reports}
         />
         <StatCard
           label="Collected"
-          value={billing ? `₹${Number(billing.totalCollected).toLocaleString("en-IN")}` : "—"}
+          value={reports ? `₹${Math.round(collected).toLocaleString("en-IN")}` : "—"}
           icon={IndianRupee}
-          loading={!billing}
+          loading={!reports}
         />
-        <StatCard label="Trials" value={billing?.trialSubscriptions ?? "—"} icon={Clock} loading={!billing} />
-        <StatCard label="Overdue" value={billing?.overdue ?? "—"} icon={PauseCircle} loading={!billing} />
+        <StatCard label="Trials" value={reports?.statusCounts.trial ?? "—"} icon={Clock} loading={!reports} />
+        <StatCard
+          label="Payment overdue"
+          value={(reports?.statusCounts.grace ?? 0) + (reports?.statusCounts.locked ?? 0)}
+          icon={PauseCircle}
+          loading={!reports}
+        />
       </div>
 
       <Card className="mt-6">

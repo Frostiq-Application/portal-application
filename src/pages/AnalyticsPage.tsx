@@ -7,16 +7,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import {
-  Ban,
-  Clock,
-  IndianRupee,
-  Lock,
-  ShoppingBag,
-  Ticket,
-  TrendingUp,
-  Users,
-} from "lucide-react";
+import { Ban, Clock, IndianRupee, Lock, ShoppingBag, Ticket, TrendingUp, Users } from "@/components/ui/icons";
 import { useState } from "react";
 import {
   useAccountAnalyticsQuery,
