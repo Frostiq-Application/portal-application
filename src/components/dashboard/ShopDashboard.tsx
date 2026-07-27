@@ -9,14 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import {
-  Ban,
-  IndianRupee,
-  Lock,
-  Receipt,
-  ShoppingBag,
-  TrendingUp,
-} from "lucide-react";
+import { Ban, IndianRupee, Lock, Receipt, ShoppingBag, TrendingUp } from "@/components/ui/icons";
 import { useShopAnalyticsQuery } from "@/features/api/analyticsApi";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { useAppSelector } from "@/app/hooks";

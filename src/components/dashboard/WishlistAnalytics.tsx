@@ -6,7 +6,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Heart, Package, ShoppingCart } from "lucide-react";
+import { Heart, Package, ShoppingCart } from "@/components/ui/icons";
 import { useWishlistAnalyticsQuery } from "@/features/api/analyticsApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
