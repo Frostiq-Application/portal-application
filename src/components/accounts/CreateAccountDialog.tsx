@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Copy, Loader2 } from "lucide-react";
+import { Copy, Loader2 } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { isValidPhoneNumber } from "react-phone-number-input";
 import { slugify, cn } from "@/lib/utils";
