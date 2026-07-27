@@ -89,6 +89,24 @@ export default {
   			'row-flash': {
   				'0%, 100%': { backgroundColor: 'transparent' },
   				'25%, 75%': { backgroundColor: 'hsl(var(--destructive) / 0.12)' }
+  			},
+  			/* Payment-processing overlay: a slow sonar ring so a several-second
+  			   wait still reads as "working", not "frozen". */
+  			'pay-ring': {
+  				'0%': { transform: 'scale(0.7)', opacity: '0.5' },
+  				'70%, 100%': { transform: 'scale(1.55)', opacity: '0' }
+  			},
+  			'pay-pop': {
+  				'0%': { transform: 'scale(0.6)', opacity: '0' },
+  				'60%': { transform: 'scale(1.08)', opacity: '1' },
+  				'100%': { transform: 'scale(1)', opacity: '1' }
+  			},
+  			/* Fired when someone tries to close/refresh mid-payment — the card
+  			   flinches so the warning is felt, not just printed. */
+  			'pay-nudge': {
+  				'0%, 100%': { transform: 'translateX(0)' },
+  				'20%, 60%': { transform: 'translateX(-5px)' },
+  				'40%, 80%': { transform: 'translateX(5px)' }
   			}
   		},
   		animation: {
@@ -96,7 +114,10 @@ export default {
   			'accordion-up': 'accordion-up 0.2s ease-out',
   			'row-leave': 'row-leave 0.28s ease-in forwards',
   			'row-enter': 'row-enter 0.28s ease-out',
-  			'row-flash': 'row-flash 0.9s ease-in-out'
+  			'row-flash': 'row-flash 0.9s ease-in-out',
+  			'pay-ring': 'pay-ring 2.4s cubic-bezier(0.24,0.6,0.3,1) infinite',
+  			'pay-pop': 'pay-pop 0.42s cubic-bezier(0.2,1.2,0.35,1) both',
+  			'pay-nudge': 'pay-nudge 0.42s ease-in-out'
   		}
   	}
   },
