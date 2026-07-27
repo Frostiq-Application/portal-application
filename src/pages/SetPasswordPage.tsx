@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Cake, Loader2 } from "lucide-react";
+import { Loader2 } from "@/components/ui/icons";
+import { FrostiqueMark } from "@/components/common/FrostiqueMark";
 import { toast } from "sonner";
 import {
   useInviteEmailQuery,
@@ -71,9 +72,7 @@ export function SetPasswordPage() {
         />
         <div className="relative flex justify-center gap-2 md:justify-start">
           <a href="#" className="flex items-center gap-2 font-medium">
-            <div className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <Cake className="size-4" />
-            </div>
+            <FrostiqueMark className="size-6" />
             Frostique Portal
           </a>
         </div>

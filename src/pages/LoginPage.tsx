@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { Cake, Loader2 } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Loader2 } from "@/components/ui/icons";
+import { FrostiqueMark } from "@/components/common/FrostiqueMark";
 import { toast } from "sonner";
 import { useAppDispatch } from "@/app/hooks";
 import { setCredentials } from "@/features/auth/authSlice";
@@ -96,9 +97,7 @@ export function LoginPage() {
         />
         <div className="relative flex justify-center gap-2 md:justify-start">
           <a href="#" className="flex items-center gap-2 font-medium">
-            <div className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <Cake className="size-4" />
-            </div>
+            <FrostiqueMark className="size-6" />
             Frostique Portal
           </a>
         </div>
@@ -148,6 +147,19 @@ export function LoginPage() {
                     )}
                     Sign in
                   </Button>
+
+                  {/* Without this, a new bakery has no route into the product
+                      at all — the register endpoint existed but nothing linked
+                      to it. */}
+                  <p className="text-center text-sm text-muted-foreground">
+                    New here?{" "}
+                    <Link
+                      to="/register"
+                      className="font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                      Create your shop
+                    </Link>
+                  </p>
                 </div>
               </form>
             ) : (
