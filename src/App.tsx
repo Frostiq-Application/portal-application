@@ -16,6 +16,7 @@ import { SubscriptionsPage } from "@/pages/SubscriptionsPage";
 import { QueriesPage } from "@/pages/QueriesPage";
 import { SubscriptionCouponsPage } from "@/pages/SubscriptionCouponsPage";
 import { BillingSettingsPage } from "@/pages/BillingSettingsPage";
+import { TenancyPage } from "@/pages/TenancyPage";
 import { MySubscriptionPage } from "@/pages/MySubscriptionPage";
 import { CheckoutPage } from "@/pages/CheckoutPage";
 import { OnboardingPage } from "@/pages/OnboardingPage";
@@ -107,6 +108,7 @@ export default function App() {
                 path="/billing-settings"
                 element={<BillingSettingsPage />}
               />
+              <Route path="/tenancy" element={<TenancyPage />} />
               <Route path="/queries" element={<QueriesPage />} />
             </Route>
 

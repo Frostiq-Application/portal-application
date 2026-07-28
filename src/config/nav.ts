@@ -1,4 +1,4 @@
-import { LayoutDashboard, Building2, Store, Users as UsersIcon, Contact, CalendarClock, ShieldCheck, BarChart3, CreditCard, Tags, Image as ImageIcon, ScrollText, ShoppingBag, Cake, CakeSlice, Phone, BadgePercent, Settings2, type IconComponent } from "@/components/ui/icons";
+import { Layers, LayoutDashboard, Building2, Store, Users as UsersIcon, Contact, CalendarClock, ShieldCheck, BarChart3, CreditCard, Tags, Image as ImageIcon, ScrollText, ShoppingBag, Cake, CakeSlice, Phone, BadgePercent, Settings2, type IconComponent } from "@/components/ui/icons";
 import type { PlanFeatureKey, Role } from "@/types";
 
 export interface NavItem {
@@ -93,6 +93,15 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Billing settings",
     path: "/billing-settings",
     icon: Settings2,
+    roles: ["platform_super_admin"],
+    group: "Platform",
+  },
+  {
+    // Schema-per-account means a shipped feature still has to reach each
+    // brand's schema. This is where you see who is behind and roll it out.
+    label: "Tenancy",
+    path: "/tenancy",
+    icon: Layers,
     roles: ["platform_super_admin"],
     group: "Platform",
   },
