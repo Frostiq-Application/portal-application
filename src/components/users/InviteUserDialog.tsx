@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Check, Copy, Loader2, Mail, User as UserIcon } from "@/components/ui/icons";
+import { Check, Loader2, Mail, User as UserIcon } from "@/components/ui/icons";
 import { toast } from "sonner";
+import { InviteSentPanel } from "@/components/common/InviteSentPanel";
 import { useCreateUserMutation, type CreateUserBody } from "@/features/api/usersApi";
 import { useListAccountsQuery } from "@/features/api/accountsApi";
 import { useListShopsQuery } from "@/features/api/shopsApi";
@@ -36,6 +37,9 @@ export function InviteUserDialog() {
   const invitesStaff = role === "shop_admin";
   const [open, setOpen] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
+  // Captured at submit so the confirmation keeps showing the right address
+  // regardless of what happens to the form fields behind it.
+  const [invitedEmail, setInvitedEmail] = useState("");
 
   // Platform → fellow super admins; shop admin → staff; shop owner → branch owner.
   const defaultRole: Role = platform
@@ -80,6 +84,7 @@ export function InviteUserDialog() {
     setAccountId("");
     setShopIds([]);
     setInviteToken(null);
+    setInvitedEmail("");
   };
 
   const submit = async () => {
@@ -99,8 +104,9 @@ export function InviteUserDialog() {
     };
     try {
       const res = await createUser(body).unwrap();
+      setInvitedEmail(body.email);
       setInviteToken(res.inviteToken);
-      toast.success("User invited");
+      toast.success(`Invite sent to ${body.email}`);
     } catch (err) {
       toast.error(apiError(err, "Failed to invite user"));
     }
@@ -249,29 +255,10 @@ export function InviteUserDialog() {
             <DialogHeader>
               <DialogTitle>User invited</DialogTitle>
               <DialogDescription>
-                Share this set-password link (valid 7 days). They&rsquo;ll
-                choose their own password before signing in.
+                They&rsquo;ll choose their own password before signing in.
               </DialogDescription>
             </DialogHeader>
-            <div className="flex items-center gap-2 py-2">
-              <Input
-                readOnly
-                value={`${window.location.origin}/set-password?token=${inviteToken}`}
-                className="font-mono text-xs"
-              />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => {
-                  navigator.clipboard?.writeText(
-                    `${window.location.origin}/set-password?token=${inviteToken}`,
-                  );
-                  toast.success("Copied");
-                }}
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
+            <InviteSentPanel email={invitedEmail} token={inviteToken} />
             <DialogFooter>
               <Button onClick={() => { setOpen(false); reset(); }}>Done</Button>
             </DialogFooter>

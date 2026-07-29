@@ -108,11 +108,21 @@ export function UsersPage() {
     }
   };
 
-  const doReset = async (id: string) => {
+  /**
+   * Emails the member a reset link, and copies the same link as a fallback.
+   *
+   * This used to copy `res.resetToken` — the bare JWT, which the recipient
+   * could do nothing with. The link is what's useful, and now that the server
+   * also mails it, the clipboard is only there for a bounced address.
+   */
+  const doReset = async (user: User) => {
     try {
-      const res = await resetPassword(id).unwrap();
-      await navigator.clipboard?.writeText(res.resetToken);
-      toast.success("Reset token copied to clipboard", {
+      const res = await resetPassword(user.id).unwrap();
+      await navigator.clipboard?.writeText(
+        `${window.location.origin}/set-password?token=${res.resetToken}`,
+      );
+      toast.success(`Reset link sent to ${user.email}`, {
+        description: "The link is also on your clipboard, in case it bounces.",
         icon: <Copy className="h-4 w-4" />,
       });
     } catch (err) {
@@ -214,7 +224,7 @@ export function UsersPage() {
                         user={u}
                         shopName={shopName}
                         onManageBranch={() => setAssignFor(u)}
-                        onReset={() => doReset(u.id)}
+                        onReset={() => doReset(u)}
                         onToggleActive={() => toggleActive(u.id, !u.isActive)}
                       />
                     ))}
