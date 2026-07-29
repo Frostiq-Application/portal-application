@@ -5,7 +5,16 @@ export type Role =
   | "platform_super_admin"
   | "account_super_admin"
   | "shop_admin"
-  | "staff";
+  | "staff"
+  | "chef"
+  | "delivery_manager";
+
+/**
+ * Granular permission keys, mirroring the backend catalog
+ * (`common/permissions/permission-catalog.ts`). Kept as a loose string so a key
+ * added server-side doesn't need a portal release before it can be granted.
+ */
+export type PermissionKey = string;
 
 export interface AuthUser {
   id: string;
@@ -14,6 +23,25 @@ export interface AuthUser {
   role: Role;
   accountId: string | null;
   shopIds: string[];
+  /**
+   * Whether this address has been proven — by an emailed code, or by setting a
+   * password from an emailed invite link. Onboarding is gated on it.
+   *
+   * Optional because a session persisted in localStorage before verification
+   * shipped won't carry it; treat `undefined` as verified rather than bouncing
+   * an existing owner into a screen they never needed.
+   */
+  emailVerified?: boolean;
+  /**
+   * The effective permission set from the server — base role defaults combined
+   * with any custom role. Nav and route guards render from this, so what the
+   * portal shows and what the API allows can't drift apart.
+   *
+   * Optional for the same reason as `emailVerified`: a session persisted before
+   * this shipped won't carry it, and `useCan` falls back to role checks when
+   * it's absent rather than hiding the whole app.
+   */
+  permissions?: PermissionKey[];
 }
 
 /** Response of POST /auth/login, /auth/2fa/verify, /auth/refresh. */
