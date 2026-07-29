@@ -170,13 +170,37 @@ function MostWishlisted({ data }: { data: WishlistAnalyticsData }) {
  * Wishlist interest analytics for the selected branch. Renders alongside the
  * order analytics; caller is responsible for the plan gate + providing shopId.
  */
-export function WishlistAnalytics({ shopId }: { shopId: string }) {
+export function WishlistAnalytics({
+  shopId,
+  from,
+  to,
+}: {
+  shopId: string;
+  from?: string;
+  to?: string;
+}) {
   const { data, isLoading, isFetching } = useWishlistAnalyticsQuery(
-    { shopId },
+    { shopId, from, to },
     { skip: !shopId },
   );
-  const loading = isLoading || isFetching || !data;
 
+  return (
+    <WishlistAnalyticsView data={data} loading={isLoading || isFetching || !data} />
+  );
+}
+
+/**
+ * The charts alone, fed from props. Split out from the fetching wrapper so a
+ * plan-locked section can render the identical report from sample data without
+ * calling an endpoint that would 403.
+ */
+export function WishlistAnalyticsView({
+  data,
+  loading,
+}: {
+  data?: WishlistAnalyticsData;
+  loading: boolean;
+}) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -206,7 +230,11 @@ export function WishlistAnalytics({ shopId }: { shopId: string }) {
             <CardTitle className="text-base">Saves over time</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? <Skeleton className="h-48 w-full" /> : <TrendChart data={data} />}
+            {loading || !data ? (
+              <Skeleton className="h-48 w-full" />
+            ) : (
+              <TrendChart data={data} />
+            )}
           </CardContent>
         </Card>
 
@@ -215,7 +243,7 @@ export function WishlistAnalytics({ shopId }: { shopId: string }) {
             <CardTitle className="text-base">Most wishlisted</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {loading || !data ? (
               <Skeleton className="h-32 w-full" />
             ) : (
               <MostWishlisted data={data} />

@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Ban, IndianRupee, Lock, Receipt, ShoppingBag, TrendingUp } from "@/components/ui/icons";
+import { Ban, IndianRupee, Receipt, ShoppingBag, TrendingUp } from "@/components/ui/icons";
 import { useShopAnalyticsQuery } from "@/features/api/analyticsApi";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { useAppSelector } from "@/app/hooks";
@@ -18,7 +18,15 @@ import {
   selectSelectedBranchId,
 } from "@/features/branch/branchSlice";
 import { ShopSelect } from "@/components/ShopSelect";
-import { WishlistAnalytics } from "@/components/dashboard/WishlistAnalytics";
+import {
+  WishlistAnalytics,
+  WishlistAnalyticsView,
+} from "@/components/dashboard/WishlistAnalytics";
+import { UpgradeOverlay } from "@/components/analytics/UpgradeOverlay";
+import {
+  PREVIEW_SHOP,
+  PREVIEW_WISHLIST,
+} from "@/components/analytics/previewData";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ShopAnalytics } from "@/types";
@@ -218,7 +226,9 @@ export function ShopDashboard() {
   const canUseWishlist = hasFeature("can_use_wishlist_analytics");
   const { data, isLoading, isFetching } = useShopAnalyticsQuery(
     { shopId },
-    { skip: !shopId },
+    // Without the feature the endpoint 403s, so don't ask — the locked view
+    // renders from sample data instead.
+    { skip: !shopId || !canUseAnalytics },
   );
   const loading = isLoading || isFetching || !data;
 
@@ -228,6 +238,53 @@ export function ShopDashboard() {
         <ShopSelect />
       </div>
 
+      {/* The whole report, live or previewed. Every number here comes from the
+          same plan-gated endpoint, so a locked plan blurs the lot rather than
+          leaving a row of zeroed KPI cards behind an empty state. */}
+      {canUseAnalytics ? (
+        <OrderAnalytics data={data} loading={loading} />
+      ) : (
+        <UpgradeOverlay
+          feature="can_use_analytics"
+          description="Track revenue, order flow, delivery split and your best-selling products, branch by branch."
+        >
+          <OrderAnalytics data={PREVIEW_SHOP} loading={false} />
+        </UpgradeOverlay>
+      )}
+
+      {/* Wishlist interest — what shoppers are saving vs. buying (Growth+) */}
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-base font-semibold">Wishlist insights</h3>
+          <p className="text-sm text-muted-foreground">
+            What shoppers are saving for later — and how often it turns into an order.
+          </p>
+        </div>
+        {canUseWishlist ? (
+          shopId && <WishlistAnalytics shopId={shopId} />
+        ) : (
+          <UpgradeOverlay
+            feature="can_use_wishlist_analytics"
+            description="See what customers save but don’t buy, which products they save most, and the save→order conversion rate."
+          >
+            <WishlistAnalyticsView data={PREVIEW_WISHLIST} loading={false} />
+          </UpgradeOverlay>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** KPI cards, order charts and top products — live data or a blurred preview. */
+function OrderAnalytics({
+  data,
+  loading,
+}: {
+  data?: ShopAnalytics;
+  loading: boolean;
+}) {
+  return (
+    <div className="space-y-6">
       {/* KPI cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard
@@ -266,22 +323,6 @@ export function ShopDashboard() {
         />
       </div>
 
-      {/* Analytics — charts + top products, gated by plan (can_use_analytics) */}
-      {!canUseAnalytics ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-muted">
-              <Lock className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <p className="text-sm font-medium">Analytics not available</p>
-            <p className="max-w-xs text-sm text-muted-foreground">
-              Charts and product insights aren’t included in your current plan.
-              Contact your administrator to upgrade.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
       {/* Charts */}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -289,7 +330,7 @@ export function ShopDashboard() {
             <CardTitle className="text-base">Orders by status</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {loading || !data ? (
               <Skeleton className="h-40 w-full" />
             ) : (
               <StatusChart data={data} />
@@ -302,7 +343,7 @@ export function ShopDashboard() {
             <CardTitle className="text-base">Delivery vs pickup</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {loading || !data ? (
               <Skeleton className="h-40 w-full" />
             ) : (
               <DeliveryChart data={data} />
@@ -317,7 +358,7 @@ export function ShopDashboard() {
           <CardTitle className="text-base">Top products</CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {loading || !data ? (
             <Skeleton className="h-24 w-full" />
           ) : data.topProducts.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
@@ -355,34 +396,6 @@ export function ShopDashboard() {
           )}
         </CardContent>
       </Card>
-
-      {/* Wishlist interest — what shoppers are saving vs. buying (Growth+) */}
-      <div className="space-y-3">
-        <div>
-          <h3 className="text-base font-semibold">Wishlist insights</h3>
-          <p className="text-sm text-muted-foreground">
-            What shoppers are saving for later — and how often it turns into an order.
-          </p>
-        </div>
-        {!canUseWishlist ? (
-          <Card>
-            <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10">
-                <Lock className="h-5 w-5 text-primary" />
-              </div>
-              <p className="text-sm font-medium">Wishlist analytics is a Growth feature</p>
-              <p className="max-w-xs text-sm text-muted-foreground">
-                See what shoppers save vs. buy and the save→order conversion.
-                Upgrade to Growth or Pro to unlock it.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          shopId && <WishlistAnalytics shopId={shopId} />
-        )}
-      </div>
-        </>
-      )}
     </div>
   );
 }
