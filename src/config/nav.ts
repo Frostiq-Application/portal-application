@@ -1,4 +1,4 @@
-import { Layers, LayoutDashboard, Building2, Store, Users as UsersIcon, Contact, CalendarClock, ShieldCheck, BarChart3, CreditCard, Tags, Image as ImageIcon, ScrollText, ShoppingBag, Cake, CakeSlice, Phone, BadgePercent, Settings2, type IconComponent } from "@/components/ui/icons";
+import { Layers, LayoutDashboard, Building2, Store, Users as UsersIcon, Contact, CalendarClock, ShieldCheck, BarChart3, CreditCard, Tags, Image as ImageIcon, ScrollText, ShoppingBag, Cake, CakeSlice, ChefHat, Truck, Images, Phone, BadgePercent, Settings2, FileClock, type IconComponent } from "@/components/ui/icons";
 import type { PermissionKey, PlanFeatureKey, Role } from "@/types";
 
 export interface NavItem {
@@ -28,6 +28,19 @@ export interface NavItem {
     | "Floor";
   /** not yet implemented — rendered as a disabled "soon" item */
   soon?: boolean;
+  /**
+   * Highlight only on an exact path match. Needed where one page owns nested
+   * paths (Custom Cakes vs its Gallery section), which would otherwise light up
+   * both rows at once.
+   */
+  exact?: boolean;
+  /**
+   * Path of the item this one belongs under. A child is a *part* of its parent
+   * feature, not a feature of its own: it renders indented beneath the parent
+   * and — unlike a top-level item — is hidden outright when the plan doesn't
+   * include it, because one add-on should present one upgrade door, not two.
+   */
+  parent?: string;
 }
 
 const NON_PLATFORM_ADMINS: Role[] = ["account_super_admin", "shop_admin"];
@@ -45,8 +58,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Dashboard",
     path: "/",
     icon: LayoutDashboard,
-    // Everyone except staff, who land straight on Orders (their only workspace).
+    // Everyone except the floor roles, who land straight on their own board.
     roles: ["platform_super_admin", "account_super_admin", "shop_admin"],
+    // It's a page of numbers, so it rides on the same permission the Analytics
+    // page does — a restricted role with no reporting access shouldn't be
+    // dropped on a dashboard it can't populate.
+    permission: "analytics.view",
     group: "Overview",
   },
   {
@@ -56,6 +73,7 @@ export const NAV_ITEMS: NavItem[] = [
     path: "/analytics",
     icon: BarChart3,
     roles: NON_PLATFORM_ADMINS,
+    permission: "analytics.view",
     feature: "can_use_analytics",
     group: "Overview",
   },
@@ -75,6 +93,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ChefHat,
     roles: BRANCH_ROLES,
     permission: "kitchen.view",
+    feature: "can_use_floor_boards",
     group: "Floor",
   },
   {
@@ -83,6 +102,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Truck,
     roles: BRANCH_ROLES,
     permission: "delivery.view",
+    feature: "can_use_floor_boards",
     group: "Floor",
   },
   {
@@ -107,8 +127,23 @@ export const NAV_ITEMS: NavItem[] = [
     path: "/custom-cakes",
     icon: CakeSlice,
     roles: NON_PLATFORM_ADMINS,
+    permission: "custom_cakes.manage",
     feature: "can_use_custom_cake",
     group: "Operations",
+    exact: true,
+  },
+  {
+    // A part of Custom Cakes, not a feature beside it — the photos exist only to
+    // be turned into custom cake requests. Nested under it, and gone entirely
+    // when the add-on isn't in the plan.
+    label: "Gallery",
+    path: "/custom-cakes/gallery",
+    icon: Images,
+    roles: NON_PLATFORM_ADMINS,
+    permission: "custom_cakes.manage",
+    feature: "can_use_custom_cake",
+    group: "Operations",
+    parent: "/custom-cakes",
   },
 
   // Platform super admin
@@ -184,6 +219,9 @@ export const NAV_ITEMS: NavItem[] = [
     group: "Brand",
   },
   {
+    // No `permission`: an owner's own billing is theirs by virtue of being the
+    // owner, and it is not something a custom role should be able to revoke —
+    // locking someone out of the page where they pay is never the right outcome.
     label: "Subscription",
     path: "/my-subscription",
     icon: CreditCard,
@@ -207,6 +245,17 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ShieldCheck,
     roles: ["platform_super_admin", "account_super_admin"],
     permission: "team.manage",
+    group: "Brand",
+  },
+  {
+    // Sits under Brand rather than Configuration: it's a record of what the
+    // brand's people did, not a switch anyone sets.
+    label: "Activity Log",
+    path: "/activity-log",
+    icon: FileClock,
+    roles: NON_PLATFORM_ADMINS,
+    permission: "activity.view",
+    feature: "can_use_audit_log",
     group: "Brand",
   },
 

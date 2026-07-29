@@ -5,7 +5,32 @@ export const ROLE_LABELS: Record<Role, string> = {
   account_super_admin: "Shop Owner",
   shop_admin: "Branch Owner",
   staff: "Branch Staff",
+  chef: "Chef",
+  delivery_manager: "Delivery Manager",
 };
+
+/** Branch-scoped roles a shop owner or branch admin invites onto a floor. */
+export const FLOOR_ROLES: Role[] = ["staff", "chef", "delivery_manager"];
+
+/**
+ * Where a role lands on sign-in, and where a blocked route sends them.
+ *
+ * Each floor role has exactly one screen that is their whole job, so dropping
+ * them on a dashboard they can't read would just be a redirect they have to
+ * click through every time.
+ */
+export function homePathForRole(role?: Role): string {
+  switch (role) {
+    case "chef":
+      return "/kitchen";
+    case "delivery_manager":
+      return "/delivery";
+    case "staff":
+      return "/orders";
+    default:
+      return "/";
+  }
+}
 
 export function roleLabel(role?: Role): string {
   return role ? ROLE_LABELS[role] : "—";
@@ -25,6 +50,11 @@ export function isShopAdmin(role?: Role): boolean {
 
 export function isStaff(role?: Role): boolean {
   return role === "staff";
+}
+
+/** True for any branch-floor role — staff, chef or rider. */
+export function isFloorRole(role?: Role): boolean {
+  return !!role && FLOOR_ROLES.includes(role);
 }
 
 /** Tailwind badge variant/tone per account status. */

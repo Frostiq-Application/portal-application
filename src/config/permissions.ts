@@ -19,7 +19,18 @@ export interface PermissionRow {
   description: string;
   /** Plan feature that must be unlocked for brand roles (gated). */
   feature?: PlanFeatureKey;
-  access: Record<Role, AccessLevel>;
+  /**
+   * Access by role. **A role left out means "none"** — with six roles and
+   * seventeen rows, spelling out every cell would be a hundred entries of
+   * which the overwhelming majority are the same word, and the exceptions are
+   * what a reader is actually scanning for.
+   */
+  access: Partial<Record<Role, AccessLevel>>;
+}
+
+/** Access for a role, treating an absent entry as no access. */
+export function accessFor(row: PermissionRow, role: Role): AccessLevel {
+  return row.access[role] ?? "none";
 }
 
 export interface PermissionGroup {
@@ -36,10 +47,50 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
         label: "View orders",
         description: "See the order queue and order details.",
         access: {
-          platform_super_admin: "none",
           account_super_admin: "full",
           shop_admin: "scoped",
           staff: "scoped",
+          chef: "scoped",
+          delivery_manager: "scoped",
+        },
+      },
+      {
+        key: "orders.status",
+        label: "Advance order status",
+        description:
+          "Move an order along the pipeline — confirmed, baking, ready, delivered.",
+        access: {
+          account_super_admin: "full",
+          shop_admin: "scoped",
+          staff: "scoped",
+          chef: "scoped",
+          delivery_manager: "scoped",
+        },
+      },
+      {
+        key: "kitchen.view",
+        label: "Kitchen board",
+        description:
+          "The production queue: what to bake and by when. No prices or customer details.",
+        feature: "can_use_floor_boards",
+        access: {
+          account_super_admin: "full",
+          shop_admin: "scoped",
+          staff: "scoped",
+          chef: "scoped",
+        },
+      },
+      {
+        key: "delivery.view",
+        label: "Delivery board",
+        description:
+          "The dispatch queue, with the delivery address and contact number.",
+        feature: "can_use_floor_boards",
+        access: {
+          account_super_admin: "full",
+          shop_admin: "scoped",
+          staff: "scoped",
+          delivery_manager: "scoped",
         },
       },
       {
@@ -65,14 +116,25 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
         },
       },
       {
+        key: "custom_cakes.manage",
+        label: "Custom cake requests",
+        description: "Quote, accept and reject bespoke cake enquiries.",
+        feature: "can_use_custom_cake",
+        access: {
+          account_super_admin: "full",
+          shop_admin: "scoped",
+        },
+      },
+      {
         key: "customers.view",
         label: "View customers",
         description: "Customer directory, spend & order history.",
         access: {
-          platform_super_admin: "none",
           account_super_admin: "full",
           shop_admin: "scoped",
-          staff: "none",
+          // A rider needs the address and a number to ring on arrival — the
+          // one thing they get that a chef deliberately does not.
+          delivery_manager: "scoped",
         },
       },
     ],
@@ -174,6 +236,21 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
           platform_super_admin: "full",
           account_super_admin: "full",
           shop_admin: "scoped",
+          staff: "none",
+        },
+      },
+      {
+        key: "activity.view",
+        label: "View activity log",
+        description:
+          "The brand's audit trail: who on the team changed what, and when.",
+        feature: "can_use_audit_log",
+        access: {
+          // The owner's by default. A branch admin appears in the log as often
+          // as anyone, so granting it to them is a deliberate choice made
+          // through a custom role, not something they inherit.
+          account_super_admin: "full",
+          shop_admin: "none",
           staff: "none",
         },
       },

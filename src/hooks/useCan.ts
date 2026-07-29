@@ -27,6 +27,7 @@ const FALLBACK_PERMISSIONS: Record<Role, PermissionKey[]> = {
     "kitchen.view",
     "delivery.view",
     "catalog.manage",
+    "custom_cakes.manage",
     "customers.view",
     "scheduling.manage",
     "coupons.manage",
@@ -36,6 +37,7 @@ const FALLBACK_PERMISSIONS: Record<Role, PermissionKey[]> = {
     "branches.manage",
     "team.manage",
     "analytics.view",
+    "activity.view",
   ],
   shop_admin: [
     "orders.view",
@@ -44,6 +46,7 @@ const FALLBACK_PERMISSIONS: Record<Role, PermissionKey[]> = {
     "kitchen.view",
     "delivery.view",
     "catalog.manage",
+    "custom_cakes.manage",
     "customers.view",
     "scheduling.manage",
     "coupons.manage",
@@ -78,10 +81,13 @@ const FALLBACK_PERMISSIONS: Record<Role, PermissionKey[]> = {
 export function useCan() {
   const { user, role } = useAuth();
 
+  // Hoisted out of the dependency list: an optional-chained member expression
+  // isn't a stable thing to depend on, so name the value first.
+  const permissions = user?.permissions;
   const granted = useMemo(() => {
-    if (user?.permissions) return new Set(user.permissions);
+    if (permissions) return new Set(permissions);
     return new Set(role ? (FALLBACK_PERMISSIONS[role] ?? []) : []);
-  }, [user?.permissions, role]);
+  }, [permissions, role]);
 
   const isExempt = role === "platform_super_admin";
 
