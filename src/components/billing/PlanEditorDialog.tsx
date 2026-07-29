@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
-import { Infinity as InfinityIcon, Loader2 } from "@/components/ui/icons";
+import { InfinityIcon, Loader2 } from "@/components/ui/icons";
 import {
   useCreatePlanMutation,
   useUpdatePlanMutation,
@@ -78,8 +78,13 @@ export function PlanEditorDialog({
   const [exclusiveAccountId, setExclusiveAccountId] = useState<string>("");
   const [values, setValues] = useState<Record<string, PlanFeatureValue>>({});
 
-  useEffect(() => {
-    if (!open) return;
+  // Seeded during render rather than in an effect so the fields are correct on
+  // first paint instead of flashing the previous plan's values for a frame.
+  // `features` is in the key because the value grid is built from it.
+  const seedKey = open ? `${plan?.id ?? "new"}:${features.length}` : null;
+  const [seeded, setSeeded] = useState<string | null>(null);
+  if (seedKey !== seeded) {
+    setSeeded(seedKey);
     setName(plan?.name ?? "");
     setCode(plan?.code ?? "");
     setTagline(plan?.tagline ?? "");
@@ -91,7 +96,7 @@ export function PlanEditorDialog({
     setHidden(plan?.visibility === "hidden");
     setExclusiveAccountId(plan?.exclusiveAccountId ?? "");
 
-    const existing = (plan?.planFeatures ?? []) as PlanFeatureValue[];
+    const existing = plan?.planFeatures ?? [];
     const byKey = new Map(existing.map((v) => [v.featureKey, v]));
     const next: Record<string, PlanFeatureValue> = {};
     for (const f of features) {
@@ -104,7 +109,7 @@ export function PlanEditorDialog({
       };
     }
     setValues(next);
-  }, [open, plan, features]);
+  }
 
   const price = Number(priceMonthly) || 0;
   const busy = creating || updating;
@@ -121,7 +126,8 @@ export function PlanEditorDialog({
       description: description.trim() || undefined,
       priceMonthly: price,
       visibility: (hidden ? "hidden" : "public") as "hidden" | "public",
-      exclusiveAccountId: hidden && exclusiveAccountId ? exclusiveAccountId : null,
+      exclusiveAccountId:
+        hidden && exclusiveAccountId ? exclusiveAccountId : null,
       badge: badge.trim() || null,
       sortOrder: Number(sortOrder) || 0,
       trialDays: Number(trialDays) || 0,
@@ -371,7 +377,8 @@ export function PlanEditorDialog({
                         ...s,
                         [f.key]: {
                           ...v,
-                          limitValue: Number(e.target.value.replace(/\D/g, "")) || 0,
+                          limitValue:
+                            Number(e.target.value.replace(/\D/g, "")) || 0,
                         },
                       }))
                     }
@@ -439,10 +446,10 @@ export function PlanEditorDialog({
               <Badge variant="secondary" className="mr-1.5">
                 {plan.subscriberCount}
               </Badge>
-              account{plan.subscriberCount === 1 ? " is" : "s are"} on this plan.
-              Changing the price never affects a period they've already paid for
-              — it applies from each account's next renewal, and they'll be
-              emailed in advance.
+              account{plan.subscriberCount === 1 ? " is" : "s are"} on this
+              plan. Changing the price never affects a period they've already
+              paid for — it applies from each account's next renewal, and
+              they'll be emailed in advance.
             </p>
           )}
         </div>

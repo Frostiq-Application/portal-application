@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "@/components/ui/icons";
 import { useUpsertFeatureMutation } from "@/features/api/billingAdminApi";
@@ -57,8 +57,12 @@ export function FeatureEditorDialog({
   const [sortOrder, setSortOrder] = useState("0");
   const [isActive, setIsActive] = useState(true);
 
-  useEffect(() => {
-    if (!open) return;
+  // Seeded during render rather than in an effect so the fields are correct on
+  // first paint instead of flashing the previous feature's values for a frame.
+  const seedKey = open ? (feature?.key ?? "new") : null;
+  const [seeded, setSeeded] = useState<string | null>(null);
+  if (seedKey !== seeded) {
+    setSeeded(seedKey);
     setKey(feature?.key ?? "");
     setLabel(feature?.label ?? "");
     setDescription(feature?.description ?? "");
@@ -73,7 +77,7 @@ export function FeatureEditorDialog({
     setTrialLimit(feature?.trialLimit != null ? String(feature.trialLimit) : "");
     setSortOrder(String(feature?.sortOrder ?? 0));
     setIsActive(feature?.isActive ?? true);
-  }, [open, feature]);
+  }
 
   const isCount = dataType === "count";
 
@@ -263,7 +267,7 @@ export function FeatureEditorDialog({
                       placeholder="5"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Fixed during trial
+                      Empty = the plan's own limit
                     </p>
                   </div>
                 </div>

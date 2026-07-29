@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ArrowRight, Check, Crown, Gift, Minus, Rocket, Sparkles } from "@/components/ui/icons";
 import { EnterpriseEnquiryDialog } from "@/components/billing/EnterpriseEnquiryDialog";
 import { cn } from "@/lib/utils";
-import { inrShort } from "@/lib/billing";
+import { featureLabel, inrShort } from "@/lib/billing";
 import type { CycleOption, PricingPlan, TrialOffer } from "@/types/billing";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -178,7 +178,13 @@ export function PlanPicker({
           const price = plan.cyclePrices.find((p) => p.code === cycle);
           const isCurrent = plan.id === currentPlanId;
           const isSelected = plan.id === selectedPlanId;
-          const featured = Boolean(plan.badge) && !isCurrent;
+          // Two tiers carry a badge now and they say different things. Only the
+          // popular one takes the inverted card — two dark cards side by side
+          // read as two recommendations. The other is marked in violet, which
+          // is loud enough to notice and quiet enough not to compete.
+          const isPopular = /popular/i.test(plan.badge ?? "");
+          const featured = isPopular && !isCurrent;
+          const premium = Boolean(plan.badge) && !isPopular && !isCurrent;
           const { Icon, chip, ring } = tierLook(plan.name);
           const flags = Object.entries(plan.flags).filter(([, on]) => on);
           // The offer is per account, not per plan: `plan.trialDays` says a
@@ -196,6 +202,8 @@ export function PlanPicker({
                 featured
                   ? "border-transparent bg-foreground text-background shadow-lg"
                   : "bg-card",
+                premium &&
+                  "border-violet-400/60 bg-violet-50/60 shadow-md dark:border-violet-500/40 dark:bg-violet-950/20",
                 isSelected && `ring-2 ${ring} border-transparent`,
                 !isSelected && !featured && "hover:border-foreground/20",
               )}
@@ -205,6 +213,8 @@ export function PlanPicker({
                   className={cn(
                     "absolute -top-2.5 right-4 shadow-sm",
                     featured && "bg-background text-foreground",
+                    premium &&
+                      "bg-violet-600 text-white hover:bg-violet-600 dark:bg-violet-500",
                   )}
                 >
                   {plan.badge}
@@ -420,26 +430,5 @@ export function PlanPicker({
         </>
       )}
     </div>
-  );
-}
-
-/** Fallback prettifier for a feature key when no catalogue label is to hand. */
-export function featureLabel(key: string): string {
-  const known: Record<string, string> = {
-    can_use_coupons: "Discount coupons",
-    can_use_cms: "Storefront content & banners",
-    can_clone_catalog: "Catalog cloning",
-    can_use_realtime: "Live order dashboard",
-    can_use_analytics: "Branch analytics",
-    can_use_wishlist_analytics: "Wishlist analytics",
-    can_use_advanced_analytics: "Cross-branch analytics",
-    can_use_audit_log: "Audit log",
-    can_use_custom_cake: "Custom cake orders",
-    can_use_customer_data: "Customer directory",
-    priority_support: "Priority support",
-  };
-  return (
-    known[key] ??
-    key.replace(/^can_use_|^can_/, "").replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase())
   );
 }

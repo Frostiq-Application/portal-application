@@ -169,9 +169,14 @@ export function ChangePlanSheet({
     { skip: !args || !open },
   );
 
-  useEffect(() => {
+  // Cleared during render rather than in an effect so the add-on keeps never
+  // survive into the first paint for a different plan or cycle.
+  const seedKey = open ? `${plan?.id ?? ""}:${cycle?.code ?? ""}` : null;
+  const [seeded, setSeeded] = useState<string | null>(null);
+  if (seedKey !== seeded) {
+    setSeeded(seedKey);
     if (open) setKeep({});
-  }, [open, plan?.id, cycle?.code]);
+  }
 
   async function handleConfirm() {
     if (!plan || !cycle || !preview) return;

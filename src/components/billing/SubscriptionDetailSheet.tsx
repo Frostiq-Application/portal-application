@@ -22,10 +22,10 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { QuoteSummary } from "./QuoteSummary";
+import { AccountEntitlementsPanel } from "./AccountEntitlementsPanel";
 
 /**
  * The platform admin's view of one subscription (SA-15/19).
@@ -50,7 +50,9 @@ export function SubscriptionDetailSheet({
 
   return (
     <Sheet open={subscriptionId != null} onOpenChange={onOpenChange}>
-      <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-xl">
+      {/* Wider than the usual sheet: the Features tab is a two-column list of
+          every catalogue entry, and it turns unreadable below this. */}
+      <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-2xl">
         <SheetHeader className="border-b px-6 py-4">
           <SheetTitle className="flex flex-wrap items-center gap-2">
             {data?.account?.name ?? "Subscription"}
@@ -193,6 +195,7 @@ export function SubscriptionDetailSheet({
                   <TabsTrigger value="timeline">Timeline</TabsTrigger>
                   <TabsTrigger value="payments">Payments</TabsTrigger>
                   <TabsTrigger value="renewal">Next renewal</TabsTrigger>
+                  <TabsTrigger value="features">Features</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="timeline" className="mt-4">
@@ -280,6 +283,16 @@ export function SubscriptionDetailSheet({
                     quote={data.quote}
                     title={`Due ${formatDate(sub.currentPeriodEnd)}`}
                   />
+                </TabsContent>
+
+                <TabsContent value="features" className="mt-4">
+                  {data.account ? (
+                    <AccountEntitlementsPanel accountId={data.account.id} />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      This subscription has no account attached.
+                    </p>
+                  )}
                 </TabsContent>
               </Tabs>
             </div>

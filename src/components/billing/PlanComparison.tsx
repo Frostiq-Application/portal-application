@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { Check, ChevronDown, Infinity as InfinityIcon, Minus } from "@/components/ui/icons";
+import { Check, ChevronDown, InfinityIcon, Minus } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 import { inrShort } from "@/lib/billing";
-import { featureLabel } from "./PlanPicker";
+import { featureLabel } from "@/lib/billing";
 import type { CycleOption, PricingPlan } from "@/types/billing";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

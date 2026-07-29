@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "@/components/ui/icons";
 import { useUpsertCycleMutation } from "@/features/api/billingAdminApi";
@@ -44,14 +44,18 @@ export function CycleEditorDialog({
   const [freeMonths, setFreeMonths] = useState("0");
   const [displayOrder, setDisplayOrder] = useState("0");
 
-  useEffect(() => {
-    if (!open) return;
+  // Seeded during render rather than in an effect so the fields are correct on
+  // first paint instead of flashing the previous cycle's values for a frame.
+  const seedKey = open ? (cycle?.code ?? "new") : null;
+  const [seeded, setSeeded] = useState<string | null>(null);
+  if (seedKey !== seeded) {
+    setSeeded(seedKey);
     setCode(cycle?.code ?? "");
     setName(cycle?.name ?? "");
     setMonths(String(cycle?.months ?? 3));
     setFreeMonths(String(cycle?.freeMonths ?? 0));
     setDisplayOrder(String(cycle?.displayOrder ?? 0));
-  }, [open, cycle]);
+  }
 
   const m = Number(months) || 0;
   const f = Number(freeMonths) || 0;
