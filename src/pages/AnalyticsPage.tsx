@@ -7,7 +7,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Ban, Clock, IndianRupee, Lock, ShoppingBag, Ticket, TrendingUp, Users } from "@/components/ui/icons";
+import { Ban, BarChart3, Building2, Heart, IndianRupee, ShoppingBag, Ticket, TrendingUp, Users } from "@/components/ui/icons";
 import { useState } from "react";
 import {
   useAccountAnalyticsQuery,
@@ -24,7 +24,16 @@ import {
 import type { AccountAnalytics, ShopAnalytics } from "@/types";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ShopSelect } from "@/components/ShopSelect";
-import { AnalyticsTiers } from "@/components/analytics/AnalyticsTiers";
+import {
+  WishlistAnalytics,
+  WishlistAnalyticsView,
+} from "@/components/dashboard/WishlistAnalytics";
+import { UpgradeOverlay } from "@/components/analytics/UpgradeOverlay";
+import {
+  PREVIEW_ACCOUNT,
+  PREVIEW_SHOP,
+  PREVIEW_WISHLIST,
+} from "@/components/analytics/previewData";
 import {
   DateRangePicker,
   defaultRange,
@@ -32,7 +41,7 @@ import {
 } from "@/components/analytics/DateRangePicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { IconComponent } from "@/components/ui/icons";
 
 const BAR = "#3b82f6";
 
@@ -93,101 +102,188 @@ function Kpi({
   );
 }
 
-export function AnalyticsPage() {
-  const { role } = useAuth();
-  const { hasFeature } = useEntitlements();
-  const canUse = hasFeature("can_use_analytics");
-  // Brand (cross-branch) analytics is a higher tier + account-admin only.
-  const showBrandTab =
-    isAccountAdmin(role) && hasFeature("can_use_advanced_analytics");
-
-  const [range, setRange] = useState<DateRangeValue>(defaultRange());
-
-  if (!canUse) {
-    return (
-      <>
-        <PageHeader
-          title="Analytics"
-          description="Sales, best sellers, peak times & coupon performance"
-        />
-        <LockedCard />
-      </>
-    );
-  }
-
+/** Heading above each report block. */
+function SectionHeading({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: IconComponent;
+  title: string;
+  description: string;
+}) {
   return (
-    <>
-      <PageHeader
-        title="Analytics"
-        description="Sales, best sellers, peak times & coupon performance"
-        actions={<DateRangePicker value={range} onChange={setRange} />}
-      />
-
-      <AnalyticsTiers />
-
-      {showBrandTab ? (
-        <Tabs defaultValue="branch">
-          <TabsList>
-            <TabsTrigger value="branch">Branch</TabsTrigger>
-            <TabsTrigger value="brand">Brand (all branches)</TabsTrigger>
-          </TabsList>
-          <TabsContent value="branch" className="mt-4">
-            <BranchAnalytics range={range} />
-          </TabsContent>
-          <TabsContent value="brand" className="mt-4">
-            <BrandAnalytics range={range} />
-          </TabsContent>
-        </Tabs>
-      ) : (
-        <BranchAnalytics range={range} />
-      )}
-    </>
+    <div className="flex items-start gap-3">
+      <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <Icon className="size-4" />
+      </span>
+      <div>
+        <h2 className="text-base font-semibold">{title}</h2>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+    </div>
   );
 }
 
-function LockedCard() {
+function NeedsBranch() {
   return (
     <Card>
-      <CardContent className="flex flex-col items-center gap-2 py-16 text-center">
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-muted">
-          <Lock className="h-5 w-5 text-muted-foreground" />
-        </div>
-        <p className="text-sm font-medium">Analytics not available</p>
-        <p className="max-w-xs text-sm text-muted-foreground">
-          Reports aren’t included in your current plan. Contact your
-          administrator to upgrade.
-        </p>
+      <CardContent className="py-16 text-center text-sm text-muted-foreground">
+        Select a branch to view its analytics.
       </CardContent>
     </Card>
   );
 }
 
-function BranchAnalytics({ range }: { range: DateRangeValue }) {
+/**
+ * Every report the platform offers, on one page — branch performance, wishlist
+ * interest and brand-wide comparison.
+ *
+ * Reports the plan doesn't include are **not** hidden or replaced by an empty
+ * state: they render in full from sample data behind a blurred upgrade overlay,
+ * so the owner can see exactly what they'd be buying and the page keeps the
+ * same shape on every plan.
+ */
+export function AnalyticsPage() {
+  const { role } = useAuth();
+  const { hasFeature } = useEntitlements();
+  const canBranch = hasFeature("can_use_analytics");
+  const canWishlist = hasFeature("can_use_wishlist_analytics");
+  const canBrand = hasFeature("can_use_advanced_analytics");
+  // Cross-branch reporting only means something to the account owner; a branch
+  // admin can't see other branches at all, so the upsell would be noise.
+  const showBrand = isAccountAdmin(role);
+
+  const [range, setRange] = useState<DateRangeValue>(defaultRange());
   const branchId = useAppSelector(selectSelectedBranchId);
   const shopId = branchId === ALL_BRANCHES ? "" : branchId;
 
-  const { data, isLoading, isFetching } = useShopAnalyticsQuery(
-    { shopId, from: range.from, to: range.to },
-    { skip: !shopId },
+  return (
+    <>
+      <PageHeader
+        title="Analytics"
+        description="Sales, best sellers, peak times, wishlist interest & brand performance"
+        actions={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <ShopSelect />
+            <DateRangePicker value={range} onChange={setRange} />
+          </div>
+        }
+      />
+
+      <div className="space-y-10">
+        <section className="space-y-4">
+          <SectionHeading
+            icon={BarChart3}
+            title="Branch performance"
+            description="Sales, best sellers, peak times & coupon performance for the selected branch."
+          />
+          {canBranch ? (
+            shopId ? (
+              <LiveBranchAnalytics shopId={shopId} range={range} />
+            ) : (
+              <NeedsBranch />
+            )
+          ) : (
+            <UpgradeOverlay
+              feature="can_use_analytics"
+              description="Track revenue, best sellers, peak ordering hours and how your coupons are performing, branch by branch."
+            >
+              <BranchAnalyticsView data={PREVIEW_SHOP} loading={false} />
+            </UpgradeOverlay>
+          )}
+        </section>
+
+        <section className="space-y-4">
+          <SectionHeading
+            icon={Heart}
+            title="Wishlist insights"
+            description="What shoppers are saving for later — and how often it turns into an order."
+          />
+          {canWishlist ? (
+            shopId ? (
+              <WishlistAnalytics
+                shopId={shopId}
+                from={range.from}
+                to={range.to}
+              />
+            ) : (
+              <NeedsBranch />
+            )
+          ) : (
+            <UpgradeOverlay
+              feature="can_use_wishlist_analytics"
+              description="See what customers save but don’t buy, which products they save most, and the save→order conversion rate."
+            >
+              <WishlistAnalyticsView data={PREVIEW_WISHLIST} loading={false} />
+            </UpgradeOverlay>
+          )}
+        </section>
+
+        {showBrand && (
+          <section className="space-y-4">
+            <SectionHeading
+              icon={Building2}
+              title="Brand overview"
+              description="Every branch together — revenue comparison, customers and repeat rate."
+            />
+            {canBrand ? (
+              <LiveBrandAnalytics range={range} />
+            ) : (
+              <UpgradeOverlay
+                feature="can_use_advanced_analytics"
+                description="Compare branches side by side and see brand-wide customers, repeat rate and revenue in one place."
+              >
+                <BrandAnalyticsView data={PREVIEW_ACCOUNT} loading={false} />
+              </UpgradeOverlay>
+            )}
+          </section>
+        )}
+      </div>
+    </>
   );
-  const loading = isLoading || isFetching || !data;
+}
 
-  if (!shopId) {
-    return (
-      <Card>
-        <CardContent className="py-16 text-center text-sm text-muted-foreground">
-          Select a branch to view its analytics.
-        </CardContent>
-      </Card>
-    );
-  }
+/* -------------------------------------------------------------------------
+ * Fetching wrappers. Kept separate from the views so a locked section can
+ * render the identical charts from sample data without touching the API —
+ * which would 403 on a plan that doesn't include the feature.
+ * ---------------------------------------------------------------------- */
 
+function LiveBranchAnalytics({
+  shopId,
+  range,
+}: {
+  shopId: string;
+  range: DateRangeValue;
+}) {
+  const { data, isLoading, isFetching } = useShopAnalyticsQuery({
+    shopId,
+    from: range.from,
+    to: range.to,
+  });
+  return <BranchAnalyticsView data={data} loading={isLoading || isFetching || !data} />;
+}
+
+function LiveBrandAnalytics({ range }: { range: DateRangeValue }) {
+  const { data, isLoading, isFetching } = useAccountAnalyticsQuery({
+    from: range.from,
+    to: range.to,
+  });
+  return <BrandAnalyticsView data={data} loading={isLoading || isFetching || !data} />;
+}
+
+/* ------------------------------- views -------------------------------- */
+
+function BranchAnalyticsView({
+  data,
+  loading,
+}: {
+  data?: ShopAnalytics;
+  loading: boolean;
+}) {
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <ShopSelect />
-      </div>
-
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Kpi label="Total orders" value={data?.totalOrders ?? 0} icon={ShoppingBag} accent="#3b82f6" loading={loading} />
         <Kpi label="Revenue" value={data ? inr(data.revenue) : "—"} icon={TrendingUp} accent="#10b981" loading={loading} />
@@ -205,13 +301,13 @@ function BranchAnalytics({ range }: { range: DateRangeValue }) {
   );
 }
 
-function BrandAnalytics({ range }: { range: DateRangeValue }) {
-  const { data, isLoading, isFetching } = useAccountAnalyticsQuery({
-    from: range.from,
-    to: range.to,
-  });
-  const loading = isLoading || isFetching || !data;
-
+function BrandAnalyticsView({
+  data,
+  loading,
+}: {
+  data?: AccountAnalytics;
+  loading: boolean;
+}) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
