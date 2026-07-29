@@ -333,3 +333,24 @@ export async function downloadInvoicePdf(
   a.remove();
   URL.revokeObjectURL(url);
 }
+/** Fallback prettifier for a feature key when no catalogue label is to hand. */
+export function featureLabel(key: string): string {
+  const known: Record<string, string> = {
+    can_use_coupons: "Discount coupons",
+    can_use_cms: "Storefront content & banners",
+    can_clone_catalog: "Catalog cloning",
+    can_use_realtime: "Live order dashboard",
+    can_use_analytics: "Branch analytics",
+    can_use_wishlist_analytics: "Wishlist analytics",
+    can_use_advanced_analytics: "Cross-branch analytics",
+    can_use_audit_log: "Audit log",
+    can_use_custom_cake: "Custom cake orders",
+    can_use_floor_boards: "Kitchen & delivery boards",
+    can_use_customer_data: "Customer directory",
+    priority_support: "Priority support",
+  };
+  return (
+    known[key] ??
+    key.replace(/^can_use_|^can_/, "").replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase())
+  );
+}

@@ -101,8 +101,8 @@ export interface AdminPlan extends Plan {
     payableMonths: number;
     price: string;
   }[];
-  features: never;
-  planFeatures?: PlanFeatureValue[];
+  /** Every grant row for this plan — booleans and Count limits alike. */
+  planFeatures: PlanFeatureValue[];
 }
 
 export interface PlanFeatureValue {
@@ -389,6 +389,18 @@ export interface PaymentRow {
   failureReason: string | null;
   paidAt: string | null;
   createdAt: string;
+  /**
+   * Add-on capacity in effect for the period this charge covers — read from the
+   * add-on ledger's history, so an old row shows what it was billed for rather
+   * than what the account holds today.
+   */
+  capacity: {
+    featureKey: string;
+    label: string;
+    quantity: number;
+    units: number;
+    pricePerStep: string;
+  }[];
   invoice: { id: string; invoiceNumber: string; total: string } | null;
 }
 
@@ -496,6 +508,67 @@ export interface AdminSubscriptionDetail {
   payments: PaymentRow[];
   timeline: SubscriptionEvent[];
   quote: Quote;
+}
+
+// ------------------------------------------------------- account overrides --
+
+/** How an account came to hold what it holds for one feature. */
+export type EntitlementSource = "plan" | "addon" | "override" | "none";
+
+/** The stored exception itself, as the admin screen shows it. */
+export interface AccountOverride {
+  /** Boolean features: true granted, false revoked. Null on count features. */
+  enabled: boolean | null;
+  /** Count features: extra units on top of plan + add-ons. */
+  bonusValue: number | null;
+  /** Count features: forced unlimited for this account. */
+  isUnlimited: boolean;
+  reason: string;
+  /** Null = permanent. */
+  expiresAt: string | null;
+  grantedBy: string | null;
+  createdAt: string;
+  /** False once the expiry has passed — the row is kept as a record. */
+  isLive: boolean;
+}
+
+/** One catalogue feature, resolved for one account. */
+export interface AccountEntitlementRow {
+  key: string;
+  label: string;
+  description: string | null;
+  category: string;
+  dataType: FeatureDataType;
+  addonStep: number | null;
+  /** What the plan alone grants. */
+  planEnabled: boolean;
+  planValue: number | null;
+  planUnlimited: boolean;
+  /** Capacity from purchased add-ons. */
+  addonValue: number;
+  /** What actually applies. `null` on the axis that doesn't fit the data type. */
+  effectiveEnabled: boolean | null;
+  effectiveValue: number | null;
+  effectiveUnlimited: boolean;
+  source: EntitlementSource;
+  override: AccountOverride | null;
+}
+
+export interface AccountEntitlements {
+  account: {
+    id: string;
+    name: string;
+    ownerEmail: string;
+    status: AccountStatus;
+  };
+  subscription: {
+    id: string;
+    status: SubscriptionStatus;
+    billingCycle: string;
+    currentPeriodEnd: string;
+  } | null;
+  plan: { id: string; name: string } | null;
+  features: AccountEntitlementRow[];
 }
 
 export interface BillingReports {

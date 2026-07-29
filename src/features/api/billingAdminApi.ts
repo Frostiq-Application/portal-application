@@ -1,5 +1,6 @@
 import { baseApi } from "./baseApi";
 import type {
+  AccountEntitlements,
   AdminPlan,
   AdminSubscriptionDetail,
   AdminSubscriptionRow,
@@ -14,7 +15,7 @@ import type {
   SubscriptionCoupon,
   SweepResult,
 } from "@/types/billing";
-import type { Paginated, SubscriptionStatus } from "@/types";
+import type { Paginated, Plan, SubscriptionStatus } from "@/types";
 
 export interface AdminSubscriptionsQuery {
   page?: number;
@@ -37,6 +38,18 @@ export interface UpsertPlanBody {
   badge?: string | null;
   sortOrder?: number;
   features?: PlanFeatureValue[];
+}
+
+export interface UpsertAccountOverrideBody {
+  /** Boolean features only. */
+  enabled?: boolean | null;
+  /** Count features only — extra units on top of plan + add-ons. */
+  bonusValue?: number | null;
+  /** Count features only. */
+  isUnlimited?: boolean;
+  reason: string;
+  /** Omit for a permanent grant. */
+  expiresAt?: string | null;
 }
 
 export interface UpsertCouponBody {
@@ -86,6 +99,44 @@ export const billingAdminApi = baseApi.injectEndpoints({
       invalidatesTags: [{ type: "Feature", id: "LIST" }],
     }),
 
+    // ---------------------------------------------------- account overrides --
+
+    accountEntitlements: build.query<AccountEntitlements, string>({
+      query: (accountId) => ({
+        url: `/billing-admin/accounts/${accountId}/entitlements`,
+      }),
+      providesTags: (_r, _e, accountId) => [
+        { type: "Entitlements", id: accountId },
+      ],
+    }),
+
+    upsertAccountOverride: build.mutation<
+      unknown,
+      { accountId: string; featureKey: string; body: UpsertAccountOverrideBody }
+    >({
+      query: ({ accountId, featureKey, body }) => ({
+        url: `/billing-admin/accounts/${accountId}/overrides/${featureKey}`,
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: (_r, _e, { accountId }) => [
+        { type: "Entitlements", id: accountId },
+      ],
+    }),
+
+    removeAccountOverride: build.mutation<
+      { removed: true },
+      { accountId: string; featureKey: string }
+    >({
+      query: ({ accountId, featureKey }) => ({
+        url: `/billing-admin/accounts/${accountId}/overrides/${featureKey}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (_r, _e, { accountId }) => [
+        { type: "Entitlements", id: accountId },
+      ],
+    }),
+
     // ---------------------------------------------------------------- plans --
 
     adminPlans: build.query<AdminPlan[], void>({
@@ -93,12 +144,16 @@ export const billingAdminApi = baseApi.injectEndpoints({
       providesTags: [{ type: "Plan", id: "LIST" }],
     }),
 
-    createPlan: build.mutation<AdminPlan, UpsertPlanBody>({
+    // These three answer with the bare plan row — no subscriberCount, no
+    // derived cyclePrices, no planFeatures. Typing them as AdminPlan claimed
+    // fields the response has never carried; the list query is what produces an
+    // AdminPlan, and every mutation here invalidates it to refetch.
+    createPlan: build.mutation<Plan, UpsertPlanBody>({
       query: (body) => ({ url: "/billing-admin/plans", method: "POST", body }),
       invalidatesTags: [{ type: "Plan", id: "LIST" }],
     }),
 
-    updatePlan: build.mutation<AdminPlan, { id: string; body: UpsertPlanBody }>({
+    updatePlan: build.mutation<Plan, { id: string; body: UpsertPlanBody }>({
       query: ({ id, body }) => ({
         url: `/billing-admin/plans/${id}`,
         method: "PATCH",
@@ -107,7 +162,7 @@ export const billingAdminApi = baseApi.injectEndpoints({
       invalidatesTags: [{ type: "Plan", id: "LIST" }],
     }),
 
-    archivePlan: build.mutation<AdminPlan, { id: string; archived: boolean }>({
+    archivePlan: build.mutation<Plan, { id: string; archived: boolean }>({
       query: ({ id, archived }) => ({
         url: `/billing-admin/plans/${id}/archive`,
         method: "PATCH",
@@ -282,6 +337,9 @@ export const {
   useAdminFeaturesQuery,
   useUpsertFeatureMutation,
   useSetFeatureActiveMutation,
+  useAccountEntitlementsQuery,
+  useUpsertAccountOverrideMutation,
+  useRemoveAccountOverrideMutation,
   useAdminPlansQuery,
   useCreatePlanMutation,
   useUpdatePlanMutation,
