@@ -1,5 +1,14 @@
 import { baseApi } from "./baseApi";
 
+/**
+ * How a role's grants combine with the holder's base-role defaults.
+ *
+ * `extend` adds to them; `restrict` replaces them outright. Restrict is the
+ * only way to take a page *away* from someone — which is the whole point of a
+ * role that shows a chef the kitchen and nothing else.
+ */
+export type CustomRoleMode = "extend" | "restrict";
+
 export interface CustomRole {
   id: string;
   accountId: string | null;
@@ -8,12 +17,14 @@ export interface CustomRole {
   isActive: boolean;
   isTemplate: boolean;
   permissions: string[];
+  mode: CustomRoleMode;
 }
 
 export interface CreateCustomRoleBody {
   name: string;
   description?: string;
   permissions: string[];
+  mode?: CustomRoleMode;
 }
 
 export interface UpdateCustomRoleBody {
@@ -21,6 +32,7 @@ export interface UpdateCustomRoleBody {
   description?: string;
   isActive?: boolean;
   permissions?: string[];
+  mode?: CustomRoleMode;
 }
 
 export const rolesApi = baseApi.injectEndpoints({

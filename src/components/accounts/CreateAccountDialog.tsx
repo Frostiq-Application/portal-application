@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Copy, Loader2 } from "@/components/ui/icons";
+import { Loader2 } from "@/components/ui/icons";
 import { toast } from "sonner";
+import { InviteSentPanel } from "@/components/common/InviteSentPanel";
 import { isValidPhoneNumber } from "react-phone-number-input";
 import { slugify, cn } from "@/lib/utils";
 import { THEME_PRESETS } from "@/lib/theme";
@@ -49,6 +50,9 @@ function extractError(err: unknown): string {
 export function CreateAccountDialog() {
   const [open, setOpen] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
+  // The form is reset the moment the account is created, so the address the
+  // invite went to is read back off the response rather than the fields.
+  const [ownerEmail, setOwnerEmail] = useState("");
   /** Once the user edits the slug by hand, stop syncing it from the brand name. */
   const [slugTouched, setSlugTouched] = useState(false);
   const [logoUrl, setLogoUrl] = useState("");
@@ -76,8 +80,9 @@ export function CreateAccountDialog() {
         bannerUrl: bannerUrl || undefined,
         themeColor: themeColor || undefined,
       }).unwrap();
+      setOwnerEmail(res.ownerEmail);
       setInviteToken(res.ownerInviteToken);
-      toast.success(`Shop "${res.name}" created.`);
+      toast.success(`Shop "${res.name}" created — invite sent to ${res.ownerEmail}.`);
       reset({ activate: false, ownerPhone: "" });
       setSlugTouched(false);
       setLogoUrl("");
@@ -91,16 +96,13 @@ export function CreateAccountDialog() {
   const close = () => {
     setOpen(false);
     setInviteToken(null);
+    setOwnerEmail("");
     reset({ activate: false, ownerPhone: "" });
     setSlugTouched(false);
     setLogoUrl("");
     setBannerUrl("");
     setThemeColor(THEME_PRESETS[0].hex);
   };
-
-  const setPasswordLink = inviteToken
-    ? `${window.location.origin}/set-password?token=${inviteToken}`
-    : "";
 
   return (
     <Sheet open={open} onOpenChange={(o) => (o ? setOpen(true) : close())}>
@@ -221,24 +223,15 @@ export function CreateAccountDialog() {
             <SheetHeader>
               <SheetTitle>Shop created</SheetTitle>
               <SheetDescription>
-                Share this set-password link with the owner. It expires in 7
-                days — they&rsquo;ll choose their own password before signing
-                in.
+                The owner will choose their own password before signing in.
               </SheetDescription>
             </SheetHeader>
-            <div className="flex items-start gap-2 py-6">
-              <Input readOnly value={setPasswordLink} className="font-mono text-xs" />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => {
-                  navigator.clipboard?.writeText(setPasswordLink);
-                  toast.success("Copied");
-                }}
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
+            <div className="py-4">
+              <InviteSentPanel
+                email={ownerEmail}
+                token={inviteToken}
+                note="They'll set their own password from the link in the email and can start setting up the shop straight away. It expires in 7 days."
+              />
             </div>
             <SheetFooter className="mt-auto">
               <Button onClick={close}>Done</Button>

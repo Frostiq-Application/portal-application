@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Clock, Copy, Loader2, Mail, MapPin, Store, User as UserIcon, Check } from "@/components/ui/icons";
+import { Clock, Loader2, Mail, MapPin, Store, User as UserIcon, Check } from "@/components/ui/icons";
 import { toast } from "sonner";
+import { InviteSentPanel } from "@/components/common/InviteSentPanel";
 import {
   useCreateShopMutation,
   useUpdateShopMutation,
@@ -10,7 +11,6 @@ import {
   useAssignShopMutation,
   useCreateUserMutation,
   useListUsersQuery,
-  useResetUserPasswordMutation,
 } from "@/features/api/usersApi";
 import { BranchTeamAccess } from "@/components/shops/BranchTeamAccess";
 import { useListAccountsQuery } from "@/features/api/accountsApi";
@@ -86,7 +86,6 @@ export function ShopDialog({
     { page: 1, limit: 100 },
     { skip: !open },
   );
-  const [resetPassword, { isLoading: resetting }] = useResetUserPasswordMutation();
 
   // Shop Owners can hand a brand-new branch straight to a Branch Owner. Platform
   // admins keep the lean flow (they invite staff from the Team page instead).
@@ -302,11 +301,14 @@ export function ShopDialog({
               role: "shop_admin",
               shopIds: [created.id],
             }).unwrap();
-            // Mint a reset-password link the owner uses to set their password.
-            const res = await resetPassword(owner.id).unwrap();
-            setResetToken(res.resetToken);
-            toast.success("Branch owner created");
-            return; // Stay open to show the reset-password link.
+            // `createUser` already mints the set-password token and emails it.
+            // This used to follow up with a reset-password call for a second
+            // token — harmless when both were only ever copied out of a dialog,
+            // but now that each one sends mail it would land the new owner two
+            // different invites for the same account.
+            setResetToken(owner.inviteToken);
+            toast.success(`Branch owner invited — email sent to ${ownerEmail.trim()}`);
+            return; // Stay open to show the invite confirmation.
           } catch (err) {
             toast.error(apiError(err, "Branch saved, but the owner invite failed"));
             return;
@@ -320,29 +322,18 @@ export function ShopDialog({
   };
 
   if (resetToken) {
-    const link = `${window.location.origin}/set-password?token=${resetToken}`;
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent className="flex w-full flex-col sm:max-w-md">
           <SheetHeader>
             <SheetTitle>Branch created · owner added</SheetTitle>
             <SheetDescription>
-              Share this reset-password link (valid 7 days). {ownerName || "The owner"} will
-              choose their own password before signing in.
+              {ownerName || "The owner"} will choose their own password before
+              signing in.
             </SheetDescription>
           </SheetHeader>
-          <div className="flex items-center gap-2 py-4">
-            <Input readOnly value={link} className="font-mono text-xs" />
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => {
-                navigator.clipboard?.writeText(link);
-                toast.success("Copied");
-              }}
-            >
-              <Copy className="h-4 w-4" />
-            </Button>
+          <div className="py-4">
+            <InviteSentPanel email={ownerEmail.trim()} token={resetToken} />
           </div>
           <SheetFooter className="mt-auto">
             <Button onClick={() => onOpenChange(false)}>Done</Button>
@@ -614,7 +605,7 @@ export function ShopDialog({
   );
 
   const saving =
-    creating || updating || invitingOwner || resetting || assigning;
+    creating || updating || invitingOwner || assigning;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

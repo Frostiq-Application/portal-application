@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAppDispatch } from "@/app/hooks";
@@ -611,11 +611,26 @@ function BranchStep({ state }: { state: OnboardingState }) {
     if (!slugTouched) setSlug(slugify(branchName));
   }, [branchName, slugTouched]);
 
-  // A pasted link overrides whatever was stored; an empty box keeps it.
+  // A pasted value overrides whatever was stored; an empty box keeps it.
   useEffect(() => {
     if (!mapLink.trim()) return;
     setCoords(parseCoordinates(mapLink));
   }, [mapLink]);
+
+  /** Typed something that isn't a usable pair — say so instead of staying mute. */
+  const coordsError = mapLink.trim() !== "" && coords == null;
+
+  /*
+   * Where "Find on map" lands. Seeded with the address already typed above so
+   * the map opens near the shop rather than on the middle of the world, and
+   * falls back to plain Maps when there's nothing to search for yet.
+   */
+  const mapSearchUrl = useMemo(() => {
+    const query = [address, displayArea, city].map((s) => s.trim()).filter(Boolean).join(", ");
+    return query
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
+      : "https://www.google.com/maps";
+  }, [address, displayArea, city]);
 
   const toggleDay = (day: string) =>
     setClosedDays((d) =>
@@ -760,12 +775,14 @@ function BranchStep({ state }: { state: OnboardingState }) {
       </div>
 
       {/*
-        Only the link is asked for — no latitude/longitude boxes.
-        Nobody knows their shop's coordinates, and a mistyped one silently puts
-        the branch in the sea. Paste the Maps link; we read them off it.
+        One box, filled by copy-paste — no latitude/longitude fields to type.
+        Nobody knows their shop's coordinates off the top of their head, and a
+        mistyped one silently puts the branch in the sea. The button is a
+        shortcut for *fetching* them: it opens Maps on whatever address was
+        typed above, they copy the pin's coordinates there and paste them back.
       */}
       <div className="space-y-1.5">
-        <Label htmlFor="b-map">Location</Label>
+        <Label htmlFor="b-map">Location coordinates</Label>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <MapPin className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -774,48 +791,46 @@ function BranchStep({ state }: { state: OnboardingState }) {
               className="pl-9"
               value={mapLink}
               onChange={(e) => setMapLink(e.target.value)}
-              placeholder="Paste your Google Maps link"
+              placeholder="18.50740, 73.80770"
             />
           </div>
-          {/* Opens the pin we parsed, not the raw link — that's the only way
-              to confirm the paste actually landed on the right building. */}
-          <Button
-            type="button"
-            variant="outline"
-            asChild={Boolean(coords)}
-            disabled={!coords}
-            title={
-              coords
-                ? "Open this location in Google Maps"
-                : "Paste a link first"
-            }
-          >
-            {coords ? (
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${coords.lat},${coords.lng}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <ExternalLink className="size-4" />
-                Open map
-              </a>
-            ) : (
-              <span>
-                <ExternalLink className="size-4" />
-                Open map
-              </span>
-            )}
+          {/* Always live — it's the "go get them" step, so disabling it until
+              coordinates exist would lock the door people came to open. */}
+          <Button type="button" variant="outline" asChild>
+            <a
+              href={mapSearchUrl}
+              target="_blank"
+              rel="noreferrer"
+              title="Open Google Maps to copy your shop's coordinates"
+            >
+              <ExternalLink className="size-4" />
+              Find on map
+            </a>
           </Button>
         </div>
         {coords ? (
           <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
             <Check className="size-3.5" />
-            Location found — {formatCoordinates(coords.lat, coords.lng)}
+            Location set — {formatCoordinates(coords.lat, coords.lng)}
+            <a
+              className="ml-1 font-normal text-muted-foreground underline-offset-2 hover:underline"
+              href={`https://www.google.com/maps/search/?api=1&query=${coords.lat},${coords.lng}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              check pin
+            </a>
+          </p>
+        ) : coordsError ? (
+          <p className="text-xs text-destructive">
+            That isn't a coordinate pair. It should look like{" "}
+            <span className="font-medium">18.50740, 73.80770</span>.
           </p>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Open your shop in Google Maps, tap Share, and paste the link here.
-            It's how customers find your nearest branch.
+            Find on map → right-click your shop (long-press on a phone) → tap
+            the coordinates that appear to copy them → paste here. It's how
+            customers find your nearest branch.
           </p>
         )}
       </div>
