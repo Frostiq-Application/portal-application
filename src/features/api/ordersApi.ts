@@ -1,4 +1,5 @@
 import { baseApi } from "./baseApi";
+import type { OrderDateBucket, OrderSortBy, SortDir } from "@/lib/orders";
 import type {
   DeliveryType,
   Order,
@@ -13,6 +14,34 @@ export interface OrdersQuery extends PaginationQuery {
   status?: OrderStatus;
   deliveryType?: DeliveryType;
   scheduledDate?: string;
+  /** Delivery-day tab. Resolved server-side against `refDate`. */
+  dateBucket?: Exclude<OrderDateBucket, "all">;
+  /** The browser's own "today", so day buckets follow the shop's clock. */
+  refDate?: string;
+  sortBy?: OrderSortBy;
+  sortDir?: SortDir;
+}
+
+/** Totals behind the delivery-day tabs. */
+export interface OrderScheduleCounts {
+  today: number;
+  tomorrow: number;
+  overmorrow: number;
+  other: number;
+  all: number;
+}
+
+/** Query params shared by the list and both count endpoints. */
+function queueParams(params?: Partial<OrdersQuery> | void) {
+  const p: Partial<OrdersQuery> = params ?? {};
+  return {
+    ...(p.shopId ? { shopId: p.shopId } : {}),
+    ...(p.deliveryType ? { deliveryType: p.deliveryType } : {}),
+    ...(p.scheduledDate ? { scheduledDate: p.scheduledDate } : {}),
+    ...(p.dateBucket ? { dateBucket: p.dateBucket } : {}),
+    ...(p.refDate ? { refDate: p.refDate } : {}),
+    ...(p.search ? { search: p.search } : {}),
+  };
 }
 
 export interface ManualOrderItemInput {
@@ -75,11 +104,10 @@ export const ordersApi = baseApi.injectEndpoints({
         params: {
           page: params?.page ?? 1,
           limit: params?.limit ?? 20,
-          ...(params?.shopId ? { shopId: params.shopId } : {}),
+          ...queueParams(params),
           ...(params?.status ? { status: params.status } : {}),
-          ...(params?.deliveryType ? { deliveryType: params.deliveryType } : {}),
-          ...(params?.scheduledDate ? { scheduledDate: params.scheduledDate } : {}),
-          ...(params?.search ? { search: params.search } : {}),
+          ...(params?.sortBy ? { sortBy: params.sortBy } : {}),
+          ...(params?.sortDir ? { sortDir: params.sortDir } : {}),
         },
       }),
       providesTags: (result) =>
@@ -104,11 +132,22 @@ export const ordersApi = baseApi.injectEndpoints({
     >({
       query: (params) => ({
         url: "/orders/counts",
+        params: queueParams(params),
+      }),
+      providesTags: [{ type: "Order", id: "LIST" }],
+    }),
+
+    // Per-delivery-day totals for the day tabs. Unlike the status counts these
+    // *do* honor the selected status, so each day shows what that tab opens.
+    getOrderScheduleCounts: build.query<
+      OrderScheduleCounts,
+      Omit<OrdersQuery, "dateBucket" | "page" | "limit"> | void
+    >({
+      query: (params) => ({
+        url: "/orders/schedule-counts",
         params: {
-          ...(params?.shopId ? { shopId: params.shopId } : {}),
-          ...(params?.deliveryType ? { deliveryType: params.deliveryType } : {}),
-          ...(params?.scheduledDate ? { scheduledDate: params.scheduledDate } : {}),
-          ...(params?.search ? { search: params.search } : {}),
+          ...queueParams(params),
+          ...(params?.status ? { status: params.status } : {}),
         },
       }),
       providesTags: [{ type: "Order", id: "LIST" }],
@@ -207,6 +246,7 @@ export const {
   useListOrdersQuery,
   useGetOrderQuery,
   useGetOrderStatusCountsQuery,
+  useGetOrderScheduleCountsQuery,
   useUpdateOrderStatusMutation,
   useCancelOrderMutation,
   useMarkOrderPaidMutation,

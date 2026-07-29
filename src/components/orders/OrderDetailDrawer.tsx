@@ -8,6 +8,7 @@ import {
   NEXT_STATUSES,
   ORDER_STATUS_LABEL,
   ORDER_STATUS_TONE,
+  formatSlotRange,
 } from "@/lib/orders";
 import {
   useCancelOrderMutation,
@@ -94,6 +95,9 @@ export function OrderDetailDrawer({ orderId, onOpenChange }: Props) {
       "Status updated",
     );
 
+  // Same wording as the queue's delivery-time column: "10:00 AM – 12:00 PM".
+  const slot = formatSlotRange(order?.scheduledSlotStart, order?.scheduledSlotEnd);
+
   const submitCancel = async () => {
     if (cancelReason.trim().length < 3) return toast.error("Reason required");
     await run(
@@ -130,8 +134,7 @@ export function OrderDetailDrawer({ orderId, onOpenChange }: Props) {
               <SheetDescription>
                 {order.deliveryType === "delivery" ? "Delivery" : "Pickup"} ·{" "}
                 {formatDate(order.scheduledDate)}
-                {order.scheduledSlotStart &&
-                  ` · ${order.scheduledSlotStart.slice(0, 5)}–${order.scheduledSlotEnd?.slice(0, 5)}`}
+                {slot && ` · ${slot}`}
               </SheetDescription>
             </SheetHeader>
 

@@ -1,21 +1,47 @@
 import { useCallback, useMemo, useState } from "react";
-import { Ban, CheckCircle2, ChefHat, Eye, Inbox, Loader2, PackageCheck, Plus, Search, Truck, X } from "@/components/ui/icons";
+import {
+  ArrowDown,
+  ArrowUp,
+  Ban,
+  CalendarClock,
+  CheckCircle2,
+  ChefHat,
+  ChevronsUpDown,
+  Clock,
+  Eye,
+  Inbox,
+  Loader2,
+  PackageCheck,
+  Plus,
+  Search,
+  Truck,
+  X,
+} from "@/components/ui/icons";
 import type { IconComponent } from "@/components/ui/icons";
 import { toast } from "sonner";
-import { formatDate, cn } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { apiError } from "@/lib/apiError";
 import { LiveIndicator } from "@/components/LiveIndicator";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import {
   CANCELLABLE,
+  DATE_BUCKET_ITEMS,
   NEXT_STATUSES,
   ORDER_STATUS_ACCENT,
   ORDER_STATUS_LABEL,
   ORDER_STATUS_TONE,
+  dayDistanceLabel,
+  formatSlotRange,
+  isOverdue,
+  isoToday,
+  relativeDayLabel,
+  shortDayDate,
 } from "@/lib/orders";
+import type { OrderDateBucket, OrderSortBy, SortDir } from "@/lib/orders";
 import {
   useCancelOrderMutation,
+  useGetOrderScheduleCountsQuery,
   useGetOrderStatusCountsQuery,
   useListOrdersQuery,
   useMarkOrderPaidMutation,
@@ -114,6 +140,111 @@ const STATUS_ICON: Record<OrderStatus, IconComponent> = {
   delivered: CheckCircle2,
   cancelled: Ban,
 };
+
+/** Tail of the empty-state sentence, per delivery-day tab. */
+const DAY_PHRASE: Record<OrderDateBucket, string> = {
+  all: "",
+  today: " due today",
+  tomorrow: " due tomorrow",
+  overmorrow: " due the day after",
+  other: " on other days",
+};
+
+/**
+ * Direction a column starts in when you first sort by it: soonest-first for
+ * the schedule (what to make next), biggest/newest first for the rest.
+ */
+const DEFAULT_SORT_DIR: Record<OrderSortBy, SortDir> = {
+  schedule: "asc",
+  slot: "asc",
+  total: "desc",
+  created: "desc",
+};
+
+/** A column header that toggles the queue's sort key/direction. */
+function SortHead({
+  label,
+  sortKey,
+  sortBy,
+  sortDir,
+  onSort,
+  className,
+}: {
+  label: string;
+  sortKey: OrderSortBy;
+  sortBy: OrderSortBy;
+  sortDir: SortDir;
+  onSort: (key: OrderSortBy) => void;
+  className?: string;
+}) {
+  const active = sortBy === sortKey;
+  const Icon = active ? (sortDir === "asc" ? ArrowUp : ArrowDown) : ChevronsUpDown;
+  return (
+    <TableHead
+      className={className}
+      aria-sort={
+        active ? (sortDir === "asc" ? "ascending" : "descending") : "none"
+      }
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={cn(
+          "group -mx-1 inline-flex items-center gap-1 rounded px-1 py-0.5 transition-colors hover:text-foreground",
+          active && "text-foreground",
+        )}
+      >
+        {label}
+        <Icon
+          className={cn(
+            "h-3.5 w-3.5 transition-opacity",
+            active ? "opacity-100" : "opacity-40 group-hover:opacity-80",
+          )}
+        />
+      </button>
+    </TableHead>
+  );
+}
+
+/**
+ * Delivery day cell: the relative day staff actually speak in ("Today",
+ * "Tomorrow") with the calendar date underneath, plus a "Late" flag for
+ * anything still open past its date.
+ */
+function DeliveryDay({ order, today }: { order: Order; today: string }) {
+  const relative = relativeDayLabel(order.scheduledDate, today);
+  const date = shortDayDate(order.scheduledDate);
+  const late = isOverdue(order.scheduledDate, order.status, today);
+  return (
+    <>
+      <div className="flex items-center gap-1.5">
+        <span className="text-sm font-medium">{relative ?? date}</span>
+        {late && (
+          <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:bg-red-950 dark:text-red-300">
+            Late
+          </span>
+        )}
+      </div>
+      <div className="text-xs text-muted-foreground">
+        {relative ? date : dayDistanceLabel(order.scheduledDate, today)}
+      </div>
+    </>
+  );
+}
+
+/** Delivery window, as a slot range — "10:00 AM – 12:00 PM". */
+function DeliveryTime({ order }: { order: Order }) {
+  const slot = formatSlotRange(order.scheduledSlotStart, order.scheduledSlotEnd);
+  if (!slot) {
+    return <span className="text-xs text-muted-foreground">Any time</span>;
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 text-sm tabular-nums">
+      <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      {slot}
+    </span>
+  );
+}
 
 /**
  * Inline row action buttons: advance to the next status, decline, mark-paid.
@@ -257,6 +388,11 @@ export function OrdersPage() {
   const [payment, setPayment] = useState<OrderPaymentStatus | "all">("all");
   const shopId = useAppSelector(selectSelectedBranchId);
   const [scheduledDate, setScheduledDate] = useState("");
+  // Opens on today's deliveries — the queue's real question is "what do we
+  // make next", and the other days are one click (and one count) away.
+  const [dateBucket, setDateBucket] = useState<OrderDateBucket>("today");
+  const [sortBy, setSortBy] = useState<OrderSortBy>("schedule");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [openId, setOpenId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   // Ids whose background action just failed and snapped back — flashed briefly.
@@ -264,14 +400,30 @@ export function OrdersPage() {
 
   const debouncedSearch = useDebouncedValue(search, 350);
 
-  const { data, isLoading, isFetching } = useListOrdersQuery({
-    page,
-    limit: 20,
+  // The browser's calendar day anchors the day tabs and the row labels, so
+  // "Today" always means the shop's today rather than the server's UTC day.
+  const today = isoToday();
+
+  // Shared by the list and both count queries — one shape, no drift. The day
+  // tab is kept separate because the day-counts query must ignore it (it is
+  // the dimension that query groups by).
+  const filters = {
     search: debouncedSearch || undefined,
-    status,
     deliveryType: deliveryType === "all" ? undefined : deliveryType,
     shopId: !shopId || shopId === ALL_BRANCHES ? undefined : shopId,
     scheduledDate: scheduledDate || undefined,
+    refDate: today,
+  };
+  const day = dateBucket === "all" ? undefined : dateBucket;
+
+  const { data, isLoading, isFetching } = useListOrdersQuery({
+    ...filters,
+    dateBucket: day,
+    page,
+    limit: 20,
+    status,
+    sortBy,
+    sortDir,
   });
 
   // The single order SSE connection lives in <OrderNotifications /> (app shell)
@@ -319,13 +471,36 @@ export function OrdersPage() {
     setPage(1);
   };
 
+  /** Toggle direction when re-clicking the active column, else adopt its default. */
+  const applySort = (key: OrderSortBy) => {
+    if (key === sortBy) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(key);
+      setSortDir(DEFAULT_SORT_DIR[key]);
+    }
+    resetPage();
+  };
+
+  // An exact date and a relative day tab would fight each other (the server
+  // ANDs them), so picking one clears the other.
+  const pickDay = (bucket: OrderDateBucket) => {
+    setDateBucket(bucket);
+    if (bucket !== "all") setScheduledDate("");
+    resetPage();
+  };
+
+  const pickExactDate = (value: string) => {
+    setScheduledDate(value);
+    if (value) setDateBucket("all");
+    resetPage();
+  };
+
   // Live per-status totals so every tab shows its count, not just the active
   // one. Same filters as the list; refreshed by the same realtime invalidation.
   const { data: statusCounts } = useGetOrderStatusCountsQuery({
-    search: debouncedSearch || undefined,
-    deliveryType: deliveryType === "all" ? undefined : deliveryType,
-    shopId: !shopId || shopId === ALL_BRANCHES ? undefined : shopId,
-    scheduledDate: scheduledDate || undefined,
+    ...filters,
+    dateBucket: day,
   });
   const statusItems = useMemo(
     () =>
@@ -338,6 +513,26 @@ export function OrdersPage() {
       })),
     [statusCounts, team],
   );
+
+  // Per-day totals for the delivery-day tabs. These honor the selected status
+  // too, so "Today · 6" means six orders in *this* queue due today.
+  const { data: dayCounts } = useGetOrderScheduleCountsQuery({
+    ...filters,
+    status,
+  });
+  const dayItems = useMemo(
+    () =>
+      DATE_BUCKET_ITEMS.map((item) => ({
+        ...item,
+        count: dayCounts?.[item.value],
+      })),
+    [dayCounts],
+  );
+
+  // Now that the queue opens on one day, "No orders found." would read as if
+  // the shop had none at all — name the day so the counts on the other tabs
+  // are the obvious next place to look.
+  const emptyMessage = `No ${ORDER_STATUS_LABEL[status].toLowerCase()} orders${DAY_PHRASE[dateBucket]}.`;
 
   return (
     <>
@@ -379,6 +574,22 @@ export function OrdersPage() {
           resetPage();
         }}
       />
+
+      {/* Delivery-day tabs: the queue's running order at a glance — what is
+          due today, next, and later — so staff know what to start on. */}
+      <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <CalendarClock className="h-3.5 w-3.5" />
+          Delivery day
+        </span>
+        <SegmentedStrip
+          className="min-w-0 flex-1"
+          variant="secondary"
+          value={dateBucket}
+          items={dayItems}
+          onChange={pickDay}
+        />
+      </div>
 
       <div className="mb-4 space-y-3">
         <div className="relative max-w-sm">
@@ -438,11 +649,9 @@ export function OrdersPage() {
           <Input
             type="date"
             className="w-44"
+            title="Jump to an exact delivery date"
             value={scheduledDate}
-            onChange={(e) => {
-              setScheduledDate(e.target.value);
-              resetPage();
-            }}
+            onChange={(e) => pickExactDate(e.target.value)}
           />
 
           {hasFilters && (
@@ -459,9 +668,28 @@ export function OrdersPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Order</TableHead>
-              <TableHead>Schedule</TableHead>
+              <SortHead
+                label="Delivery date"
+                sortKey="schedule"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={applySort}
+              />
+              <SortHead
+                label="Delivery time"
+                sortKey="slot"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={applySort}
+              />
               <TableHead>Type</TableHead>
-              <TableHead>Total</TableHead>
+              <SortHead
+                label="Total"
+                sortKey="total"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={applySort}
+              />
               <TableHead>Payment</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -471,7 +699,7 @@ export function OrdersPage() {
             {isLoading ? (
               [0, 1, 2, 3].map((i) => (
                 <TableRow key={i}>
-                  <TableCell colSpan={7}>
+                  <TableCell colSpan={8}>
                     <Skeleton className="h-6 w-full" />
                   </TableCell>
                 </TableRow>
@@ -479,10 +707,10 @@ export function OrdersPage() {
             ) : rows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={8}
                   className="py-10 text-center text-sm text-muted-foreground"
                 >
-                  No orders found.
+                  {emptyMessage}
                 </TableCell>
               </TableRow>
             ) : (
@@ -498,9 +726,11 @@ export function OrdersPage() {
                   <TableCell className="font-mono font-medium">
                     {o.orderNumber}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatDate(o.scheduledDate)}
-                    {o.scheduledSlotStart && ` · ${o.scheduledSlotStart.slice(0, 5)}`}
+                  <TableCell className="whitespace-nowrap">
+                    <DeliveryDay order={o} today={today} />
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <DeliveryTime order={o} />
                   </TableCell>
                   <TableCell className="capitalize text-sm">
                     {o.deliveryType}
