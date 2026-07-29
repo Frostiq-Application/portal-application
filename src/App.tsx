@@ -4,6 +4,7 @@ import { useAppSelector } from "@/app/hooks";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 import { OnboardingGate } from "@/routes/OnboardingGate";
 import { EmailVerifiedGate } from "@/routes/EmailVerifiedGate";
+import { PermissionRoute } from "@/routes/PermissionRoute";
 import { FeatureRoute } from "@/routes/FeatureRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { LoginPage } from "@/pages/LoginPage";
@@ -30,18 +31,54 @@ import { CouponsPage } from "@/pages/CouponsPage";
 import { CmsPage } from "@/pages/CmsPage";
 import { CatalogPage } from "@/pages/CatalogPage";
 import { OrdersPage } from "@/pages/OrdersPage";
+import { KitchenPage } from "@/pages/KitchenPage";
+import { DeliveryPage } from "@/pages/DeliveryPage";
 import { CustomersPage } from "@/pages/CustomersPage";
 import { CustomCakesPage } from "@/pages/CustomCakesPage";
 import { SchedulingPage } from "@/pages/SchedulingPage";
 import { AnalyticsPage } from "@/pages/AnalyticsPage";
+import { ActivityLogPage } from "@/pages/ActivityLogPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import { useAuth } from "@/hooks/useAuth";
+import { homePathForRole, isFloorRole } from "@/lib/roles";
+import { useCan } from "@/hooks/useCan";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { navFor } from "@/config/nav";
 import { Toaster } from "@/components/ui/sonner";
 
-/** Staff have no dashboard — their whole job is Orders, so send them there. */
+/**
+ * What "/" resolves to, which depends entirely on what the user may see.
+ *
+ * Floor roles have one screen that is their whole job. Everyone else gets the
+ * dashboard — unless a restricted custom role has taken `analytics.view` away,
+ * in which case the dashboard is a page of numbers they can't load, and the
+ * honest answer is the first thing they *can* open. Falling through to a blank
+ * dashboard would look like the app is broken.
+ */
 function HomeRoute() {
   const { role } = useAuth();
-  return role === "staff" ? <Navigate to="/orders" replace /> : <DashboardPage />;
+  const { can } = useCan();
+  const { hasFeature } = useEntitlements();
+
+  if (isFloorRole(role)) {
+    // A chef's home is the kitchen board — but only if the brand's plan
+    // includes it. Landing them on the upgrade card every single login would
+    // be a screen they can't act on (they can't buy a plan) in place of the
+    // work they can still do, so fall back to the order queue.
+    const boarded =
+      role === "staff" || hasFeature("can_use_floor_boards");
+    const home =
+      boarded || !can("orders.view") ? homePathForRole(role) : "/orders";
+    return <Navigate to={home} replace />;
+  }
+  if (can("analytics.view")) return <DashboardPage />;
+
+  const firstAvailable = navFor(role, can).find((i) => i.path !== "/");
+  return firstAvailable ? (
+    <Navigate to={firstAvailable.path} replace />
+  ) : (
+    <DashboardPage />
+  );
 }
 
 function ThemeSync() {
@@ -95,15 +132,44 @@ export default function App() {
             <Route index element={<HomeRoute />} />
             <Route path="/profile" element={<ProfilePage />} />
 
-            {/* Orders — the one operational area branch staff can reach. */}
+            {/* Operations floor. The role list is the coarse gate; the
+                permission is what a custom role actually moves, so a chef sees
+                Kitchen and nothing else on this row. */}
             <Route
               element={
                 <ProtectedRoute
-                  roles={["account_super_admin", "shop_admin", "staff"]}
+                  roles={[
+                    "account_super_admin",
+                    "shop_admin",
+                    "staff",
+                    "chef",
+                    "delivery_manager",
+                  ]}
                 />
               }
             >
-              <Route path="/orders" element={<OrdersPage />} />
+              <Route element={<PermissionRoute permission="orders.view" />}>
+                <Route path="/orders" element={<OrdersPage />} />
+              </Route>
+              {/* The floor boards are a plan module (Growth Plus & Pro), so
+                  the feature gate sits outside the permission one: holding
+                  `kitchen.view` says the role may work a board, not that the
+                  brand has bought them. */}
+              <Route
+                element={
+                  <FeatureRoute
+                    feature="can_use_floor_boards"
+                    featureLabel="Kitchen & delivery boards"
+                  />
+                }
+              >
+                <Route element={<PermissionRoute permission="kitchen.view" />}>
+                  <Route path="/kitchen" element={<KitchenPage />} />
+                </Route>
+                <Route element={<PermissionRoute permission="delivery.view" />}>
+                  <Route path="/delivery" element={<DeliveryPage />} />
+                </Route>
+              </Route>
             </Route>
 
             {/* Platform super admin */}
@@ -131,10 +197,20 @@ export default function App() {
                 />
               }
             >
-              <Route path="/catalog" element={<CatalogPage />} />
-              <Route path="/scheduling" element={<SchedulingPage />} />
-              <Route path="/analytics" element={<AnalyticsPage />} />
-              <Route path="/shops" element={<ShopsPage />} />
+              <Route element={<PermissionRoute permission="catalog.manage" />}>
+                <Route path="/catalog" element={<CatalogPage />} />
+              </Route>
+              <Route
+                element={<PermissionRoute permission="scheduling.manage" />}
+              >
+                <Route path="/scheduling" element={<SchedulingPage />} />
+              </Route>
+              <Route element={<PermissionRoute permission="analytics.view" />}>
+                <Route path="/analytics" element={<AnalyticsPage />} />
+              </Route>
+              <Route element={<PermissionRoute permission="branches.view" />}>
+                <Route path="/shops" element={<ShopsPage />} />
+              </Route>
 
               {/* Plan-gated feature modules */}
               <Route
@@ -145,7 +221,11 @@ export default function App() {
                   />
                 }
               >
-                <Route path="/customers" element={<CustomersPage />} />
+                <Route
+                  element={<PermissionRoute permission="customers.view" />}
+                >
+                  <Route path="/customers" element={<CustomersPage />} />
+                </Route>
               </Route>
               <Route
                 element={
@@ -155,14 +235,20 @@ export default function App() {
                   />
                 }
               >
-                <Route path="/coupons" element={<CouponsPage />} />
+                <Route
+                  element={<PermissionRoute permission="coupons.manage" />}
+                >
+                  <Route path="/coupons" element={<CouponsPage />} />
+                </Route>
               </Route>
               <Route
                 element={
                   <FeatureRoute feature="can_use_cms" featureLabel="CMS" />
                 }
               >
-                <Route path="/cms" element={<CmsPage />} />
+                <Route element={<PermissionRoute permission="cms.manage" />}>
+                  <Route path="/cms" element={<CmsPage />} />
+                </Route>
               </Route>
               <Route
                 element={
@@ -172,7 +258,33 @@ export default function App() {
                   />
                 }
               >
-                <Route path="/custom-cakes" element={<CustomCakesPage />} />
+                <Route
+                  element={
+                    <PermissionRoute permission="custom_cakes.manage" />
+                  }
+                >
+                  <Route path="/custom-cakes" element={<CustomCakesPage />} />
+                  {/* Same page, gallery section preselected — so the sidebar
+                      can point straight at it. */}
+                  <Route
+                    path="/custom-cakes/gallery"
+                    element={<CustomCakesPage />}
+                  />
+                </Route>
+              </Route>
+              <Route
+                element={
+                  <FeatureRoute
+                    feature="can_use_audit_log"
+                    featureLabel="Activity Log"
+                  />
+                }
+              >
+                <Route
+                  element={<PermissionRoute permission="activity.view" />}
+                >
+                  <Route path="/activity-log" element={<ActivityLogPage />} />
+                </Route>
               </Route>
             </Route>
 
@@ -187,14 +299,25 @@ export default function App() {
                 />
               }
             >
-              <Route path="/users" element={<UsersPage />} />
+              <Route element={<PermissionRoute permission="team.manage" />}>
+                <Route path="/users" element={<UsersPage />} />
+              </Route>
             </Route>
 
-            {/* Roles & Permissions — platform super admin only */}
+            {/* Roles & Permissions. Now open to shop owners: they decide what
+                their chefs and riders can reach, so locking them out of this
+                screen made the whole custom-role system unusable by the people
+                it was built for. */}
             <Route
-              element={<ProtectedRoute roles={["platform_super_admin"]} />}
+              element={
+                <ProtectedRoute
+                  roles={["platform_super_admin", "account_super_admin"]}
+                />
+              }
             >
-              <Route path="/roles" element={<RolesPage />} />
+              <Route element={<PermissionRoute permission="team.manage" />}>
+                <Route path="/roles" element={<RolesPage />} />
+              </Route>
             </Route>
 
             {/* Account super admin — read-only view of their own subscription */}
