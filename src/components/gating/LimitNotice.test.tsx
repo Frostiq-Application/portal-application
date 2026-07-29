@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { renderHook } from "@testing-library/react";
-import { LimitCounter, LimitNotice, useLimitState } from "./LimitNotice";
+import { LimitCounter, LimitNotice } from "./LimitNotice";
+import { useLimitState } from "@/hooks/useLimitState";
 
 // The notice branches on role, so stub the auth hook rather than standing up a
 // whole store for a presentational test.

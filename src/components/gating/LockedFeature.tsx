@@ -3,8 +3,7 @@ import { ArrowRight, Check, Crown, Rocket, Sparkles } from "@/components/ui/icon
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyPlansQuery } from "@/features/api/billingApi";
-import { featureLabel } from "@/components/billing/PlanPicker";
-import { inrShort } from "@/lib/billing";
+import { featureLabel, inrShort } from "@/lib/billing";
 import type { PlanFeatureKey } from "@/types";
 import type { PricingPlan } from "@/types/billing";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -13,11 +12,17 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-function tierIcon(name: string) {
+/**
+ * Returns the rendered icon rather than the component type. Binding a component
+ * to a variable and rendering `<Icon />` makes the element type change with the
+ * plan name, which remounts the subtree; an element keeps the type static.
+ */
+function tierIcon(name: string, className: string) {
   const n = name.toLowerCase();
-  if (n.includes("pro") || n.includes("enterprise")) return Crown;
-  if (n.includes("growth")) return Rocket;
-  return Sparkles;
+  if (n.includes("pro") || n.includes("enterprise"))
+    return <Crown className={className} />;
+  if (n.includes("growth")) return <Rocket className={className} />;
+  return <Sparkles className={className} />;
 }
 
 /**
@@ -144,7 +149,6 @@ function RecommendedPlan({
   currentFlags: Record<string, boolean | undefined>;
   onUpgrade: () => void;
 }) {
-  const Icon = tierIcon(plan.name);
   // Only show what's genuinely *new* — repeating features they already have
   // makes the upgrade look smaller than it is.
   const newFlags = Object.entries(plan.flags)
@@ -158,13 +162,15 @@ function RecommendedPlan({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <span className="rounded-lg bg-primary/10 p-2 text-primary">
-            <Icon className="size-4" />
+            {tierIcon(plan.name, "size-4")}
           </span>
           <div>
-            <p className="flex flex-wrap items-center gap-2 font-semibold">
+            {/* A div, not a p: Badge renders a div, and a div inside a p is
+                invalid HTML that React warns about at runtime. */}
+            <div className="flex flex-wrap items-center gap-2 font-semibold">
               {plan.name}
               <Badge variant="secondary">Recommended</Badge>
-            </p>
+            </div>
             {plan.tagline && (
               <p className="text-xs text-muted-foreground">{plan.tagline}</p>
             )}
