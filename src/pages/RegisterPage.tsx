@@ -31,10 +31,11 @@ const STOREFRONT_HOST =
  * The backend has always exposed `POST /accounts/register`, but nothing in the
  * portal called it — so a new shop had no way in at all. This is that door.
  *
- * It asks for the bare minimum to create a login, then **signs the owner in and
- * drops them straight into onboarding**. Making someone register, then hunt for
+ * It asks for the bare minimum to create a login, then **signs the owner in**
+ * and sends them to verify their email. Making someone register, then hunt for
  * a confirmation, then log in separately is three chances to lose them before
- * they have seen the product.
+ * they have seen the product — so the session is live from the first submit and
+ * the emailed code is the only thing standing between them and setup.
  */
 export function RegisterPage() {
   const dispatch = useAppDispatch();
@@ -90,8 +91,9 @@ export function RegisterPage() {
         password,
       }).unwrap();
 
-      // Sign them straight in. The account already has an owner user with this
-      // password, so there is nothing to confirm and nothing to wait for.
+      // Sign them straight in regardless of verification. The account is real
+      // and the password works, so there is no reason to make them log in
+      // again — verification gates onboarding, not the session.
       const session = await login({
         email: ownerEmail.trim().toLowerCase(),
         password,
@@ -105,6 +107,13 @@ export function RegisterPage() {
             refreshToken: session.refreshToken,
           }),
         );
+        // Registration already sent a code; the verify screen picks it up from
+        // there. Anyone somehow already verified skips straight to setup.
+        if (session.user.emailVerified === false) {
+          toast.success(`Welcome, ${ownerName.trim().split(" ")[0]} — check your email for a code.`);
+          navigate("/verify-email", { replace: true });
+          return;
+        }
         toast.success(`Welcome, ${ownerName.trim().split(" ")[0]} — let's set up your shop.`);
         navigate("/onboarding", { replace: true });
         return;

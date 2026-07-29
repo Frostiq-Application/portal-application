@@ -3,11 +3,14 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { useAppSelector } from "@/app/hooks";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 import { OnboardingGate } from "@/routes/OnboardingGate";
+import { EmailVerifiedGate } from "@/routes/EmailVerifiedGate";
 import { FeatureRoute } from "@/routes/FeatureRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { LoginPage } from "@/pages/LoginPage";
 import { RegisterPage } from "@/pages/RegisterPage";
 import { SetPasswordPage } from "@/pages/SetPasswordPage";
+import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage";
+import { VerifyEmailPage } from "@/pages/VerifyEmailPage";
 import { DemoDashboardPage } from "@/pages/DemoDashboardPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { AccountsPage } from "@/pages/AccountsPage";
@@ -59,6 +62,11 @@ export default function App() {
         {/* Public self-serve signup — the way a new bakery gets in. */}
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/set-password" element={<SetPasswordPage />} />
+        {/* Self-serve recovery — the alternative was phoning support for a
+            hand-minted token. */}
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        {/* Signed in but unverified: the code step of signup. */}
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
         {/* Public, backend-free replica of the owner dashboard — for marketing screenshots only */}
         <Route path="/demo-dashboard" element={<DemoDashboardPage />} />
 
@@ -74,11 +82,14 @@ export default function App() {
           instead of a payment form.
         */}
         <Route element={<ProtectedRoute roles={["account_super_admin"]} />}>
-          <Route path="/onboarding" element={<OnboardingPage />} />
-          <Route path="/checkout" element={<CheckoutPage />} />
+          <Route element={<EmailVerifiedGate />}>
+            <Route path="/onboarding" element={<OnboardingPage />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
+          </Route>
         </Route>
 
         <Route element={<ProtectedRoute />}>
+          <Route element={<EmailVerifiedGate />}>
           <Route element={<OnboardingGate />}>
           <Route element={<AppLayout />}>
             <Route index element={<HomeRoute />} />
@@ -195,6 +206,7 @@ export default function App() {
                 element={<MySubscriptionPage />}
               />
             </Route>
+          </Route>
           </Route>
           </Route>
         </Route>

@@ -10,6 +10,25 @@ interface LoginRequest {
   password: string;
 }
 
+export type OtpPurpose = "email_verification" | "password_reset";
+
+export interface OtpRequest {
+  email: string;
+  purpose: OtpPurpose;
+}
+
+export interface OtpRequested {
+  sent: boolean;
+  expiresInMinutes: number;
+  resendAfterSeconds: number;
+}
+
+export interface OtpVerified {
+  verified: boolean;
+  /** Only for `password_reset` — feed it to `/set-password`. */
+  resetToken?: string | null;
+}
+
 export const authApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
     login: build.mutation<LoginResponse, LoginRequest>({
@@ -49,6 +68,23 @@ export const authApi = baseApi.injectEndpoints({
         params: { token },
       }),
     }),
+
+    /**
+     * Sends a one-time code. Always resolves — the server won't say whether the
+     * address has an account, so a rejection here means rate limiting, never
+     * "no such user".
+     */
+    requestOtp: build.mutation<OtpRequested, OtpRequest>({
+      query: (body) => ({ url: "/auth/otp/request", method: "POST", body }),
+    }),
+    /**
+     * `password_reset` comes back with a `resetToken` for `/set-password`;
+     * `email_verification` comes back with nothing but `verified`.
+     */
+    verifyOtp: build.mutation<OtpVerified, OtpRequest & { code: string }>({
+      query: (body) => ({ url: "/auth/otp/verify", method: "POST", body }),
+      invalidatesTags: ["Me"],
+    }),
   }),
   overrideExisting: false,
 });
@@ -61,4 +97,6 @@ export const {
   useMeQuery,
   useSetPasswordMutation,
   useInviteEmailQuery,
+  useRequestOtpMutation,
+  useVerifyOtpMutation,
 } = authApi;

@@ -130,7 +130,18 @@ export function LoginPage() {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="password">Password</Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="password">Password</Label>
+                      {/* Carries whatever's already typed above, so the reset
+                          screen doesn't ask for the email a second time. */}
+                      <Link
+                        to="/forgot-password"
+                        state={email ? { email } : undefined}
+                        className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                      >
+                        Forgot password?
+                      </Link>
+                    </div>
                     <Input
                       id="password"
                       type="password"
