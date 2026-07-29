@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { StatusBanner } from "./StatusBanner";
-import type { ScheduledChange, SubscriptionSummary } from "@/types/billing";
+import type {
+  ScheduledChange,
+  SubscriptionSummary,
+  UsageRow,
+} from "@/types/billing";
 import type { SubscriptionStatus } from "@/types";
 
 /**
@@ -53,7 +57,23 @@ const change: ScheduledChange = {
   effectiveAt: "2026-12-31T00:00:00Z",
 };
 
-const show = (s: SubscriptionSummary, scheduled?: ScheduledChange | null) =>
+const usage = (over: Partial<UsageRow> = {}): UsageRow => ({
+  featureKey: "max_products_per_shop",
+  label: "Products per branch",
+  used: 10,
+  planValue: 50,
+  addonValue: 0,
+  effective: 50,
+  isUnlimited: false,
+  trialCapped: false,
+  ...over,
+});
+
+const show = (
+  s: SubscriptionSummary,
+  scheduled?: ScheduledChange | null,
+  rows?: UsageRow[],
+) =>
   render(
     <MemoryRouter>
       <StatusBanner
@@ -61,6 +81,7 @@ const show = (s: SubscriptionSummary, scheduled?: ScheduledChange | null) =>
         scheduledChange={scheduled}
         nextAmount="24990.00"
         archiveDays={90}
+        usage={rows}
         onPay={noop}
         onUndoCancel={noop}
         onUndoChange={noop}
@@ -155,5 +176,37 @@ describe("StatusBanner priority", () => {
     expect(
       screen.getByRole("button", { name: /pay ₹24,990\.00/i }),
     ).toBeInTheDocument();
+  });
+
+  it("says so when a count limit is full", () => {
+    show(sub(), null, [usage({ used: 50, effective: 50 })]);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "You've used all 50 products per branch",
+    );
+  });
+
+  it("stays quiet while there is still room", () => {
+    const { container } = show(sub(), null, [usage({ used: 49, effective: 50 })]);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("ignores unlimited rows, which can never be full", () => {
+    const { container } = show(sub(), null, [
+      usage({ used: 900, effective: null, isUnlimited: true }),
+    ]);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("lets a full limit outrank a scheduled change", () => {
+    show(sub(), change, [usage({ used: 50, effective: 50 })]);
+    expect(screen.getByRole("status")).toHaveTextContent("You've used all 50");
+  });
+
+  it("keeps the trial countdown above a full limit", () => {
+    const soon = new Date(Date.now() + 2 * 86_400_000).toISOString();
+    show(sub({ status: "trial", trialEndsAt: soon }), null, [
+      usage({ used: 50, effective: 50 }),
+    ]);
+    expect(screen.getByRole("status")).toHaveTextContent("left in your trial");
   });
 });

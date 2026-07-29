@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
-import { AlertTriangle, CalendarClock, Loader2, RotateCcw, Sparkles, Zap } from "@/components/ui/icons";
+import { AlertTriangle, CalendarClock, Loader2, RotateCcw, Sparkles, TrendingUp, Zap } from "@/components/ui/icons";
 import { daysUntil, inr } from "@/lib/billing";
 import { cn, formatDate } from "@/lib/utils";
-import type { ScheduledChange, SubscriptionSummary } from "@/types/billing";
+import type { ScheduledChange, SubscriptionSummary, UsageRow } from "@/types/billing";
 import { Button } from "@/components/ui/button";
 
 type Tone = "danger" | "warn" | "info" | "muted";
@@ -48,9 +48,11 @@ export function StatusBanner({
   scheduledChange,
   nextAmount,
   archiveDays,
+  usage,
   onPay,
   onUndoCancel,
   onUndoChange,
+  onUpgrade,
   undoingCancel,
   undoingChange,
 }: {
@@ -58,9 +60,13 @@ export function StatusBanner({
   scheduledChange?: ScheduledChange | null;
   nextAmount?: string;
   archiveDays?: number;
+  /** Count-limit usage, for the "no room left" banner. */
+  usage?: UsageRow[];
   onPay: () => void;
   onUndoCancel: () => void;
   onUndoChange: () => void;
+  /** Where "see options" goes; falls back to the pay action. */
+  onUpgrade?: () => void;
   undoingCancel?: boolean;
   undoingChange?: boolean;
 }) {
@@ -148,7 +154,33 @@ export function StatusBanner({
     });
   }
 
-  // ---- 5. Scheduled plan change ------------------------------------------
+  // ---- 5. Out of room on a Count limit ------------------------------------
+  // Ranked below the trial countdown but above a scheduled change: hitting a
+  // ceiling blocks work *today*, and it's the moment an upgrade is worth most.
+  // Unlimited and zero-capacity rows are skipped — neither has a ratio.
+  const full = (usage ?? [])
+    .filter((u) => !u.isUnlimited && u.effective != null && u.effective > 0)
+    .filter((u) => u.used >= u.effective!)
+    .sort((a, b) => b.used - a.used)[0];
+
+  if (full) {
+    banners.push({
+      priority: 3.5,
+      tone: "warn",
+      Icon: TrendingUp,
+      title: `You've used all ${full.effective} ${full.label.toLowerCase()}`,
+      body: (
+        <>
+          You can't add more {full.label.toLowerCase()} until there's room. Move
+          up a plan, or buy extra capacity for this one — nothing you've already
+          created is affected either way.
+        </>
+      ),
+      action: { label: "See options", onClick: onUpgrade ?? onPay, icon: Zap },
+    });
+  }
+
+  // ---- 6. Scheduled plan change ------------------------------------------
   if (scheduledChange) {
     banners.push({
       priority: 4,
