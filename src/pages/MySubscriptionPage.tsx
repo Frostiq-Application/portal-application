@@ -1,7 +1,16 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Download, Gift, Infinity as InfinityIcon, Loader2, PackagePlus, Receipt, Sparkles, TrendingUp } from "@/components/ui/icons";
+import {
+  Download,
+  Gift,
+  InfinityIcon,
+  Loader2,
+  PackagePlus,
+  Receipt,
+  Sparkles,
+  TrendingUp,
+} from "@/components/ui/icons";
 import {
   useMyPaymentsQuery,
   useMyPlansQuery,
@@ -13,6 +22,7 @@ import {
   useUndoCancelMutation,
   useUndoScheduledChangeMutation,
 } from "@/features/api/billingApi";
+import { useMyEntitlementsQuery } from "@/features/api/entitlementsApi";
 import {
   EVENT_LABEL,
   NEGATIVE_EVENTS,
@@ -152,6 +162,7 @@ function UsageMeter({ row }: { row: UsageRow }) {
  */
 export function MySubscriptionPage() {
   const { data, isLoading, refetch } = useMySubscriptionQuery();
+  const { data: entitlements } = useMyEntitlementsQuery();
   const { data: catalogue } = useMyPlansQuery();
   const { data: payments } = useMyPaymentsQuery();
   const { data: timeline } = useMyTimelineQuery();
@@ -188,7 +199,6 @@ export function MySubscriptionPage() {
   const isTrial = sub?.status === "trial";
   /** On a ₹0 plan — add-ons are meaningless and switching is free. */
   const isOnFreePlan = Number(sub?.lockedMonthlyPrice ?? 0) === 0;
-  const needsPayment = sub?.status === "grace" || sub?.status === "locked";
 
   const atRiskUsage = useMemo(
     () =>
@@ -204,8 +214,13 @@ export function MySubscriptionPage() {
   async function handleStartTrial(plan: PricingPlan) {
     try {
       await startTrial({ planId: plan.id }).unwrap();
+      // No day count rather than a guessed one — the window is configured per
+      // plan, so a hardcoded fallback here would eventually quote the wrong
+      // number back to someone who just started a trial of a different length.
       toast.success(
-        `Your ${trialOffer?.days ?? 7}-day ${plan.name} trial has started.`,
+        trialOffer
+          ? `Your ${trialOffer.days}-day ${plan.name} trial has started.`
+          : `Your ${plan.name} trial has started.`,
       );
       refetch();
     } catch (err) {
@@ -305,8 +320,8 @@ export function MySubscriptionPage() {
                 <strong className="font-semibold">
                   Free forever, no card.
                 </strong>{" "}
-                Real orders, real customers, your own branded storefront. Nothing
-                expires — move up whenever you need more room.
+                Real orders, real customers, your own branded storefront.
+                Nothing expires — move up whenever you need more room.
               </p>
             </CardContent>
           </Card>
@@ -343,14 +358,11 @@ export function MySubscriptionPage() {
             Setting up your storefront…
           </p>
         )}
-
       </div>
     );
   }
 
   // ------------------------------------------------------------- subscribed --
-  const currentPlan = plans.find((p) => p.id === sub.planId) ?? null;
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -364,7 +376,11 @@ export function MySubscriptionPage() {
         scheduledChange={data?.scheduledChange}
         nextAmount={data?.nextRenewal?.quote.totalAmount}
         archiveDays={data?.settings.archiveDays}
+        usage={data?.usage}
         onPay={() => goToCheckout(sub.planId, sub.billingCycle)}
+        // Out of room isn't a payment problem — send them to the plan list
+        // rather than to a checkout for the plan they already have.
+        onUpgrade={() => setTab("plans")}
         onUndoCancel={async () => {
           try {
             await undoCancel().unwrap();
@@ -445,7 +461,9 @@ export function MySubscriptionPage() {
               <div>
                 <dt className="text-xs text-muted-foreground">Payment</dt>
                 <dd className="mt-0.5 font-medium">
-                  {sub.autopayEnabled && sub.hasMandate ? "Autopay on" : "Manual"}
+                  {sub.autopayEnabled && sub.hasMandate
+                    ? "Autopay on"
+                    : "Manual"}
                 </dd>
                 <dd className="text-xs text-muted-foreground">
                   {sub.autopayEnabled && sub.hasMandate
@@ -507,6 +525,45 @@ export function MySubscriptionPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Things this account holds that its plan doesn't list. Shown rather
+            than left invisible so the plan comparison below never reads as a
+            contradiction — and so support and the customer are looking at the
+            same account. */}
+        {(entitlements?.grantedExtras ?? []).length > 0 && (
+          <Card className="border-emerald-500/30 bg-emerald-500/5 lg:col-span-3">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Gift className="size-4 text-emerald-600" />
+                Added for your account
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1.5">
+              {entitlements!.grantedExtras.map((extra) => (
+                <p key={extra.featureKey} className="text-sm">
+                  <span className="font-medium">{extra.label}</span>
+                  {extra.dataType === "count" && (
+                    <span className="text-muted-foreground">
+                      {extra.isUnlimited
+                        ? " — unlimited"
+                        : ` — ${extra.bonusValue} extra`}
+                    </span>
+                  )}
+                  {extra.expiresAt && (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · until {formatDate(extra.expiresAt)}
+                    </span>
+                  )}
+                </p>
+              ))}
+              <p className="pt-1 text-xs text-muted-foreground">
+                Included on top of {sub.planName}, and unaffected by changing
+                your plan.
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* ---- tabs ---------------------------------------------------------- */}
@@ -547,16 +604,16 @@ export function MySubscriptionPage() {
           )}
 
           <div className="mt-6">
-          <PlanComparison
-            plans={plans}
-            cycle={activeCycle}
-            currentPlanId={sub.planId}
-            onChoose={(p) =>
-              Number(p.priceMonthly) === 0 && isOnFreePlan
-                ? handleFreeSwitch(p)
-                : setChangePlan(p)
-            }
-          />
+            <PlanComparison
+              plans={plans}
+              cycle={activeCycle}
+              currentPlanId={sub.planId}
+              onChoose={(p) =>
+                Number(p.priceMonthly) === 0 && isOnFreePlan
+                  ? handleFreeSwitch(p)
+                  : setChangePlan(p)
+              }
+            />
           </div>
         </TabsContent>
 
@@ -568,7 +625,10 @@ export function MySubscriptionPage() {
                   title="No add-ons yet"
                   description="Add-ons raise a limit without changing your plan — useful when you need one more branch but not a bigger tier."
                 >
-                  <Button onClick={() => setAddonsOpen(true)} disabled={isTrial}>
+                  <Button
+                    onClick={() => setAddonsOpen(true)}
+                    disabled={isTrial}
+                  >
                     <PackagePlus className="size-4" />
                     Browse add-ons
                   </Button>
@@ -672,10 +732,22 @@ export function MySubscriptionPage() {
                               </span>
                             )}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap text-muted-foreground">
-                            {p.periodStart && p.periodEnd
-                              ? `${formatDate(p.periodStart)} – ${formatDate(p.periodEnd)}`
-                              : "—"}
+                          <TableCell className="text-muted-foreground">
+                            <span className="whitespace-nowrap">
+                              {p.periodStart && p.periodEnd
+                                ? `${formatDate(p.periodStart)} – ${formatDate(p.periodEnd)}`
+                                : "—"}
+                            </span>
+                            {p.capacity?.length > 0 && (
+                              <p className="mt-0.5 max-w-56 text-xs">
+                                {p.capacity
+                                  .map(
+                                    (c) =>
+                                      `+${c.units} ${c.label.toLowerCase()}`,
+                                  )
+                                  .join(" · ")}
+                              </p>
+                            )}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
                             {inr(p.totalAmount)}

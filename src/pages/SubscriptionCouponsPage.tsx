@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { BadgePercent, Eye, EyeOff, Loader2, Pencil, Plus, Search } from "@/components/ui/icons";
 import {
@@ -277,8 +277,12 @@ function CouponEditor({
   const [planIds, setPlanIds] = useState<string[]>([]);
   const [cycleCodes, setCycleCodes] = useState<string[]>([]);
 
-  useEffect(() => {
-    if (!open) return;
+  // Seeded during render rather than in an effect so the fields are correct on
+  // first paint instead of flashing the previous coupon's values for a frame.
+  const seedKey = open ? (coupon?.id ?? "new") : null;
+  const [seeded, setSeeded] = useState<string | null>(null);
+  if (seedKey !== seeded) {
+    setSeeded(seedKey);
     setCode(coupon?.code ?? "");
     setNote(coupon?.internalNote ?? "");
     setDiscountType(coupon?.discountType ?? "percent");
@@ -296,7 +300,7 @@ function CouponEditor({
     setPerAccountLimit(String(coupon?.perAccountLimit ?? 1));
     setPlanIds(coupon?.planIds ?? []);
     setCycleCodes(coupon?.cycleCodes ?? []);
-  }, [open, coupon]);
+  }
 
   const busy = creating || updating;
   const isPercent = discountType === "percent";

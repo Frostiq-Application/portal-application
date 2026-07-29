@@ -56,7 +56,9 @@ export function PlansPage() {
   const { data: plans, isLoading } = useAdminPlansQuery();
   const { data: features } = useAdminFeaturesQuery();
   const { data: cycles } = useAdminCyclesQuery();
-  const { data: accounts } = useListAccountsQuery({ page: 1, limit: 200 });
+  // 100 is the server's cap (`PaginationDto` is `@Max(100)`); asking for 200
+  // fails validation, so this picker was silently coming back empty.
+  const { data: accounts } = useListAccountsQuery({ page: 1, limit: 100 });
 
   const [archivePlan] = useArchivePlanMutation();
   const [setFeatureActive] = useSetFeatureActiveMutation();
@@ -192,11 +194,7 @@ export function PlansPage() {
                         variant="outline"
                         className="flex-1"
                         onClick={() => {
-                          setEditing({
-                            ...plan,
-                            planFeatures:
-                              plan.features as unknown as AdminPlan["planFeatures"],
-                          });
+                          setEditing(plan);
                           setPlanOpen(true);
                         }}
                       >

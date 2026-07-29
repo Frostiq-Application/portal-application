@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { AlertTriangle, CalendarClock, Loader2, PlayCircle, RefreshCw, Search, Zap } from "@/components/ui/icons";
+import { AlertTriangle, CalendarClock, Loader2, PlayCircle, RefreshCw, Search, X, Zap } from "@/components/ui/icons";
 import {
   useAdminSubscriptionsQuery,
   useBillingReportsQuery,
@@ -89,11 +90,19 @@ export function SubscriptionsPage() {
   const [page, setPage] = useState(1);
   const [detailId, setDetailId] = useState<string | null>(null);
 
+  // The Accounts page links here as `?accountId=…` to answer "what is this one
+  // brand on?". Without honouring it that link dropped the admin into the
+  // unfiltered book of every subscription — technically a page, practically a
+  // dead end.
+  const [params, setParams] = useSearchParams();
+  const accountId = params.get("accountId");
+
   const { data, isLoading, isFetching } = useAdminSubscriptionsQuery({
     page,
     limit: 20,
     ...(status !== "all" ? { status } : {}),
     ...(search.trim() ? { search: search.trim() } : {}),
+    ...(accountId ? { accountId } : {}),
   });
   const { data: reports } = useBillingReportsQuery();
   const [runCycle, { isLoading: running }] = useRunBillingCycleMutation();
@@ -207,6 +216,21 @@ export function SubscriptionsPage() {
             ))}
           </SelectContent>
         </Select>
+        {accountId && (
+          <Badge variant="outline" className="gap-1.5 py-1.5">
+            One account
+            <button
+              type="button"
+              aria-label="Show all accounts"
+              onClick={() => {
+                setParams({}, { replace: true });
+                setPage(1);
+              }}
+            >
+              <X className="size-3" />
+            </button>
+          </Badge>
+        )}
         {isFetching && (
           <RefreshCw className="size-4 animate-spin text-muted-foreground" />
         )}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ArrowLeft, Building2, CreditCard, ArrowRight, BadgeCheck, BadgePercent, Check, CheckCircle2, Info, Loader2, Lock, Minus, Package, PackagePlus, Pencil, Plus, ShieldCheck, Tag, TriangleAlert, X, Zap } from "@/components/ui/icons";
@@ -29,7 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { AnimatedNumber } from "@/components/ui/animated-number";
 import { Odometer } from "@/components/ui/odometer";
-import { featureLabel } from "@/components/billing/PlanPicker";
+import { featureLabel } from "@/lib/billing";
 import {
   PaymentProcessingOverlay,
   type PaymentStage,
@@ -242,9 +242,12 @@ export function CheckoutPage() {
         .map(([key]) => key)
     : [];
 
-  // Prefill from the saved billing profile once it lands.
-  useEffect(() => {
-    if (!profile) return;
+  // Prefill from the saved billing profile once it lands. Done during render so
+  // the fields are populated on the paint the profile arrives — a checkout form
+  // that fills itself in a frame later reads as a glitch.
+  const [seenProfile, setSeenProfile] = useState<typeof profile>(undefined);
+  if (profile && profile !== seenProfile) {
+    setSeenProfile(profile);
     setForm((f) =>
       f.billingAddress || f.billingCity
         ? f
@@ -256,20 +259,21 @@ export function CheckoutPage() {
             gstin: profile.gstin ?? "",
           },
     );
-  }, [profile]);
+  }
 
-  const quoteArgs = useMemo(
-    () =>
-      plan && cycle
-        ? {
-            planId: plan.id,
-            billingCycle: cycle.code,
-            couponCode: appliedCoupon,
-            addons: addonQuery,
-          }
-        : undefined,
-    [plan, cycle, appliedCoupon, addonQuery],
-  );
+  // Not memoized: RTK Query serialises query args into the cache key, so a
+  // fresh object with the same contents is the same request. The manual memo
+  // this replaces depended on values the compiler couldn't prove stable, which
+  // cost the whole component its optimisation to save one object literal.
+  const quoteArgs =
+    plan && cycle
+      ? {
+          planId: plan.id,
+          billingCycle: cycle.code,
+          couponCode: appliedCoupon,
+          addons: addonQuery,
+        }
+      : undefined;
   const { data: quote, isFetching: quoting } = useQuoteQuery(
     quoteArgs ?? { planId: "", billingCycle: "" },
     { skip: !quoteArgs },
@@ -281,12 +285,21 @@ export function CheckoutPage() {
 
   // A bad code is reported on the quote rather than failing it, so the preview
   // keeps working while the message explains what's wrong.
+  //
+  // Dropping the code happens during render so the next quote request already
+  // omits it; announcing it stays an effect, because a toast fired mid-render
+  // would run again on every replayed render.
+  const couponError = quote?.couponError;
+  const [rejectedCode, setRejectedCode] = useState<string | undefined>(
+    undefined,
+  );
+  if (couponError && appliedCoupon && appliedCoupon !== rejectedCode) {
+    setRejectedCode(appliedCoupon);
+    setAppliedCoupon(undefined);
+  }
   useEffect(() => {
-    if (quote?.couponError && appliedCoupon) {
-      toast.error(quote.couponError);
-      setAppliedCoupon(undefined);
-    }
-  }, [quote?.couponError, appliedCoupon]);
+    if (couponError) toast.error(couponError);
+  }, [couponError]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -428,8 +441,6 @@ export function CheckoutPage() {
       </div>
     );
   }
-
-  const price = plan.cyclePrices.find((p) => p.code === cycle.code);
 
   return (
     <TooltipProvider delayDuration={150}>

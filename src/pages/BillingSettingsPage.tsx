@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { AlertTriangle, FileText, Loader2, Receipt, ShieldCheck, Timer, Trash2 } from "@/components/ui/icons";
 import {
@@ -75,9 +75,13 @@ export function BillingSettingsPage() {
   } | null>(null);
   const [typedName, setTypedName] = useState("");
 
-  useEffect(() => {
-    if (data) setDraft(data);
-  }, [data]);
+  // Seeded during render rather than in an effect, so the form shows the saved
+  // settings on the paint they arrive instead of one frame later.
+  const [seeded, setSeeded] = useState<typeof data>(undefined);
+  if (data && data !== seeded) {
+    setSeeded(data);
+    setDraft(data);
+  }
 
   const set = <K extends keyof BillingSettings>(
     key: K,
