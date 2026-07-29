@@ -3,8 +3,27 @@ import { useMyEntitlementsQuery } from "@/features/api/entitlementsApi";
 import { useAuth } from "@/hooks/useAuth";
 import type { Entitlements, PlanFeatureKey } from "@/types";
 
-/** Roles whose access is gated by the brand's subscription plan. */
-const GATED_ROLES = ["account_super_admin", "shop_admin", "staff"] as const;
+/**
+ * Roles whose access is gated by the brand's subscription plan — every role
+ * that belongs to a brand.
+ *
+ * Chefs and riders are on this list for the same reason everyone else is: a
+ * plan is bought by the brand, not by the person. Leaving them off (as they
+ * were when those roles first shipped) made them silently plan-exempt, so a
+ * kitchen on a plan without realtime still got the live stream while the owner
+ * paying for the account did not.
+ *
+ * Only `platform_super_admin` is genuinely exempt — they have no brand, and
+ * `GET /accounts/me/entitlements` has nothing to answer for them. Every role
+ * here is allowed on that endpoint server-side.
+ */
+const GATED_ROLES = [
+  "account_super_admin",
+  "shop_admin",
+  "staff",
+  "chef",
+  "delivery_manager",
+] as const;
 
 export interface EntitlementsState {
   /** True while the entitlements query is in flight (gated roles only). */

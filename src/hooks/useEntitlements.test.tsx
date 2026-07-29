@@ -77,6 +77,25 @@ describe("isAccountDeactivated", () => {
     expect(withAccount("rejected").isAccountDeactivated).toBe(true);
   });
 
+  it("gates every brand role, floor roles included", () => {
+    // Chefs and riders were left off the gated list when their roles shipped,
+    // which quietly handed them features their brand hadn't paid for — a
+    // kitchen with the realtime stream on a plan that doesn't include it.
+    for (const role of [
+      "account_super_admin",
+      "shop_admin",
+      "staff",
+      "chef",
+      "delivery_manager",
+    ]) {
+      mockState.role = role;
+      mockState.data = undefined;
+      const r = renderHook(() => useEntitlements()).result.current;
+      expect(r.isExempt, `${role} should be plan-gated`).toBe(false);
+      expect(r.hasFeature("can_use_realtime"), role).toBe(false);
+    }
+  });
+
   it("never deactivates the platform super admin", () => {
     mockState.role = "platform_super_admin";
     mockState.data = undefined;
