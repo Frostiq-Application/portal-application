@@ -21,7 +21,10 @@ function Reel({ digit, delay }: { digit: number; delay: number }) {
       style={{ height: CELL }}
     >
       <span
-        className="flex flex-col transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
+        // Arbitrary property rather than the ease- shorthand: Tailwind calls a
+        // bracketed cubic-bezier there ambiguous and silently drops the
+        // utility, leaving this on the default easing.
+        className="flex flex-col transition-transform duration-700 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
         style={{
           transform: `translateY(-${digit * 10}%)`,
           transitionDelay: `${delay}ms`,

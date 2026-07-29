@@ -29,4 +29,7 @@ function Badge({ className, variant, ...props }: BadgeProps) {
   return <div className={cn(badgeVariants({ variant }), className)} {...props} />
 }
 
-export { Badge, badgeVariants }
+// `badgeVariants` stays module-local: nothing outside this file uses it, and
+// exporting a non-component alongside a component drops the file out of
+// Fast Refresh.
+export { Badge }

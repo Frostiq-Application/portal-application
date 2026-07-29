@@ -658,10 +658,15 @@ const SidebarMenuSkeleton = React.forwardRef<
     showIcon?: boolean
   }
 >(({ className, showIcon = false, ...props }, ref) => {
-  // Random width between 50 to 90%.
+  // Varied width between 50 and 90%, hashed from this element's id rather than
+  // Math.random(): rendering has to be pure, and a random value recomputed on a
+  // replayed render would make the skeleton twitch instead of sit still.
+  const id = React.useId()
   const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`
-  }, [])
+    let hash = 0
+    for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0
+    return `${(hash % 40) + 50}%`
+  }, [id])
 
   return (
     <div
@@ -767,5 +772,4 @@ export {
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
-  useSidebar,
 }

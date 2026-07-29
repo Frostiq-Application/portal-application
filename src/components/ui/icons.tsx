@@ -64,6 +64,7 @@ import handshakeIcon from "@iconify-icons/la/handshake";
 import hashIcon from "@iconify-icons/la/hashtag";
 import heartIcon from "@iconify-icons/la/heart";
 import heartCrackIcon from "@iconify-icons/la/heart-broken";
+import historyIcon from "@iconify-icons/la/history";
 import imageIcon from "@iconify-icons/la/image";
 import imageIconIcon from "@iconify-icons/la/image";
 import imageOffIcon from "@iconify-icons/la/file-image";
@@ -118,6 +119,9 @@ import shieldCheckIcon from "@iconify-icons/la/user-shield";
 import shoppingBagIcon from "@iconify-icons/la/shopping-bag";
 import shoppingCartIcon from "@iconify-icons/la/shopping-cart";
 import sparklesIcon from "@iconify-icons/la/magic";
+import starIcon from "@iconify-icons/la/star";
+import starFilledIcon from "@iconify-icons/la/star-solid";
+import gripVerticalIcon from "@iconify-icons/la/grip-vertical-solid";
 import stickyNoteIcon from "@iconify-icons/la/sticky-note";
 import storeIcon from "@iconify-icons/la/store";
 import sunIcon from "@iconify-icons/la/sun";
@@ -151,7 +155,11 @@ export interface IconProps extends Omit<IconifyProps, "icon"> {
 export type IconComponent = ComponentType<IconProps>;
 
 function make(data: IconifyIcon, displayName: string): IconComponent {
-  const Component = ({ size, strokeWidth: _strokeWidth, ...props }: IconProps) => (
+  const Component = ({
+    size,
+    strokeWidth: _strokeWidth,
+    ...props
+  }: IconProps) => (
     <Icon
       icon={data}
       aria-hidden
@@ -208,6 +216,8 @@ export const Gift = make(giftIcon, "Gift");
 export const Globe = make(globeIcon, "Globe");
 export const Handshake = make(handshakeIcon, "Handshake");
 export const Hash = make(hashIcon, "Hash");
+/** Audit trail / "what happened when" — the Activity Log. */
+export const FileClock = make(historyIcon, "FileClock");
 export const Heart = make(heartIcon, "Heart");
 export const HeartCrack = make(heartCrackIcon, "HeartCrack");
 export const Image = make(imageIcon, "Image");
@@ -217,7 +227,9 @@ export const ImagePlus = make(imagePlusIcon, "ImagePlus");
 export const Images = make(imagesIcon, "Images");
 export const Inbox = make(inboxIcon, "Inbox");
 export const IndianRupee = make(indianRupeeIcon, "IndianRupee");
-export const Infinity = make(infinityIcon, "Infinity");
+// Named `InfinityIcon`, not `Infinity`: the latter shadows the global inside
+// this module, and every consumer already aliased it to this name anyway.
+export const InfinityIcon = make(infinityIcon, "Infinity");
 export const Info = make(infoIcon, "Info");
 export const Instagram = make(instagramIcon, "Instagram");
 export const KeyRound = make(keyRoundIcon, "KeyRound");
@@ -251,7 +263,10 @@ export const PlayCircle = make(playCircleIcon, "PlayCircle");
 export const Plus = make(plusIcon, "Plus");
 export const Quote = make(quoteIcon, "Quote");
 export const Receipt = make(receiptIcon, "Receipt");
-export const ReceiptIndianRupee = make(receiptIndianRupeeIcon, "ReceiptIndianRupee");
+export const ReceiptIndianRupee = make(
+  receiptIndianRupeeIcon,
+  "ReceiptIndianRupee",
+);
 export const RefreshCw = make(refreshCwIcon, "RefreshCw");
 export const Rocket = make(rocketIcon, "Rocket");
 export const RotateCcw = make(rotateCcwIcon, "RotateCcw");
@@ -264,6 +279,9 @@ export const ShieldCheck = make(shieldCheckIcon, "ShieldCheck");
 export const ShoppingBag = make(shoppingBagIcon, "ShoppingBag");
 export const ShoppingCart = make(shoppingCartIcon, "ShoppingCart");
 export const Sparkles = make(sparklesIcon, "Sparkles");
+export const Star = make(starIcon, "Star");
+export const StarFilled = make(starFilledIcon, "StarFilled");
+export const GripVertical = make(gripVerticalIcon, "GripVertical");
 export const StickyNote = make(stickyNoteIcon, "StickyNote");
 export const Store = make(storeIcon, "Store");
 export const Sun = make(sunIcon, "Sun");
