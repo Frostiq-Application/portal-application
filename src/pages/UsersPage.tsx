@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { Copy, KeyRound, MapPin, MoreHorizontal, Search, Store, UserCog, Users as UsersIcon } from "@/components/ui/icons";
+import { ChefHat, Copy, KeyRound, MapPin, MoreHorizontal, Search, Store, Truck, UserCog, Users as UsersIcon } from "@/components/ui/icons";
 import { toast } from "sonner";
+import { useLimitState } from "@/hooks/useLimitState";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { useAuth } from "@/hooks/useAuth";
@@ -20,7 +21,6 @@ import { InviteUserDialog } from "@/components/users/InviteUserDialog";
 import {
   LimitCounter,
   LimitNotice,
-  useLimitState,
 } from "@/components/gating/LimitNotice";
 import { BranchAssignmentDialog } from "@/components/users/BranchAssignmentDialog";
 import { Button } from "@/components/ui/button";
@@ -42,13 +42,22 @@ import {
  *  - Shop Owner manages their own Branch Owners (never platform admins).
  */
 const PLATFORM_TAB_ROLES: Role[] = ["platform_super_admin", "account_super_admin"];
-const OWNER_TAB_ROLES: Role[] = ["shop_admin"];
-const SHOP_ADMIN_TAB_ROLES: Role[] = ["staff"];
+// An owner runs branch admins *and* every floor role beneath them.
+const OWNER_TAB_ROLES: Role[] = [
+  "shop_admin",
+  "staff",
+  "chef",
+  "delivery_manager",
+];
+// A branch admin runs the whole floor, so every floor role gets a tab.
+const SHOP_ADMIN_TAB_ROLES: Role[] = ["staff", "chef", "delivery_manager"];
 const ROLE_ICON: Record<Role, typeof UserCog> = {
   platform_super_admin: UserCog,
   account_super_admin: Store,
   shop_admin: Store,
   staff: UsersIcon,
+  chef: ChefHat,
+  delivery_manager: Truck,
 };
 
 function initials(name: string): string {

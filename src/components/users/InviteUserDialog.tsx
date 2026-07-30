@@ -6,7 +6,7 @@ import { useCreateUserMutation, type CreateUserBody } from "@/features/api/users
 import { useListAccountsQuery } from "@/features/api/accountsApi";
 import { useListShopsQuery } from "@/features/api/shopsApi";
 import { useAuth } from "@/hooks/useAuth";
-import { isPlatformAdmin, roleLabel } from "@/lib/roles";
+import { FLOOR_ROLES, isFloorRole, isPlatformAdmin, roleLabel } from "@/lib/roles";
 import { apiError } from "@/lib/apiError";
 import type { Role } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,8 @@ import {
 export function InviteUserDialog() {
   const { role } = useAuth();
   const platform = isPlatformAdmin(role);
-  // Branch owners (shop_admin) invite branch staff; Shop Owners invite branch owners.
+  // Branch owners (shop_admin) staff their own floor; Shop Owners can also
+  // appoint branch owners.
   const invitesStaff = role === "shop_admin";
   const [open, setOpen] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
@@ -61,19 +62,28 @@ export function InviteUserDialog() {
     { skip: !platform },
   );
   const accountScoped = userRole !== "platform_super_admin";
+  // Every branch-scoped role needs the branch picker — a chef or rider with no
+  // branch is a login that can see nothing, and the server rejects it anyway.
+  const needsBranch = userRole === "shop_admin" || isFloorRole(userRole);
   const { data: shops } = useListShopsQuery(
-    userRole === "shop_admin"
+    needsBranch
       ? { page: 1, limit: 100, ...(platform && accountId ? { accountId } : {}) }
       : undefined,
-    { skip: userRole !== "shop_admin" },
+    { skip: !needsBranch },
   );
 
-  // Each viewer invites exactly one kind of member from this portal.
+  /**
+   * Who this viewer may invite.
+   *
+   * Owners and branch admins both staff a floor, so both get the floor roles;
+   * only an owner can additionally mint a branch admin. Platform admins invite
+   * fellow platform admins and nothing else.
+   */
   const roleOptions: Role[] = platform
     ? ["platform_super_admin"]
     : invitesStaff
-      ? ["staff"]
-      : ["shop_admin"];
+      ? FLOOR_ROLES
+      : ["shop_admin", ...FLOOR_ROLES];
   const singleRole = roleOptions.length === 1;
 
   const reset = () => {
@@ -91,7 +101,7 @@ export function InviteUserDialog() {
     if (name.trim().length < 2 || !email.trim()) {
       return toast.error("Name and email are required");
     }
-    if (userRole === "shop_admin" && shopIds.length === 0) {
+    if (needsBranch && shopIds.length === 0) {
       return toast.error("Select a branch");
     }
     const body: CreateUserBody = {
@@ -100,7 +110,7 @@ export function InviteUserDialog() {
       phone: phone.trim() || undefined,
       role: userRole,
       ...(platform && accountScoped && accountId ? { accountId } : {}),
-      ...(userRole === "shop_admin" && shopIds.length ? { shopIds } : {}),
+      ...(needsBranch && shopIds.length ? { shopIds } : {}),
     };
     try {
       const res = await createUser(body).unwrap();
@@ -130,7 +140,7 @@ export function InviteUserDialog() {
               <DialogTitle>{invitesStaff ? "Invite staff" : "Invite User"}</DialogTitle>
               <DialogDescription>
                 {invitesStaff
-                  ? "Staff help run orders for your branch. They’ll receive a link to set their password."
+                  ? "Your branch team — staff, chefs and delivery managers. They’ll receive a link to set their password."
                   : "They’ll receive a link to set their password."}
               </DialogDescription>
             </DialogHeader>
@@ -197,7 +207,7 @@ export function InviteUserDialog() {
                   </Select>
                 </div>
               )}
-              {userRole === "shop_admin" && (
+              {needsBranch && (
                 <div className="flex flex-col gap-1.5">
                   <Label>
                     Assign branch <span className="text-destructive">*</span>
@@ -243,7 +253,7 @@ export function InviteUserDialog() {
               <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
               <Button
                 onClick={submit}
-                disabled={isLoading || (userRole === "shop_admin" && shopIds.length === 0)}
+                disabled={isLoading || (needsBranch && shopIds.length === 0)}
               >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Invite

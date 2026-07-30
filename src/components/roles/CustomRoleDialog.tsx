@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Loader2 } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { apiError } from "@/lib/apiError";
@@ -6,6 +6,7 @@ import {
   useCreateCustomRoleMutation,
   useUpdateCustomRoleMutation,
   type CustomRole,
+  type CustomRoleMode,
 } from "@/features/api/rolesApi";
 import { PERMISSION_CATALOG } from "@/config/permissions";
 import { cn } from "@/lib/utils";
@@ -40,17 +41,23 @@ export function CustomRoleDialog({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [mode, setMode] = useState<CustomRoleMode>("extend");
 
   const [create, { isLoading: creating }] = useCreateCustomRoleMutation();
   const [update, { isLoading: updating }] = useUpdateCustomRoleMutation();
   const saving = creating || updating;
 
-  useEffect(() => {
-    if (!open) return;
+  // Seeded during render rather than in an effect so the fields are correct on
+  // first paint instead of flashing the previous role's values for a frame.
+  const seedKey = open ? (role?.id ?? "new") : null;
+  const [seeded, setSeeded] = useState<string | null>(null);
+  if (seedKey !== seeded) {
+    setSeeded(seedKey);
     setName(role?.name ?? "");
     setDescription(role?.description ?? "");
     setSelected(new Set(role?.permissions ?? []));
-  }, [open, role]);
+    setMode(role?.mode ?? "extend");
+  }
 
   const toggle = (key: string) =>
     setSelected((prev) => {
@@ -72,10 +79,16 @@ export function CustomRoleDialog({
 
   const submit = async () => {
     if (name.trim().length < 2) return toast.error("Name is required");
+    if (mode === "restrict" && selected.size === 0) {
+      return toast.error(
+        "Tick at least one permission — a restricted role with none can't reach any page.",
+      );
+    }
     const body = {
       name: name.trim(),
       description: description.trim() || undefined,
       permissions: [...selected],
+      mode,
     };
     try {
       if (editing) {
@@ -97,8 +110,8 @@ export function CustomRoleDialog({
         <DialogHeader>
           <DialogTitle>{editing ? "Edit role" : "New custom role"}</DialogTitle>
           <DialogDescription>
-            Pick exactly what this role can do. Members assigned to it get these
-            permissions on top of their base access.
+            Pick exactly what this role can do. Members assigned to it see only
+            the pages their permissions cover.
           </DialogDescription>
         </DialogHeader>
 
@@ -122,12 +135,63 @@ export function CustomRoleDialog({
             </div>
           </div>
 
+          {/* The distinction that decides whether this role can take a page
+              away, so it's stated in plain terms rather than as a mode switch
+              with a doc link. */}
+          <div className="grid gap-1.5">
+            <Label>Access</Label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {(
+                [
+                  {
+                    value: "extend" as const,
+                    title: "Add to their role",
+                    blurb:
+                      "Keeps everything their role normally has, plus what you tick.",
+                  },
+                  {
+                    value: "restrict" as const,
+                    title: "Only what's ticked",
+                    blurb:
+                      "Replaces their role's access entirely. Use this for a chef or rider.",
+                  },
+                ] satisfies {
+                  value: CustomRoleMode;
+                  title: string;
+                  blurb: string;
+                }[]
+              ).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setMode(opt.value)}
+                  className={cn(
+                    "rounded-lg border p-2.5 text-left transition-colors",
+                    mode === opt.value
+                      ? "border-primary/50 bg-primary/5"
+                      : "hover:bg-muted/50",
+                  )}
+                >
+                  <p className="text-sm font-medium">{opt.title}</p>
+                  <p className="text-xs text-muted-foreground">{opt.blurb}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="flex items-center justify-between">
             <Label>Permissions</Label>
             <span className="text-xs text-muted-foreground">
               {selected.size} selected
             </span>
           </div>
+
+          {mode === "restrict" && selected.size === 0 && (
+            <p className="rounded-md bg-amber-50 px-2.5 py-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+              Nothing ticked. A restricted role with no permissions can&rsquo;t
+              open a single page — tick what this person actually needs.
+            </p>
+          )}
 
           <div className="space-y-4">
             {grouped.map(([group, rows]) => (

@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Check, Lock, Minus, MoreHorizontal, Pencil, Plus, ShieldCheck, Sparkles, Store, Trash2 } from "@/components/ui/icons";
 import { toast } from "sonner";
 import {
+  accessFor,
   PERMISSION_CATALOG,
   type AccessLevel,
 } from "@/config/permissions";
-import { roleLabel } from "@/lib/roles";
+import { isPlatformAdmin, roleLabel } from "@/lib/roles";
+import { useAuth } from "@/hooks/useAuth";
 import { apiError } from "@/lib/apiError";
 import type { Role } from "@/types";
 import { cn } from "@/lib/utils";
@@ -31,6 +33,17 @@ const ROLES: Role[] = [
   "account_super_admin",
   "shop_admin",
   "staff",
+  "chef",
+  "delivery_manager",
+];
+
+/** The matrix a shop owner sees — their own floor, not the platform's roles. */
+const BRAND_ROLES: Role[] = [
+  "account_super_admin",
+  "shop_admin",
+  "staff",
+  "chef",
+  "delivery_manager",
 ];
 
 const ROLE_BLURB: Record<Role, string> = {
@@ -38,19 +51,30 @@ const ROLE_BLURB: Record<Role, string> = {
   account_super_admin: "Owns a brand — full control across all its branches.",
   shop_admin: "Runs a single branch — scoped to their assigned outlet.",
   staff: "Branch team member — day-to-day order operations only.",
+  chef: "Works the kitchen — the bake queue and nothing else.",
+  delivery_manager: "Runs dispatch — what's ready, where it goes, who to call.",
 };
 
 export function RolesPage() {
+  const { role } = useAuth();
+  // A shop owner has no business reading the platform's own role definitions,
+  // and the extra columns only make the matrix harder to scan on their screen.
+  const columns = isPlatformAdmin(role) ? ROLES : BRAND_ROLES;
+
   return (
     <>
       <PageHeader
         title="Roles & Permissions"
-        description="What each role can access across the portal"
+        description={
+          isPlatformAdmin(role)
+            ? "What each role can access across the portal"
+            : "What each role on your team can reach — and the custom roles you've defined"
+        }
       />
 
       {/* Role summary cards */}
       <div className="mb-5 grid gap-3 md:grid-cols-3">
-        {ROLES.map((r) => (
+        {columns.map((r) => (
           <Card key={r}>
             <CardContent className="py-4">
               <div className="flex items-center gap-2">
@@ -77,7 +101,7 @@ export function RolesPage() {
           <thead>
             <tr className="border-b bg-muted/40">
               <th className="px-4 py-3 text-left font-semibold">Capability</th>
-              {ROLES.map((r) => (
+              {columns.map((r) => (
                 <th
                   key={r}
                   className="px-3 py-3 text-center font-semibold"
@@ -89,7 +113,12 @@ export function RolesPage() {
           </thead>
           <tbody>
             {PERMISSION_CATALOG.map((group) => (
-              <GroupRows key={group.group} group={group.group} rows={group.rows} />
+              <GroupRows
+                key={group.group}
+                group={group.group}
+                rows={group.rows}
+                columns={columns}
+              />
             ))}
           </tbody>
         </table>
@@ -249,15 +278,17 @@ function CustomRoleCard({
 function GroupRows({
   group,
   rows,
+  columns,
 }: {
   group: string;
   rows: (typeof PERMISSION_CATALOG)[number]["rows"];
+  columns: Role[];
 }) {
   return (
     <>
       <tr className="border-b bg-muted/20">
         <td
-          colSpan={1 + ROLES.length}
+          colSpan={1 + columns.length}
           className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
         >
           {group}
@@ -279,9 +310,9 @@ function GroupRows({
             </div>
             <p className="text-xs text-muted-foreground">{row.description}</p>
           </td>
-          {ROLES.map((r) => (
+          {columns.map((r) => (
             <td key={r} className="px-3 py-3 text-center">
-              <AccessCell level={row.access[r]} />
+              <AccessCell level={accessFor(row, r)} />
             </td>
           ))}
         </tr>
