@@ -1,36 +1,12 @@
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Crown } from "@/components/ui/icons";
-import { useAuth } from "@/hooks/useAuth";
-import { useEntitlements } from "@/hooks/useEntitlements";
-import { useMyPlansQuery } from "@/features/api/billingApi";
-import { featureLabel } from "@/components/billing/PlanPicker";
+import { useUnlockingPlan } from "@/hooks/useUnlockingPlan";
+import { featureLabel } from "@/lib/billing";
 import { inrShort } from "@/lib/billing";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { PlanFeatureKey } from "@/types";
-
-/**
- * The cheapest plan that actually turns `feature` on. Only the account owner
- * can load the catalogue (and only they can act on it), so everyone else gets
- * null and a "ask your owner" message instead of a price.
- */
-function useUnlockingPlan(feature: PlanFeatureKey) {
-  const { role } = useAuth();
-  const { entitlements } = useEntitlements();
-  const isOwner = role === "account_super_admin";
-  // Every locked section on the page asks for this; RTK Query dedupes it to a
-  // single request.
-  const { data } = useMyPlansQuery(undefined, { skip: !isOwner });
-
-  const plan =
-    (data?.plans ?? [])
-      .filter((p) => p.flags[feature] === true && p.id !== entitlements?.planId)
-      .sort((a, b) => Number(a.priceMonthly) - Number(b.priceMonthly))[0] ??
-    null;
-
-  return { isOwner, plan };
-}
 
 /**
  * Covers a section whose feature isn't in the plan.
@@ -65,14 +41,17 @@ export function UpgradeOverlay({
 
   return (
     <div className={cn("relative isolate overflow-hidden rounded-xl", className)}>
+      {/* Capped and faded out at the bottom: a locked report is a teaser, not a
+          second copy of the page. Left at full height, three locked sections
+          made the page scroll for thousands of pixels of blur. */}
       <div
         aria-hidden
-        className="pointer-events-none select-none blur-[5px] saturate-[0.6] [&_*]:!cursor-default"
+        className="pointer-events-none max-h-[26rem] select-none overflow-hidden blur-[5px] saturate-[0.6] [mask-image:linear-gradient(to_bottom,black_55%,transparent)] [&_*]:!cursor-default"
       >
         {children}
       </div>
 
-      <div className="absolute inset-0 flex items-center justify-center bg-background/60 p-4">
+      <div className="absolute inset-0 flex items-center justify-center bg-background/40 p-4">
         <div className="w-full max-w-md rounded-xl border bg-card/95 p-6 text-center shadow-lg">
           {/* Crown, not a padlock — it matches the sidebar marker that leads
               here, and frames the feature as something to reach for. */}

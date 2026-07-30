@@ -34,11 +34,8 @@ import {
   PREVIEW_SHOP,
   PREVIEW_WISHLIST,
 } from "@/components/analytics/previewData";
-import {
-  DateRangePicker,
-  defaultRange,
-  type DateRangeValue,
-} from "@/components/analytics/DateRangePicker";
+import { DateRangePicker } from "@/components/analytics/DateRangePicker";
+import { defaultRange, type DateRangeValue } from "@/lib/dateRange";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { IconComponent } from "@/components/ui/icons";
