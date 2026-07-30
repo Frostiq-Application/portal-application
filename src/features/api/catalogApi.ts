@@ -139,6 +139,18 @@ export const catalogApi = baseApi.injectEndpoints({
       query: (body) => ({ url: "/products", method: "POST", body }),
       invalidatesTags: [{ type: "Product", id: "LIST" }],
     }),
+    /** Fill an empty branch with editable placeholder cakes. */
+    seedStarterCatalog: build.mutation<
+      { created: number; skipped: number },
+      { shopId?: string }
+    >({
+      query: (body) => ({
+        url: "/products/starter-catalog",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [{ type: "Product", id: "LIST" }],
+    }),
     updateProduct: build.mutation<
       Product,
       { id: string; body: Partial<CreateProductBody> & { isActive?: boolean } }
@@ -191,9 +203,11 @@ export const catalogApi = baseApi.injectEndpoints({
       invalidatesTags: [{ type: "Addon", id: "LIST" }],
     }),
 
-    // Clone a catalog between two branches of the same account (plan-gated by
-    // can_clone_catalog on the backend). Invalidates the lists so the target
-    // branch shows its freshly-copied products the moment it's selected.
+    // Clone a catalog between two branches of the same account. Plan-gated by
+    // can_clone_catalog on both sides: the UI hides it, and the backend rejects
+    // it with 403 (@RequiresFeature on POST /catalog/clone). Invalidates the
+    // lists so the target branch shows its freshly-copied products the moment
+    // it's selected.
     cloneCatalog: build.mutation<CloneResult, CloneCatalogBody>({
       query: (body) => ({ url: "/catalog/clone", method: "POST", body }),
       invalidatesTags: [
@@ -213,6 +227,7 @@ export const {
   useDeleteCategoryMutation,
   useListProductsQuery,
   useCreateProductMutation,
+  useSeedStarterCatalogMutation,
   useUpdateProductMutation,
   useToggleProductMutation,
   useDeleteProductMutation,

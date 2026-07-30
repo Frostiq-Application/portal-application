@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Boxes, Cake, CheckCircle2, Copy, EyeOff, LayoutGrid, Layers, Lock, MoreHorizontal, Search, X } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { apiError } from "@/lib/apiError";
-import { cn } from "@/lib/utils";
+import { useLimitState } from "@/hooks/useLimitState";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   useDeleteAddonMutation,
@@ -30,8 +30,8 @@ import { AddonDialog } from "@/components/catalog/AddonDialog";
 import {
   LimitCounter,
   LimitNotice,
-  useLimitState,
 } from "@/components/gating/LimitNotice";
+import { StarterCatalogCard } from "@/components/catalog/StarterCatalogCard";
 import { CategoryDialog } from "@/components/catalog/CategoryDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -245,6 +245,13 @@ function ProductsTab({
         label="products in this branch"
         unit="products"
       />
+
+      {/* Only on a truly empty branch — not merely one filtered down to zero,
+          which would offer to seed a catalogue that already has cakes in it. */}
+      {shopId && !isLoading && (data?.data?.length ?? 0) === 0 && !hasFilters && (
+        <StarterCatalogCard shopId={shopId} />
+      )}
+
       <div className="rounded-lg border bg-background">
         <Table>
           <TableHeader>
