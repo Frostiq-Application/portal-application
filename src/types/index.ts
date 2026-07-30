@@ -164,7 +164,10 @@ export interface Plan {
   sortOrder: number;
   /** Free-trial window in days; 0 on every plan that isn't the offer. */
   trialDays: number;
-  features: Record<string, boolean | number | null>;
+  // No `features` here. The plan row used to carry a JSONB blob of its flags,
+  // which drifted from the `plan_features` grants it mirrored; the column is
+  // gone. What a plan grants comes from `AdminPlan.planFeatures` (admin) or
+  // `PricingPlan.flags` / `.limits` (public catalogue).
 }
 
 /**
@@ -196,6 +199,11 @@ export interface PlanFeatureFlags {
   can_use_audit_log?: boolean;
   /** Custom cake ordering (quote-request module). */
   can_use_custom_cake?: boolean;
+  /**
+   * Kitchen & delivery boards — the drag-and-drop production and dispatch
+   * screens the chef and rider roles work from.
+   */
+  can_use_floor_boards?: boolean;
   /** Customer directory: lifetime spend, order history & contact data. */
   can_use_customer_data?: boolean;
   priority_support?: boolean;
@@ -229,10 +237,28 @@ export interface Entitlements {
   maxProductsPerShop: number | null;
   maxTeamSeats: number | null;
   teamSeatsUsed: number;
+  /**
+   * Capabilities a platform admin granted this account beyond its plan. Almost
+   * always empty — `features` and the limits above already include them, so this
+   * exists only to explain *why* the brand has something its plan doesn't list.
+   */
+  grantedExtras: GrantedExtra[];
   support: {
     email: string | null;
     whatsapp: string | null;
   };
+}
+
+/** One capability held beyond the plan, for the "added for you" list. */
+export interface GrantedExtra {
+  featureKey: string;
+  label: string;
+  dataType: "boolean" | "count";
+  /** Count features: extra units granted on top of the plan. */
+  bonusValue: number | null;
+  isUnlimited: boolean;
+  /** Null = permanent. */
+  expiresAt: string | null;
 }
 /** Cycles are data, not an enum — the API returns whatever rows exist. */
 export type BillingCycleCode = string;
@@ -661,4 +687,40 @@ export interface AccountAnalytics {
   returningCustomers: number;
   repeatRatePct: string;
   branchComparison: BranchComparison[];
+}
+
+// ==================== Activity log (audit trail) ====================
+
+/**
+ * One entry in the brand's audit trail — GET /activity-log.
+ *
+ * `actorName` is resolved live from the user record, so it goes null once that
+ * person is removed from the team; `actorEmail` and `actorRole` were copied in
+ * at the time of the action and always survive. Render the email as the
+ * fallback identity rather than "Unknown".
+ */
+export interface ActivityEntry {
+  id: string;
+  actorUserId: string | null;
+  actorName: string | null;
+  actorEmail: string | null;
+  actorRole: Role | string | null;
+  shopId: string | null;
+  shopName: string | null;
+  /** Dotted verb — "product.updated", "order.status_changed". */
+  action: string;
+  /** Bucket the entry belongs to — "product", "order", "coupon"… */
+  entityType: string;
+  entityId: string | null;
+  summary: string | null;
+  metadata: Record<string, unknown> | null;
+  ipAddress: string | null;
+  createdAt: string;
+}
+
+/** GET /activity-log/filters — options actually present in this brand's log. */
+export interface ActivityFilters {
+  entityTypes: string[];
+  actions: string[];
+  actors: { userId: string | null; name: string | null; email: string | null }[];
 }

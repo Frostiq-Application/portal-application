@@ -48,17 +48,32 @@ export function useSseStream<T>(
 
   const [status, setStatus] = useState<StreamStatus>("connecting");
 
-  // Keep the latest callback without re-subscribing on every render.
+  // Keep the latest callback without re-subscribing on every render. Written in
+  // an effect rather than during render: a discarded render must not leave the
+  // ref pointing at a callback belonging to a render that never committed.
   const onEventRef = useRef(onEvent);
-  onEventRef.current = onEvent;
+  useEffect(() => {
+    onEventRef.current = onEvent;
+  }, [onEvent]);
+
+  // Disabled by plan, or brand-scoped stream for a user without a brand
+  // (platform admins have no accountId) → never connect. Derived rather than
+  // pushed into state by the effect, so the reported status is already "closed"
+  // on the first render instead of claiming "connecting" for a frame.
+  const disabled = !enabled || !accessToken || (requireAccount && !accountId);
+
+  // A new stream or a rotated token means a fresh connection, so the status
+  // goes back to "connecting" — done here rather than at the top of the effect
+  // so it lands in the same render the subscription identity changes.
+  const subscriptionKey = `${path}:${accessToken ?? ""}`;
+  const [seenSubscription, setSeenSubscription] = useState(subscriptionKey);
+  if (subscriptionKey !== seenSubscription) {
+    setSeenSubscription(subscriptionKey);
+    setStatus("connecting");
+  }
 
   useEffect(() => {
-    // Disabled by plan, or brand-scoped stream for a user without a brand
-    // (platform admins have no accountId) → don't connect.
-    if (!enabled || !accessToken || (requireAccount && !accountId)) {
-      setStatus("closed");
-      return;
-    }
+    if (disabled) return;
 
     const controller = new AbortController();
     // A mutable token we can rotate in place when we refresh mid-stream.
@@ -91,8 +106,6 @@ export function useSseStream<T>(
       }
       return false;
     };
-
-    setStatus("connecting");
 
     fetchEventSource(`${API_BASE_URL}${path}`, {
       signal: controller.signal,
@@ -157,7 +170,7 @@ export function useSseStream<T>(
     });
 
     return () => controller.abort();
-  }, [enabled, accessToken, refreshToken, accountId, dispatch, path]);
+  }, [disabled, accessToken, refreshToken, dispatch, path]);
 
-  return status;
+  return disabled ? "closed" : status;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { NAV_ITEMS, navForRole } from "@/config/nav";
 
@@ -82,17 +82,68 @@ describe("SidebarNav plan gating", () => {
     expect(coupons).not.toHaveAccessibleName(/not in your plan/i);
   });
 
-  it("locks every gated item when the plan grants nothing", () => {
+  it("locks every gated top-level item when the plan grants nothing", () => {
     mockState.role = "account_super_admin";
     mockState.granted = new Set();
 
     const { container } = renderNav();
 
-    const gated = navForRole("account_super_admin").filter((i) => i.feature);
+    // Sub-items are excluded on purpose — see the next test.
+    const gated = navForRole("account_super_admin").filter(
+      (i) => i.feature && !i.parent,
+    );
     expect(gated.length).toBeGreaterThan(0);
 
     const locked = container.querySelectorAll('[data-locked="true"]');
     expect(locked.length).toBe(gated.length);
+  });
+
+  it("hides a sub-item entirely when its parent feature is locked", () => {
+    // A sub-item is a part of its parent, not a feature of its own. Selling one
+    // add-on through two crowned rows is noise, and the child's page is
+    // unreachable anyway while the parent feature is off.
+    const child = navForRole("account_super_admin").find((i) => i.parent);
+    expect(child).toBeDefined();
+
+    mockState.role = "account_super_admin";
+    mockState.granted = new Set();
+    const { unmount } = renderNav();
+    expect(
+      screen.queryByRole("link", { name: new RegExp(child!.label, "i") }),
+    ).toBeNull();
+    unmount();
+
+    // ...and appears once the plan carries the parent feature.
+    mockState.granted = new Set([child!.feature!]);
+    renderNav();
+    expect(
+      screen.getByRole("link", { name: new RegExp(child!.label, "i") }),
+    ).toHaveAttribute("href", child!.path);
+  });
+
+  it("sells the floor boards rather than hiding them", () => {
+    // Kitchen and Delivery are a plan module (Growth Plus & Pro). A brand on a
+    // lower tier still runs orders from the queue, so the boards have to read
+    // as something to buy — the same rule as every other gated module.
+    mockState.role = "account_super_admin";
+    mockState.granted = new Set();
+    const { unmount } = renderNav();
+
+    for (const label of [/kitchen/i, /delivery/i]) {
+      expect(screen.getByRole("link", { name: label })).toHaveAttribute(
+        "data-locked",
+        "true",
+      );
+    }
+    unmount();
+
+    mockState.granted = new Set(["can_use_floor_boards"]);
+    renderNav();
+    for (const label of [/kitchen/i, /delivery/i]) {
+      expect(
+        screen.getByRole("link", { name: label }),
+      ).not.toHaveAttribute("data-locked");
+    }
   });
 
   it("never locks an ungated item", () => {

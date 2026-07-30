@@ -1,6 +1,15 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Crown, LogOut, Menu, Moon, Plus, Sun, UserRound, X } from "@/components/ui/icons";
+import {
+  Crown,
+  LogOut,
+  Menu,
+  Moon,
+  Plus,
+  Sun,
+  UserRound,
+  X,
+} from "@/components/ui/icons";
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import { logout } from "@/features/auth/authSlice";
 import { toggleTheme } from "@/features/ui/uiSlice";
@@ -15,15 +24,13 @@ import { OrderNotifications } from "@/components/orders/OrderNotifications";
 import { EnquiryNotifications } from "@/components/enquiries/EnquiryNotifications";
 import { AccountDeactivatedGate } from "@/components/gating/AccountDeactivatedGate";
 import { NoSubscriptionGate } from "@/components/gating/NoSubscriptionGate";
-import { navForRole, type NavItem } from "@/config/nav";
+import { navFor, type NavItem } from "@/config/nav";
+import { useCan } from "@/hooks/useCan";
 import { roleLabel } from "@/lib/roles";
 import { applyBrandTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  Avatar,
-  AvatarFallback,
-} from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +42,9 @@ import {
 
 const GROUP_ORDER: NavItem["group"][] = [
   "Overview",
+  // Sits high on purpose: for a chef or a rider this is the only group they
+  // have, and it should be the first thing under the logo, not buried.
+  "Floor",
   "Operations",
   "Platform",
   "Brand",
@@ -47,6 +57,7 @@ const GROUP_ORDER: NavItem["group"][] = [
  */
 export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const { role } = useAuth();
+  const { can } = useCan();
   const { hasFeature } = useEntitlements();
   const hasUnseenOrders = useAppSelector(selectHasUnseenOrders);
   const hasUnseenEnquiries = useAppSelector(selectHasUnseenEnquiries);
@@ -59,8 +70,12 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   // crown beside a live-looking item reads as "this is the good stuff" — which
   // is the feeling that actually sells an upgrade. The route still works and
   // still lands on the upgrade card.
-  const items = navForRole(role);
-  const isLocked = (i: NavItem) => Boolean(i.feature) && !hasFeature(i.feature!);
+  // Role first, then permission: a custom role in restrict mode can drop items
+  // a role would normally carry, which is how a chef ends up with Kitchen and
+  // nothing else in the sidebar.
+  const items = navFor(role, can);
+  const isLocked = (i: NavItem) =>
+    Boolean(i.feature) && !hasFeature(i.feature!);
 
   return (
     <nav className="flex flex-col gap-6 px-3 py-4">
@@ -73,94 +88,112 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
               {group}
             </p>
             <div className="flex flex-col gap-1">
-              {groupItems.map((item) => {
-                const Icon = item.icon;
-                if (item.soon) {
-                  return (
-                    <span
-                      key={item.path}
-                      className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground/60"
-                      title="Coming soon"
-                    >
-                      <Icon className="h-4 w-4" />
-                      {item.label}
-                      <span className="ml-auto rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase">
-                        soon
-                      </span>
-                    </span>
-                  );
-                }
-                const locked = isLocked(item);
-                return (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    end={item.path === "/"}
-                    onClick={onNavigate}
-                    aria-label={
-                      locked ? `${item.label} — not in your plan` : undefined
-                    }
-                    data-locked={locked || undefined}
-                    title={
-                      locked
-                        ? `${item.label} isn't in your plan — tap to see upgrade options`
-                        : undefined
-                    }
-                    className={({ isActive }) =>
-                      cn(
-                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                        isActive
-                          ? "bg-primary text-primary-foreground"
-                          : "text-foreground/80 hover:bg-muted",
-                      )
-                    }
-                  >
-                    {/* Render-prop children so the crown can react to the
-                        active row, where amber on the brand fill would clash. */}
-                    {({ isActive }) => (
-                      <>
-                        <Icon className="h-4 w-4" />
-                        {item.label}
-                        {locked && (
-                          /* Contained rather than a bare glyph: a floating
-                             icon at the row's edge reads as stray decoration,
-                             while a tinted chip reads as a deliberate mark and
-                             gives the amber somewhere to sit. */
-                          <span
-                            className={cn(
-                              "ml-auto flex size-5 shrink-0 items-center justify-center rounded-md",
-                              isActive
-                                ? "bg-primary-foreground/15 text-primary-foreground"
-                                : "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-                            )}
-                            aria-hidden
-                          >
-                            <Crown className="size-3" />
-                          </span>
-                        )}
-                        {item.path === "/orders" && hasUnseenOrders && (
-                          <span
-                            className="ml-auto h-2 w-2 shrink-0 rounded-full bg-red-500"
-                            title="New orders"
-                          />
-                        )}
-                        {item.path === "/queries" && hasUnseenEnquiries && (
-                          <span
-                            className="ml-auto h-2 w-2 shrink-0 rounded-full bg-red-500"
-                            title="New queries"
-                          />
-                        )}
-                      </>
-                    )}
-                  </NavLink>
-                );
-              })}
+              {groupItems
+                .filter((i) => !i.parent)
+                .map((item) => (
+                  <Fragment key={item.path}>
+                    {renderItem(item)}
+                    {/* Sub-items are parts of the parent feature. When the plan
+                        doesn't include it there is nothing to nest and the
+                        parent row already carries the upgrade prompt — a second
+                        crowned row for the same add-on just reads as clutter. */}
+                    {!isLocked(item) &&
+                      items
+                        .filter((c) => c.parent === item.path)
+                        .map((child) => renderItem(child, true))}
+                  </Fragment>
+                ))}
             </div>
           </div>
         );
       })}
     </nav>
   );
+
+  /** One sidebar row. `nested` indents a sub-item under its parent feature. */
+  function renderItem(item: NavItem, nested = false) {
+    const Icon = item.icon;
+    if (item.soon) {
+      return (
+        <span
+          key={item.path}
+          className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground/60"
+          title="Coming soon"
+        >
+          <Icon className="h-4 w-4" />
+          {item.label}
+          <span className="ml-auto rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase">
+            soon
+          </span>
+        </span>
+      );
+    }
+    const locked = isLocked(item);
+    return (
+      <NavLink
+        key={item.path}
+        to={item.path}
+        end={item.path === "/" || item.exact}
+        onClick={onNavigate}
+        aria-label={locked ? `${item.label} — not in your plan` : undefined}
+        data-locked={locked || undefined}
+        title={
+          locked
+            ? `${item.label} isn't in your plan — tap to see upgrade options`
+            : undefined
+        }
+        className={({ isActive }) =>
+          cn(
+            "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+            isActive
+              ? "bg-primary text-primary-foreground"
+              : "text-foreground/80 hover:bg-muted",
+            // Indented and quieter: a part of the row above it,
+            // not a peer of it.
+            nested && "ml-3 py-1.5 text-[13px]",
+          )
+        }
+      >
+        {/* Render-prop children so the crown can react to the
+          active row, where amber on the brand fill would clash. */}
+        {({ isActive }) => (
+          <>
+            <Icon className={nested ? "h-3.5 w-3.5" : "h-4 w-4"} />
+            {item.label}
+            {locked && (
+              /* Contained rather than a bare glyph: a floating
+               icon at the row's edge reads as stray decoration,
+               while a tinted chip reads as a deliberate mark and
+               gives the amber somewhere to sit. */
+              <span
+                className={cn(
+                  "ml-auto flex size-5 shrink-0 items-center justify-center rounded-md",
+                  isActive
+                    ? "bg-primary-foreground/15 text-primary-foreground"
+                    : "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+                )}
+                aria-hidden
+              >
+                <Crown className="size-3" />
+              </span>
+            )}
+            {item.path === "/orders" && hasUnseenOrders && (
+              <span
+                className="ml-auto h-2 w-2 shrink-0 rounded-full bg-red-500"
+                title="New orders"
+              />
+            )}
+            {item.path === "/queries" && hasUnseenEnquiries && (
+              <span
+                className="ml-auto h-2 w-2 shrink-0 rounded-full bg-red-500"
+                title="New queries"
+              />
+            )}
+          </>
+        )}
+      </NavLink>
+    );
+  }
 }
 
 /**
@@ -213,9 +246,7 @@ export function AppLayout() {
 
   // Reflect the brand in the browser tab so the whole portal reads as theirs.
   useEffect(() => {
-    document.title = brand?.name
-      ? `${brand.name} Portal`
-      : "Frostique Portal";
+    document.title = brand?.name ? `${brand.name} Portal` : "Frostique Portal";
   }, [brand?.name]);
 
   // Recolour the portal's primary accents with the brand's theme colour while a
