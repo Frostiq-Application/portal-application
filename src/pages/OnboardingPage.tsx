@@ -525,12 +525,19 @@ function BranchStep({ state }: { state: OnboardingState }) {
   const editing = saved != null;
 
   const [branchName, setBranchName] = useState(saved?.branchName ?? "");
-  const [slug, setSlug] = useState(saved?.slug ?? "");
+  // Only what the user typed is stored; the effective slug is derived below.
+  const [typedSlug, setTypedSlug] = useState(saved?.slug ?? "");
   const [slugTouched, setSlugTouched] = useState(editing);
   const [displayArea, setDisplayArea] = useState(saved?.displayArea ?? "");
   const [city, setCity] = useState(saved?.city ?? "");
   const [address, setAddress] = useState(saved?.address ?? "");
-  const [mapLink, setMapLink] = useState("");
+  // Shows what's already stored, so rewinding to this step doesn't look like
+  // the location was lost — the box is the coordinates now, not a scratch pad.
+  const [mapLink, setMapLink] = useState(
+    saved?.latitude && saved?.longitude
+      ? `${saved.latitude}, ${saved.longitude}`
+      : "",
+  );
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     saved?.latitude && saved?.longitude
       ? { lat: Number(saved.latitude), lng: Number(saved.longitude) }
@@ -567,10 +574,13 @@ function BranchStep({ state }: { state: OnboardingState }) {
    * then stays out of the way while someone is typing.
    */
   const savedId = saved?.id ?? null;
-  useEffect(() => {
-    if (!saved) return;
+  // Seeded during render, keyed on the saved branch's id, so the form shows the
+  // stored values on the paint they arrive rather than one frame later.
+  const [seededId, setSeededId] = useState<string | null>(null);
+  if (saved && savedId !== seededId) {
+    setSeededId(savedId);
     setBranchName(saved.branchName ?? "");
-    setSlug(saved.slug ?? "");
+    setTypedSlug(saved.slug ?? "");
     setSlugTouched(true);
     setDisplayArea(saved.displayArea ?? "");
     setCity(saved.city ?? "");
@@ -580,6 +590,11 @@ function BranchStep({ state }: { state: OnboardingState }) {
         ? { lat: Number(saved.latitude), lng: Number(saved.longitude) }
         : null,
     );
+    setMapLink(
+      saved.latitude && saved.longitude
+        ? `${saved.latitude}, ${saved.longitude}`
+        : "",
+    );
     setBannerUrl(saved.bannerUrl ?? "");
     setWhatsapp(saved.whatsappNumber ?? "");
     setOpening(saved.openingTime ?? "09:00");
@@ -588,8 +603,7 @@ function BranchStep({ state }: { state: OnboardingState }) {
     // Anyone staged as an invite has been created for real by now, so they
     // belong in the assigned list below rather than staged a second time.
     setInvites([]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [savedId]);
+  }
 
   /*
    * Ticked team members, re-seeded whenever the *server's* set changes.
@@ -602,20 +616,23 @@ function BranchStep({ state }: { state: OnboardingState }) {
     .map((u) => u.id)
     .sort()
     .join(",");
-  useEffect(() => {
+  const [seenAssigned, setSeenAssigned] = useState(serverAssigned);
+  if (serverAssigned !== seenAssigned) {
+    setSeenAssigned(serverAssigned);
     setAssignedUserIds(serverAssigned ? serverAssigned.split(",") : []);
-  }, [serverAssigned]);
+  }
 
   // Derive the slug until someone edits it themselves — then stop fighting them.
-  useEffect(() => {
-    if (!slugTouched) setSlug(slugify(branchName));
-  }, [branchName, slugTouched]);
+  // Computed rather than stored, so the preview can't lag the name it's built
+  // from by a frame.
+  const slug = slugTouched ? typedSlug : slugify(branchName);
 
   // A pasted value overrides whatever was stored; an empty box keeps it.
-  useEffect(() => {
-    if (!mapLink.trim()) return;
-    setCoords(parseCoordinates(mapLink));
-  }, [mapLink]);
+  const [seenMapLink, setSeenMapLink] = useState(mapLink);
+  if (mapLink !== seenMapLink) {
+    setSeenMapLink(mapLink);
+    if (mapLink.trim()) setCoords(parseCoordinates(mapLink));
+  }
 
   /** Typed something that isn't a usable pair — say so instead of staying mute. */
   const coordsError = mapLink.trim() !== "" && coords == null;
@@ -725,7 +742,7 @@ function BranchStep({ state }: { state: OnboardingState }) {
             disabled={editing}
             onChange={(e) => {
               setSlugTouched(true);
-              setSlug(slugify(e.target.value));
+              setTypedSlug(slugify(e.target.value));
             }}
             className="font-mono text-sm"
           />
@@ -1060,7 +1077,9 @@ function PlanStep() {
   const navigate = useNavigate();
   const { data: catalogue, isLoading } = useMyPlansQuery();
   const [save] = useSavePlanStepMutation();
-  const [cycle, setCycle] = useState("yearly");
+  // Monthly by default: signup is the moment someone is least willing to
+  // commit to a year, so the smaller number is the one to open on.
+  const [cycle, setCycle] = useState("monthly");
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const plans = catalogue?.plans ?? [];
@@ -1084,7 +1103,7 @@ function PlanStep() {
       // to checkout, because nothing is granted before money arrives.
       if (!next.completed) {
         navigate(
-          `/checkout?plan=${plan.id}&cycle=${activeCycle?.code ?? "yearly"}`,
+          `/checkout?plan=${plan.id}&cycle=${activeCycle?.code ?? "monthly"}`,
         );
       }
     } catch (err) {
@@ -1151,7 +1170,7 @@ function PaymentStep({ state }: { state: OnboardingState }) {
   const navigate = useNavigate();
   const [goToStep, { isLoading: rewinding }] = useGoToOnboardingStepMutation();
   const planId = (state.data.chosenPlanId as string) ?? state.prefill.planId;
-  const cycle = (state.data.chosenCycle as string) ?? "yearly";
+  const cycle = (state.data.chosenCycle as string) ?? "monthly";
 
   return (
     <div className="rounded-2xl border bg-card p-6 text-center">

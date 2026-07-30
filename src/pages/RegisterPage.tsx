@@ -9,16 +9,13 @@ import { useRegisterAccountMutation } from "@/features/api/accountsApi";
 import { useLoginMutation } from "@/features/api/authApi";
 import { useAuth } from "@/hooks/useAuth";
 import { cn, slugify } from "@/lib/utils";
+import { apiError } from "@/lib/apiError";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-function extractError(err: unknown): string {
-  const data = (err as { data?: { message?: string | string[] } })?.data;
-  const msg = data?.message;
-  if (Array.isArray(msg)) return msg.join(", ");
-  return msg ?? "Something went wrong. Please try again.";
-}
+const extractError = (err: unknown) =>
+  apiError(err, "Something went wrong. Please try again.");
 
 /** The storefront domain a slug will produce, for the live preview. */
 const STOREFRONT_HOST =
@@ -46,7 +43,8 @@ export function RegisterPage() {
   const [login, { isLoading: loggingIn }] = useLoginMutation();
 
   const [name, setName] = useState("");
-  const [appSlug, setAppSlug] = useState("");
+  // Only what the user typed is stored; the effective slug is derived below.
+  const [typedSlug, setTypedSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
   const [ownerName, setOwnerName] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
@@ -59,10 +57,9 @@ export function RegisterPage() {
   }, [isAuthenticated, navigate]);
 
   // Derive the URL from the shop name until someone edits it themselves —
-  // then stop overwriting their choice.
-  useEffect(() => {
-    if (!slugTouched) setAppSlug(slugify(name));
-  }, [name, slugTouched]);
+  // then stop overwriting their choice. Derived rather than stored in state, so
+  // the preview can't lag a keystroke behind the name it is built from.
+  const appSlug = slugTouched ? typedSlug : slugify(name);
 
   const passwordStrongEnough = password.length >= 8;
   const emailLooksValid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(ownerEmail);
@@ -110,11 +107,15 @@ export function RegisterPage() {
         // Registration already sent a code; the verify screen picks it up from
         // there. Anyone somehow already verified skips straight to setup.
         if (session.user.emailVerified === false) {
-          toast.success(`Welcome, ${ownerName.trim().split(" ")[0]} — check your email for a code.`);
+          toast.success(
+            `Welcome, ${ownerName.trim().split(" ")[0]} — check your email for a code.`,
+          );
           navigate("/verify-email", { replace: true });
           return;
         }
-        toast.success(`Welcome, ${ownerName.trim().split(" ")[0]} — let's set up your shop.`);
+        toast.success(
+          `Welcome, ${ownerName.trim().split(" ")[0]} — let's set up your shop.`,
+        );
         navigate("/onboarding", { replace: true });
         return;
       }
@@ -179,7 +180,7 @@ export function RegisterPage() {
                     value={appSlug}
                     onChange={(e) => {
                       setSlugTouched(true);
-                      setAppSlug(slugify(e.target.value));
+                      setTypedSlug(slugify(e.target.value));
                     }}
                     placeholder="sweet-cake-bake"
                     className="border-0 font-mono text-sm shadow-none focus-visible:ring-0"
@@ -249,7 +250,9 @@ export function RegisterPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
                     className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
                   >
                     {showPassword ? (
@@ -273,7 +276,11 @@ export function RegisterPage() {
                 </p>
               </div>
 
-              <Button type="submit" className="w-full" disabled={busy || incomplete}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={busy || incomplete}
+              >
                 {busy && <Loader2 className="mr-2 size-4 animate-spin" />}
                 Create shop
               </Button>

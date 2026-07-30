@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Loader2 } from "@/components/ui/icons";
 import { FrostiqueMark } from "@/components/common/FrostiqueMark";
@@ -11,16 +11,13 @@ import {
   useVerifyTwoFactorMutation,
 } from "@/features/api/authApi";
 import type { LoginResponse } from "@/types";
+import { apiError } from "@/lib/apiError";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-function extractError(err: unknown): string {
-  const data = (err as { data?: { message?: string | string[] } })?.data;
-  const msg = data?.message;
-  if (Array.isArray(msg)) return msg.join(", ");
-  return msg ?? "Something went wrong. Please try again.";
-}
+const extractError = (err: unknown) =>
+  apiError(err, "Something went wrong. Please try again.");
 
 export function LoginPage() {
   const dispatch = useAppDispatch();
@@ -41,9 +38,11 @@ export function LoginPage() {
 
   const from = (location.state as { from?: Location })?.from?.pathname ?? "/";
 
-  if (isAuthenticated) {
-    navigate(from, { replace: true });
-  }
+  // Redirecting from the render body makes React warn that the router is being
+  // updated while a different component renders; do it as an effect instead.
+  useEffect(() => {
+    if (isAuthenticated) navigate(from, { replace: true });
+  }, [isAuthenticated, from, navigate]);
 
   const finish = (res: LoginResponse) => {
     if (res.user && res.refreshToken) {

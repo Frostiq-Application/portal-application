@@ -7,16 +7,13 @@ import {
   useInviteEmailQuery,
   useSetPasswordMutation,
 } from "@/features/api/authApi";
+import { apiError } from "@/lib/apiError";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-function extractError(err: unknown): string {
-  const data = (err as { data?: { message?: string | string[] } })?.data;
-  const msg = data?.message;
-  if (Array.isArray(msg)) return msg.join(", ");
-  return msg ?? "Something went wrong. Please try again.";
-}
+const extractError = (err: unknown) =>
+  apiError(err, "Something went wrong. Please try again.");
 
 export function SetPasswordPage() {
   const navigate = useNavigate();
