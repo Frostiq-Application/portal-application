@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Loader2 } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { useUpdateMyAccountMutation } from "@/features/api/accountsApi";
@@ -39,8 +39,13 @@ export function EditMyBrandDialog({ open, onOpenChange, account }: Props) {
   const [bannerUrl, setBannerUrl] = useState("");
   const [themeColor, setThemeColor] = useState("");
 
-  useEffect(() => {
-    if (open && account) {
+  // Seeded during render rather than in an effect, so the fields are correct on
+  // first paint instead of flashing the previous brand's values for a frame.
+  const seedKey = open && account ? account.id : null;
+  const [seeded, setSeeded] = useState<string | null>(null);
+  if (seedKey !== seeded) {
+    setSeeded(seedKey);
+    if (account) {
       setName(account.name);
       setOwnerName(account.ownerName);
       setOwnerPhone(account.ownerPhone);
@@ -48,7 +53,7 @@ export function EditMyBrandDialog({ open, onOpenChange, account }: Props) {
       setBannerUrl(account.bannerUrl ?? "");
       setThemeColor(account.themeColor ?? "");
     }
-  }, [open, account]);
+  }
 
   const submit = async () => {
     if (name.trim().length < 2) return toast.error("Brand name required");

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2 } from "@/components/ui/icons";
@@ -65,12 +65,17 @@ export function CreateAccountDialog() {
     handleSubmit,
     reset,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { activate: false, ownerPhone: "" },
   });
+
+  // `useWatch` rather than `watch()`: the latter returns a fresh function that
+  // can't be memoized safely, which makes React Compiler skip this component.
+  const ownerPhone = useWatch({ control, name: "ownerPhone" });
+  const activate = useWatch({ control, name: "activate" });
 
   const onSubmit = async (values: FormValues) => {
     try {
@@ -162,7 +167,7 @@ export function CreateAccountDialog() {
                 <PhoneInput
                   defaultCountry="IN"
                   placeholder="Enter phone number"
-                  value={watch("ownerPhone")}
+                  value={ownerPhone}
                   onChange={(v) => setValue("ownerPhone", v ?? "", { shouldValidate: true })}
                 />
               </Field>
@@ -199,7 +204,7 @@ export function CreateAccountDialog() {
               <div className="flex items-center gap-3 pt-1">
                 <Switch
                   id="activate"
-                  checked={watch("activate")}
+                  checked={activate}
                   onCheckedChange={(v) => setValue("activate", v)}
                 />
                 <Label htmlFor="activate" className="cursor-pointer">
