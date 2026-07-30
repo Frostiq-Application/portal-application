@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
-import { CakeSlice, Eye, Search, Settings2 } from "@/components/ui/icons";
+import { useLocation, useNavigate } from "react-router-dom";
+import { CakeSlice, Eye, Images, Search, Settings2 } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import {
@@ -29,10 +30,14 @@ import { useCustomCakeStream } from "@/hooks/useCustomCakeStream";
 import { CustomCakeDetailSheet } from "@/components/custom-cake/CustomCakeDetailSheet";
 import { CustomCakeOptionsDrawer } from "@/components/custom-cake/CustomCakeOptionsDrawer";
 import { CustomCakeIntro } from "@/components/custom-cake/CustomCakeIntro";
+import { useListGalleryImagesQuery } from "@/features/api/galleryApi";
+import { GalleryTab } from "@/components/custom-cake/GalleryTab";
 
 const INTRO_SEEN_KEY = "frostique-portal-custom-cake-intro";
 
 type StatusFilter = "all" | CustomCakeStatus;
+/** The page has two workspaces: the request queue and the design gallery. */
+type CustomCakeSection = "requests" | "gallery";
 
 const STATUS_ORDER: CustomCakeStatus[] = [
   "submitted",
@@ -46,10 +51,21 @@ const STATUS_ORDER: CustomCakeStatus[] = [
   "cancelled",
 ];
 
+const NO_ITEMS: CustomCakeRequest[] = [];
+
 export function CustomCakesPage() {
   const dispatch = useAppDispatch();
   const branchId = useAppSelector(selectSelectedBranchId);
   const shopId = branchId === ALL_BRANCHES ? "" : branchId;
+  // The section lives in the URL so the sidebar can link straight to the
+  // gallery and highlight the row the user is actually on.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const section: CustomCakeSection = location.pathname.endsWith("/gallery")
+    ? "gallery"
+    : "requests";
+  const setSection = (next: CustomCakeSection) =>
+    navigate(next === "gallery" ? "/custom-cakes/gallery" : "/custom-cakes");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 350);
@@ -75,7 +91,9 @@ export function CustomCakesPage() {
     { skip: !shopId },
   );
 
-  const items = data?.items ?? [];
+  // `?? []` would build a fresh array each render while the query is in flight,
+  // making the memo below recompute every time. One shared constant is stable.
+  const items = data?.items ?? NO_ITEMS;
 
   // Realtime: when a request changes for this brand, refresh the affected
   // request + the list so every open tab reflects it live. New requests toast.
@@ -111,6 +129,31 @@ export function CustomCakesPage() {
     return c;
   }, [items]);
 
+  // Cheap count for the section pill — RTK dedupes it with the tab's own query.
+  const { data: galleryImages } = useListGalleryImagesQuery(shopId, {
+    skip: !shopId,
+  });
+
+  const sectionItems: SegmentedItem<CustomCakeSection>[] = useMemo(
+    () => [
+      {
+        value: "requests",
+        label: "Requests",
+        icon: CakeSlice,
+        accent: "#e11d48",
+        count: items.length,
+      },
+      {
+        value: "gallery",
+        label: "Gallery",
+        icon: Images,
+        accent: "#8b5cf6",
+        count: galleryImages?.length,
+      },
+    ],
+    [items.length, galleryImages?.length],
+  );
+
   const statusItems: SegmentedItem<StatusFilter>[] = useMemo(
     () => [
       { value: "all", label: "All", count: items.length },
@@ -130,28 +173,42 @@ export function CustomCakesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Custom Cakes</h1>
           <p className="text-sm text-muted-foreground">
-            Review made-to-order cake requests, send quotes, and convert them
-            into orders.
+            {section === "requests"
+              ? "Review made-to-order cake requests, send quotes, and convert them into orders."
+              : "Curate the cake photos customers browse for inspiration."}
           </p>
         </div>
         <div className="flex items-end gap-2">
-          {realtimeEnabled && <LiveIndicator status={streamStatus} />}
+          {realtimeEnabled && section === "requests" && (
+            <LiveIndicator status={streamStatus} />
+          )}
           <ShopSelect />
-          <Button
-            variant="outline"
-            onClick={() => setOptionsOpen(true)}
-            disabled={!shopId}
-          >
-            <Settings2 className="mr-2 h-4 w-4" />
-            Form options
-          </Button>
+          {section === "requests" && (
+            <Button
+              variant="outline"
+              onClick={() => setOptionsOpen(true)}
+              disabled={!shopId}
+            >
+              <Settings2 className="mr-2 h-4 w-4" />
+              Form options
+            </Button>
+          )}
         </div>
       </div>
 
+      <SegmentedStrip
+        value={section}
+        items={sectionItems}
+        onChange={setSection}
+      />
+
       {!shopId ? (
         <Card className="p-10 text-center text-sm text-muted-foreground">
-          Select a branch to view its custom cake requests.
+          Select a branch to view its{" "}
+          {section === "requests" ? "custom cake requests" : "design gallery"}.
         </Card>
+      ) : section === "gallery" ? (
+        <GalleryTab shopId={shopId} />
       ) : (
         <>
           <div className="relative max-w-sm">

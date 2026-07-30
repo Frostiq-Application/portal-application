@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { MessageCircle, Phone, Receipt, ShoppingBag, StickyNote } from "@/components/ui/icons";
 import {
@@ -79,14 +79,19 @@ function SheetBody({ request }: { request: CustomCakeRequest }) {
   const [reason, setReason] = useState("");
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
-  useEffect(() => {
+  // Seeded during render rather than in an effect so the sheet never shows the
+  // previously selected request's quote for a frame.
+  const seedKey = `${request.id}:${request.quotedPrice ?? ""}:${request.adminNotes ?? ""}:${request.status}`;
+  const [seeded, setSeeded] = useState<string | null>(null);
+  if (seedKey !== seeded) {
+    setSeeded(seedKey);
     setPrice(request.quotedPrice ?? "");
     setQuoteNote("");
     setNotes(request.adminNotes ?? "");
     setNextStatus(request.status);
     setReason("");
     setPreviewIndex(null);
-  }, [request.id, request.quotedPrice, request.adminNotes, request.status]);
+  }
 
   const { data: events } = useGetCustomCakeEventsQuery(request.id);
   const [quote, quoteState] = useQuoteCustomCakeMutation();
