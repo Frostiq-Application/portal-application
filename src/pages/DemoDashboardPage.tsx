@@ -15,7 +15,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Ban, BarChart3, Bell, Cake, CalendarClock, Contact, CakeSlice, CreditCard, IndianRupee, LayoutDashboard, Moon, Plus, Receipt, ShoppingBag, Store, Tags, TrendingUp, Users as UsersIcon, type IconComponent } from "@/components/ui/icons";
+import { BarChart3, Bell, Cake, CalendarClock, Contact, CakeSlice, CreditCard, IndianRupee, LayoutDashboard, Moon, Plus, Receipt, ShoppingBag, Store, Tags, TrendingUp, Users as UsersIcon, type IconComponent } from "@/components/ui/icons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";

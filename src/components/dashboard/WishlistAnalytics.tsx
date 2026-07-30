@@ -65,12 +65,15 @@ function MiniKpi({
 }
 
 function TrendChart({ data }: { data: WishlistAnalyticsData }) {
-  // Running cumulative net saves reads better than noisy per-day deltas.
+  // Running cumulative net saves reads better than noisy per-day deltas. Built
+  // with a plain loop rather than a `map` closing over a counter: the running
+  // total is only clamped for display, so it has to stay a true cumulative.
+  const rows: { date: string; saves: number }[] = [];
   let running = 0;
-  const rows = data.trend.map((p) => {
+  for (const p of data.trend) {
     running += p.saves;
-    return { date: p.date.slice(5), saves: Math.max(0, running) };
-  });
+    rows.push({ date: p.date.slice(5), saves: Math.max(0, running) });
+  }
 
   if (rows.length === 0) {
     return (

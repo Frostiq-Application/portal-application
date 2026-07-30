@@ -9,8 +9,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Ban, IndianRupee, Receipt, ShoppingBag, TrendingUp } from "@/components/ui/icons";
+import { Link } from "react-router-dom";
+import { ArrowRight, Ban, IndianRupee, Receipt, ShoppingBag, Store, TrendingUp } from "@/components/ui/icons";
 import { useShopAnalyticsQuery } from "@/features/api/analyticsApi";
+import { useListShopsQuery } from "@/features/api/shopsApi";
+import { Button } from "@/components/ui/button";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { useAppSelector } from "@/app/hooks";
 import {
@@ -23,6 +26,7 @@ import {
   WishlistAnalyticsView,
 } from "@/components/dashboard/WishlistAnalytics";
 import { UpgradeOverlay } from "@/components/analytics/UpgradeOverlay";
+import { TrialStatusStrip } from "@/components/billing/TrialStatusStrip";
 import {
   PREVIEW_SHOP,
   PREVIEW_WISHLIST,
@@ -232,8 +236,26 @@ export function ShopDashboard() {
   );
   const loading = isLoading || isFetching || !data;
 
+  // Same query key as ShopSelect's, so this reads its cache rather than firing
+  // a second request. A brand with no branch yet has nothing to report on, and
+  // the skipped analytics query would otherwise leave the page in skeletons
+  // forever.
+  const { data: shops, isLoading: shopsLoading } = useListShopsQuery({
+    page: 1,
+    limit: 100,
+  });
+  const hasNoBranches = !shopsLoading && (shops?.data.length ?? 0) === 0;
+
   return (
     <div className="space-y-6">
+      {/* Above the numbers, because a trial deadline outranks yesterday's
+          revenue — and this is the screen people actually open. */}
+      <TrialStatusStrip />
+
+      {hasNoBranches ? (
+        <NoBranchYet />
+      ) : (
+        <>
       <div className="flex items-center justify-end">
         <ShopSelect />
       </div>
@@ -271,7 +293,37 @@ export function ShopDashboard() {
           </UpgradeOverlay>
         )}
       </div>
+        </>
+      )}
     </div>
+  );
+}
+
+/**
+ * A brand that hasn't created a branch yet. Every number on this page is
+ * per-branch, so there is nothing to show and nothing to load — say so, and
+ * point at the one action that fixes it.
+ */
+function NoBranchYet() {
+  return (
+    <Card>
+      <CardContent className="flex flex-col items-center gap-2 py-16 text-center">
+        <div className="flex size-11 items-center justify-center rounded-full bg-primary/10">
+          <Store className="size-5 text-primary" />
+        </div>
+        <p className="text-sm font-medium">No branch yet</p>
+        <p className="max-w-xs text-sm text-muted-foreground">
+          Orders, revenue and product insights are all per branch. Create your
+          first one to start seeing them here.
+        </p>
+        <Button asChild className="mt-2">
+          <Link to="/shops">
+            Add a branch
+            <ArrowRight className="size-4" />
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
