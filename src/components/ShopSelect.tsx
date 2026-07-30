@@ -14,6 +14,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { Shop } from "@/types";
+
+const NO_SHOPS: Shop[] = [];
 
 /**
  * Branch picker for shop-scoped screens (catalog, orders, coupons, scheduling).
@@ -36,7 +39,10 @@ export function ShopSelect({
   const dispatch = useAppDispatch();
   const selected = useAppSelector(selectSelectedBranchId);
   const { data } = useListShopsQuery({ page: 1, limit: 100 });
-  const shops = data?.data ?? [];
+  // `?? []` would build a fresh array on every render while the query is in
+  // flight, so the effects below would re-run each time. One shared constant
+  // keeps the reference stable.
+  const shops = data?.data ?? NO_SHOPS;
 
   // Establish a sensible default once shops load and nothing is chosen yet:
   // "All branches" when the page offers it, otherwise the first branch.

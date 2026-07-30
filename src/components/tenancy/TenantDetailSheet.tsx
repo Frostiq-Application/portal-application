@@ -18,7 +18,8 @@ import {
 } from "@/features/api/tenancyApi";
 import { formatDate } from "@/lib/utils";
 import type { SyncResult } from "@/types/tenancy";
-import { MigrationStateBadge, migrationStateHint } from "./TenantHealthBadge";
+import { MigrationStateBadge } from "./TenantHealthBadge";
+import { migrationStateHint } from "@/lib/tenancy";
 import { SyncResultPanel } from "./SyncResultPanel";
 
 /**

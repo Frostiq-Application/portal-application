@@ -7,6 +7,7 @@ import {
   Ban,
 } from "@/components/ui/icons";
 import type { TenantHealth, TenantMigrationState } from "@/types/tenancy";
+import { MIGRATION_STATE } from "@/lib/tenancy";
 
 const HEALTH: Record<
   TenantHealth,
@@ -29,30 +30,7 @@ export function TenantHealthBadge({ health }: { health: TenantHealth }) {
   );
 }
 
-const STATE: Record<
-  TenantMigrationState,
-  { label: string; variant: "success" | "warning" | "destructive" | "secondary"; hint: string }
-> = {
-  applied: { label: "Applied", variant: "success", hint: "Recorded and verified against the live schema." },
-  pending: { label: "Pending", variant: "warning", hint: "Never run on this tenant." },
-  failed: { label: "Failed", variant: "destructive", hint: "Last attempt errored — see the message below." },
-  checksum_mismatch: {
-    label: "Changed since",
-    variant: "destructive",
-    hint: "This migration's SQL was edited after it ran here. Re-sync to bring the tenant onto the current version.",
-  },
-  structural_drift: {
-    label: "Drifted",
-    variant: "destructive",
-    hint: "Recorded as applied, but the schema no longer has the change — usually a restore or a manual edit.",
-  },
-};
-
 export function MigrationStateBadge({ state }: { state: TenantMigrationState }) {
-  const { label, variant } = STATE[state];
+  const { label, variant } = MIGRATION_STATE[state];
   return <Badge variant={variant}>{label}</Badge>;
-}
-
-export function migrationStateHint(state: TenantMigrationState): string {
-  return STATE[state].hint;
 }

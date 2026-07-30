@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Clock, Loader2, Mail, MapPin, Store, User as UserIcon, Check } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { InviteSentPanel } from "@/components/common/InviteSentPanel";
@@ -113,8 +113,13 @@ export function ShopDialog({
   /** Once the user edits the slug by hand, stop syncing it from the name. */
   const [slugTouched, setSlugTouched] = useState(false);
 
-  useEffect(() => {
-    if (open) {
+  // Seeded during render rather than in an effect so the fields are correct on
+  // first paint instead of flashing the previous branch's values for a frame.
+  const seedKey = open ? (shop?.id ?? `new:${defaultAccountId ?? ""}`) : null;
+  const [seeded, setSeeded] = useState<string | null>(null);
+  if (seedKey !== seeded) {
+    setSeeded(seedKey);
+    {
       setAccountId(shop?.accountId ?? defaultAccountId ?? "");
       setBranchName(shop?.branchName ?? "");
       setSlug(shop?.slug ?? "");
@@ -135,7 +140,7 @@ export function ShopDialog({
       setOwnerPhone("");
       setResetToken(null);
     }
-  }, [open, shop, defaultAccountId]);
+  }
 
   const onBranchNameChange = (value: string) => {
     setBranchName(value);
@@ -206,16 +211,22 @@ export function ShopDialog({
   const [assignedUserIds, setAssignedUserIds] = useState<string[]>([]);
 
   // Seed from current access whenever the drawer opens on an existing branch.
-  useEffect(() => {
-    if (!open) return;
-    setAssignedUserIds(
-      shop
-        ? (teamPage?.data ?? [])
-            .filter((u) => (u.shopIds ?? []).includes(shop.id))
-            .map((u) => u.id)
-        : [],
-    );
-  }, [open, shop, teamPage]);
+  // Done during render so the checkboxes are right on the paint the team list
+  // arrives, rather than showing an empty selection for a frame first.
+  const accessKey = open ? `${shop?.id ?? "new"}:${teamPage?.data?.length ?? -1}` : null;
+  const [accessSeeded, setAccessSeeded] = useState<string | null>(null);
+  if (accessKey !== accessSeeded) {
+    setAccessSeeded(accessKey);
+    if (open) {
+      setAssignedUserIds(
+        shop
+          ? (teamPage?.data ?? [])
+              .filter((u) => (u.shopIds ?? []).includes(shop.id))
+              .map((u) => u.id)
+          : [],
+      );
+    }
+  }
 
   const ownerRequested =
     canAddOwner &&

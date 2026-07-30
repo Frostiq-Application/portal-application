@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
-import { MoreHorizontal, Search, MapPin, Clock, Phone, CalendarOff, Store } from "@/components/ui/icons";
+import { useCallback, useState } from "react";
+import { MoreHorizontal, Search, MapPin, Clock, Phone, CalendarOff, Store, MessageCircle } from "@/components/ui/icons";
 import { toast } from "sonner";
+import { useLimitState } from "@/hooks/useLimitState";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import {
   LimitCounter,
   LimitNotice,
-  useLimitState,
 } from "@/components/gating/LimitNotice";
 import { apiError } from "@/lib/apiError";
 import {
@@ -16,6 +16,7 @@ import {
 } from "@/features/api/shopsApi";
 import type { Shop } from "@/types";
 import { cn } from "@/lib/utils";
+import { storefrontUrl, whatsappShareUrl } from "@/lib/storefront";
 import { useAuth } from "@/hooks/useAuth";
 import { isShopAdmin } from "@/lib/roles";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -111,16 +112,21 @@ function BranchGrid() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Shop | null>(null);
 
-  // Reset the accumulator whenever the search term changes.
-  useEffect(() => {
+  // Reset the accumulator whenever the search term changes. Done during render,
+  // not in an effect, so the previous search's rows are never painted under the
+  // new term before being cleared.
+  const [seenSearch, setSeenSearch] = useState(debounced);
+  if (debounced !== seenSearch) {
+    setSeenSearch(debounced);
     setPage(1);
     setItems([]);
-  }, [debounced]);
+  }
 
   // Accumulate pages for infinite scroll. Page 1 (initial load, search change,
   // or a mutation refetch that invalidates LIST) replaces the accumulator.
-  useEffect(() => {
-    if (!data) return;
+  const [seenData, setSeenData] = useState<typeof data>(undefined);
+  if (data && data !== seenData) {
+    setSeenData(data);
     setItems((prev) =>
       data.meta.page === 1
         ? data.data
@@ -129,7 +135,7 @@ function BranchGrid() {
             ...data.data,
           ],
     );
-  }, [data]);
+  }
 
   const totalPages = data?.meta.totalPages ?? 1;
   const hasMore = page < totalPages;
@@ -312,6 +318,18 @@ function BranchTicket({ shop, onEdit, onSuspend, onActivate }: BranchTicketProps
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={onEdit}>Edit</DropdownMenuItem>
+              {/* Copy is the fallback for desktop; the WhatsApp item below is
+                  the one that actually gets used, on a phone. */}
+              <DropdownMenuItem
+                onClick={() => {
+                  void navigator.clipboard
+                    ?.writeText(storefrontUrl(shop.slug))
+                    .then(() => toast.success("Shop link copied."))
+                    .catch(() => toast.error("Couldn't copy that."));
+                }}
+              >
+                Copy shop link
+              </DropdownMenuItem>
               {shop.status === "active" ? (
                 <DropdownMenuItem
                   className="text-destructive"
@@ -339,6 +357,25 @@ function BranchTicket({ shop, onEdit, onSuspend, onActivate }: BranchTicketProps
         <p className="mt-2 truncate font-mono text-xs text-muted-foreground/80">
           /{shop.slug}
         </p>
+
+        {/* The last step before a first order: getting this link to the people
+            who already buy from this bakery. One tap, straight into WhatsApp's
+            own contact picker. */}
+        <Button
+          asChild
+          variant="outline"
+          size="sm"
+          className="mt-3 w-full border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-400"
+        >
+          <a
+            href={whatsappShareUrl(shop.branchName, shop.slug)}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <MessageCircle className="h-4 w-4" />
+            Share on WhatsApp
+          </a>
+        </Button>
       </div>
 
       {/* Feature strip at the bottom */}
