@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { CalendarClock, CalendarOff, Clock, Plus, Sun, Trash2 } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/utils";
@@ -133,13 +133,16 @@ function SettingsCard({
   const [maxDays, setMaxDays] = useState(7);
   const [capacity, setCapacity] = useState<string>("");
 
-  useEffect(() => {
-    if (!data) return;
+  // Seeded during render rather than in an effect so the controls show the
+  // saved settings on the paint they arrive instead of one frame later.
+  const [seeded, setSeeded] = useState<typeof data>(undefined);
+  if (data && data !== seeded) {
+    setSeeded(data);
     setSlotDuration(data.slotDurationMinutes);
     setCutoff(data.dailyCutoffTime?.slice(0, 5) ?? "");
     setMaxDays(data.maxAdvanceDays);
     setCapacity(data.slotCapacity != null ? String(data.slotCapacity) : "");
-  }, [data]);
+  }
 
   // The backend falls back to the 'all' row when this scope has none saved.
   const inherited = scope !== "all" && data != null && data.fulfilmentType !== scope;
@@ -292,7 +295,13 @@ function WeeklyHoursCard({
   const [draft, setDraft] = useState<DayDraft[]>([]);
 
   // Rebuild the 7-day draft whenever the branch, scope, or saved rows change.
-  useEffect(() => {
+  // Done during render so switching branch or scope never paints the previous
+  // one's hours for a frame — these are per-branch settings, and showing the
+  // wrong branch's opening times even briefly is worth avoiding.
+  const draftKey = `${shopId}:${scope}:${rows?.length ?? -1}`;
+  const [draftSeeded, setDraftSeeded] = useState<string | null>(null);
+  if (draftKey !== draftSeeded) {
+    setDraftSeeded(draftKey);
     const next: DayDraft[] = WEEKDAY_LABELS.map((_, weekday) => {
       const row = (rows ?? []).find(
         (r) => r.fulfilmentType === scope && r.weekday === weekday,
@@ -306,7 +315,7 @@ function WeeklyHoursCard({
       };
     });
     setDraft(next);
-  }, [rows, scope, shopId]);
+  }
 
   const patchDay = (weekday: number, patch: Partial<DayDraft>) =>
     setDraft((prev) =>

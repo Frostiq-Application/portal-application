@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { MoreHorizontal, Ticket, Store, CalendarRange, Users, Globe, Lock, ShoppingBag } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { cn, formatDate } from "@/lib/utils";
@@ -37,19 +37,20 @@ export function CouponsPage() {
 
   // Accumulate pages for infinite scroll. When the LIST tag is invalidated
   // (create/update/delete) RTK refetches page 1, so reset the accumulator.
-  useEffect(() => {
-    if (!data) return;
+  // Accumulated during render rather than in an effect, so a newly fetched page
+  // lands in the same paint the data arrives.
+  const [seenData, setSeenData] = useState<typeof data>(undefined);
+  if (data && data !== seenData) {
+    setSeenData(data);
     setItems((prev) =>
       data.meta.page === 1
         ? data.data
         : [
-            ...prev.filter(
-              (p) => !data.data.some((n) => n.id === p.id),
-            ),
+            ...prev.filter((p) => !data.data.some((n) => n.id === p.id)),
             ...data.data,
           ],
     );
-  }, [data]);
+  }
 
   const totalPages = data?.meta.totalPages ?? 1;
   const hasMore = page < totalPages;
