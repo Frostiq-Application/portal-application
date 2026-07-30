@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Loader2 } from "@/components/ui/icons";
 import { toast } from "sonner";
 import {
@@ -38,12 +38,17 @@ export function CategoryDialog({ open, onOpenChange, shopId, category }: Props) 
   const [sortOrder, setSortOrder] = useState("0");
 
   // Reset the form whenever the dialog opens or the target category changes.
-  useEffect(() => {
-    if (!open) return;
+  // Done during render rather than in an effect: React re-runs this component
+  // before committing, so the fields are already correct on first paint instead
+  // of flashing the previous category's values for a frame.
+  const seedKey = open ? (category?.id ?? "new") : null;
+  const [seeded, setSeeded] = useState<string | null>(null);
+  if (seedKey !== seeded) {
+    setSeeded(seedKey);
     setName(category?.name ?? "");
     setImageUrl(category?.imageUrl ?? null);
     setSortOrder(category ? String(category.sortOrder) : "0");
-  }, [open, category]);
+  }
 
   const saving = creating || updating;
 

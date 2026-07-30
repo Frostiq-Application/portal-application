@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Loader2 } from "@/components/ui/icons";
 import { toast } from "sonner";
 import {
@@ -51,8 +51,12 @@ export function AddonDialog({ open, onOpenChange, shopId, addon }: Props) {
   const [stockQuantity, setStockQuantity] = useState("");
 
   // Reset the form whenever the dialog opens or the target add-on changes.
-  useEffect(() => {
-    if (!open) return;
+  // Done during render rather than in an effect so the fields are correct on
+  // first paint instead of flashing the previous add-on's values for a frame.
+  const seedKey = open ? (addon?.id ?? "new") : null;
+  const [seeded, setSeeded] = useState<string | null>(null);
+  if (seedKey !== seeded) {
+    setSeeded(seedKey);
     setName(addon?.name ?? "");
     setPrice(addon ? String(Number(addon.price)) : "0");
     setUnitType(addon?.unitType ?? "piece");
@@ -61,7 +65,7 @@ export function AddonDialog({ open, onOpenChange, shopId, addon }: Props) {
     setStockQuantity(
       addon?.stockQuantity != null ? String(addon.stockQuantity) : "",
     );
-  }, [open, addon]);
+  }
 
   const saving = creating || updating;
 

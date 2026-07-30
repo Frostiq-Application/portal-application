@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowRight, Copy, Loader2, Lock, Sparkles } from "@/components/ui/icons";
 import { toast } from "sonner";
 import {
@@ -74,14 +74,18 @@ export function CloneCatalogDialog({
 
   const [clone, { isLoading: cloning }] = useCloneCatalogMutation();
 
-  useEffect(() => {
+  // Cleared during render rather than in an effect, so a reopened dialog never
+  // paints the previous run's selection for a frame before resetting.
+  const [seeded, setSeeded] = useState(false);
+  if (open !== seeded) {
+    setSeeded(open);
     if (open) {
       setTargetShopId("");
       setMode("full");
       setCopyPrices(true);
       setProductIds([]);
     }
-  }, [open]);
+  }
 
   // Branches you can copy INTO — every active branch except the source.
   const targets = useMemo(

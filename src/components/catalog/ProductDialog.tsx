@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Loader2, Plus, Trash2 } from "@/components/ui/icons";
 import { toast } from "sonner";
 import {
@@ -67,8 +67,13 @@ export function ProductDialog({ open, onOpenChange, shopId, product }: Props) {
   ]);
   const [flavors, setFlavors] = useState<FlavorRow[]>([]);
 
-  useEffect(() => {
-    if (open) {
+  // Seeded during render rather than in an effect so the fields are correct on
+  // first paint instead of flashing the previous product's values for a frame.
+  const seedKey = open ? (product?.id ?? "new") : null;
+  const [seeded, setSeeded] = useState<string | null>(null);
+  if (seedKey !== seeded) {
+    setSeeded(seedKey);
+    {
       setName(product?.name ?? "");
       setProductType(product?.productType ?? "cake");
       setCategoryId(product?.categoryId ?? "none");
@@ -95,7 +100,7 @@ export function ProductDialog({ open, onOpenChange, shopId, product }: Props) {
         })),
       );
     }
-  }, [open, product]);
+  }
 
   const setVariant = (i: number, patch: Partial<VariantRow>) =>
     setVariants((prev) => prev.map((v, idx) => (idx === i ? { ...v, ...patch } : v)));
