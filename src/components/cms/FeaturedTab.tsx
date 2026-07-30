@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Plus, Sparkles, Search } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -57,14 +57,11 @@ function FeaturedEditor({ shopId }: { shopId: string }) {
   const { data: occasions, isLoading } = useListOccasionsQuery();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Default-select the first occasion once loaded.
-  useEffect(() => {
-    if (!selectedId && occasions && occasions.length > 0) {
-      setSelectedId(occasions[0].id);
-    }
-  }, [occasions, selectedId]);
-
-  const selected = occasions?.find((o) => o.id === selectedId) ?? null;
+  // Default to the first occasion once loaded. Derived rather than pushed into
+  // state by an effect, so the list is never briefly rendered with nothing
+  // selected on the paint the occasions arrive.
+  const effectiveId = selectedId ?? occasions?.[0]?.id ?? null;
+  const selected = occasions?.find((o) => o.id === effectiveId) ?? null;
 
   return (
     <div className="grid gap-4 md:grid-cols-[220px_1fr]">
@@ -81,7 +78,7 @@ function FeaturedEditor({ shopId }: { shopId: string }) {
                   onClick={() => setSelectedId(o.id)}
                   className={cn(
                     "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
-                    o.id === selectedId
+                    o.id === effectiveId
                       ? "bg-primary/10 font-medium text-primary"
                       : "hover:bg-muted",
                   )}
@@ -191,10 +188,13 @@ function ProductPicker({
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  // Seed the selection from the saved assignment when it (re)loads.
-  useEffect(() => {
-    if (current) setSelected(new Set(current.productIds));
-  }, [current, occasion.id]);
+  // Seed the selection from the saved assignment when it (re)loads. Done during
+  // render so the checkboxes are right on the paint the assignment arrives.
+  const [seeded, setSeeded] = useState<typeof current>(undefined);
+  if (current && current !== seeded) {
+    setSeeded(current);
+    setSelected(new Set(current.productIds));
+  }
 
   const toggle = (id: string) =>
     setSelected((prev) => {

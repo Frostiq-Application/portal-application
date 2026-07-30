@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Facebook, Instagram, Loader2, MessageCircle, Quote } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { apiError } from "@/lib/apiError";
@@ -21,15 +21,17 @@ export function BrandTab() {
   const [facebookUrl, setFacebook] = useState("");
   const [whatsappUrl, setWhatsapp] = useState("");
 
-  useEffect(() => {
-    if (data) {
-      setTagline(data.tagline ?? "");
-      setAboutText(data.aboutText ?? "");
-      setInstagram(data.instagramUrl ?? "");
-      setFacebook(data.facebookUrl ?? "");
-      setWhatsapp(data.whatsappUrl ?? "");
-    }
-  }, [data]);
+  // Seeded during render rather than in an effect: the fields fill in on the
+  // same paint the fetched brand content arrives, not one frame later.
+  const [seeded, setSeeded] = useState<typeof data>(undefined);
+  if (data && data !== seeded) {
+    setSeeded(data);
+    setTagline(data.tagline ?? "");
+    setAboutText(data.aboutText ?? "");
+    setInstagram(data.instagramUrl ?? "");
+    setFacebook(data.facebookUrl ?? "");
+    setWhatsapp(data.whatsappUrl ?? "");
+  }
 
   const submit = async () => {
     try {
