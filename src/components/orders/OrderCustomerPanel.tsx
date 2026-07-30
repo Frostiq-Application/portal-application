@@ -4,6 +4,7 @@ import { cn, formatDate } from "@/lib/utils";
 import { ORDER_STATUS_LABEL, ORDER_STATUS_TONE } from "@/lib/orders";
 import { useGetCustomerQuery } from "@/features/api/customersApi";
 import { useEntitlements } from "@/hooks/useEntitlements";
+import { UpgradeNote } from "@/components/gating/UpgradeNote";
 import type { Order, OrderStatus } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -248,10 +249,10 @@ export function OrderCustomerPanel({ order }: { order: Order }) {
 
       {/* Lifetime value + history (plan-gated) */}
       {!canSeeHistory ? (
-        <p className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
-          Lifetime spend and past orders are part of the Customer data feature.
-          Contact your administrator to upgrade.
-        </p>
+        <UpgradeNote
+          feature="can_use_customer_data"
+          description="Lifetime spend and this customer’s past orders, right here in the order."
+        />
       ) : profileLoading ? (
         <div className="space-y-3">
           <Skeleton className="h-16 w-full" />

@@ -10,7 +10,9 @@ import {
   Clock,
   Eye,
   Inbox,
+  IndianRupee,
   Loader2,
+  MoreHorizontal,
   PackageCheck,
   Plus,
   Search,
@@ -91,6 +93,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const DELIVERY_TYPES: DeliveryType[] = ["delivery", "pickup"];
 const PAYMENT_STATUSES: OrderPaymentStatus[] = ["pending", "paid"];
@@ -190,7 +198,9 @@ function SortHead({
         type="button"
         onClick={() => onSort(sortKey)}
         className={cn(
-          "group -mx-1 inline-flex items-center gap-1 rounded px-1 py-0.5 transition-colors hover:text-foreground",
+          // Buttons don't inherit the header's text-transform, so a sortable
+          // column would otherwise sit in sentence case next to ORDER / TYPE.
+          "group -mx-1 inline-flex items-center gap-1 rounded px-1 py-0.5 uppercase tracking-wide transition-colors hover:text-foreground",
           active && "text-foreground",
         )}
       >
@@ -247,11 +257,14 @@ function DeliveryTime({ order }: { order: Order }) {
 }
 
 /**
- * Inline row action buttons: advance to the next status, decline, mark-paid.
+ * Inline row actions.
  *
- * `onFail` lets the page flash the row when a background request reverts it,
- * and `busy` reflects that the row has an in-flight action (it fades out
- * optimistically the instant the action fires).
+ * Advancing an order is what staff do all day, so that button stays visible and
+ * one click away. Mark-paid and Decline are occasional, and as plain buttons
+ * they made the actions cell wrap onto three lines once the queue grew a
+ * delivery-time column — so they live in the overflow menu instead.
+ *
+ * `onFail` lets the page flash the row when a background request reverts it.
  */
 function OrderRowActions({
   order,
@@ -303,7 +316,7 @@ function OrderRowActions({
   return (
     // Stop row-click (which opens the detail dialog) when using the buttons.
     <div
-      className="flex flex-wrap justify-end gap-2"
+      className="flex flex-nowrap items-center justify-end gap-2"
       onClick={(e) => e.stopPropagation()}
     >
       {next.map((s) => (
@@ -321,28 +334,46 @@ function OrderRowActions({
           Mark {ORDER_STATUS_LABEL[s]}
         </Button>
       ))}
-      {canPay && (
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={paying}
-          onClick={() => run(() => markPaid(order.id).unwrap(), "Marked paid")}
-        >
-          {paying && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
-          Mark paid
-        </Button>
-      )}
-      {canDecline && (
-        <Button
-          size="sm"
-          variant="ghost"
-          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-          disabled={declining}
-          onClick={() => setDeclineOpen(true)}
-        >
-          <Ban className="mr-1 h-3.5 w-3.5" />
-          Decline
-        </Button>
+      {(canPay || canDecline) && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="px-2"
+              aria-label={`More actions for ${order.orderNumber}`}
+            >
+              {paying || declining ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <MoreHorizontal className="h-4 w-4" />
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {canPay && (
+              <DropdownMenuItem
+                disabled={paying}
+                onClick={() =>
+                  run(() => markPaid(order.id).unwrap(), "Marked paid")
+                }
+              >
+                <IndianRupee className="mr-2 h-3.5 w-3.5" />
+                Mark paid
+              </DropdownMenuItem>
+            )}
+            {canDecline && (
+              <DropdownMenuItem
+                disabled={declining}
+                className="text-destructive focus:text-destructive"
+                onClick={() => setDeclineOpen(true)}
+              >
+                <Ban className="mr-2 h-3.5 w-3.5" />
+                Decline
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
 
       <AlertDialog open={declineOpen} onOpenChange={setDeclineOpen}>
@@ -663,7 +694,9 @@ export function OrdersPage() {
         </div>
       </div>
 
-      <div className="rounded-lg border bg-background">
+      {/* The row actions no longer wrap, so on a narrow screen the table
+          scrolls inside its own frame rather than the whole page shifting. */}
+      <div className="overflow-x-auto rounded-lg border bg-background">
         <Table>
           <TableHeader>
             <TableRow>
@@ -723,7 +756,9 @@ export function OrdersPage() {
                   )}
                   onClick={() => setOpenId(o.id)}
                 >
-                  <TableCell className="font-mono font-medium">
+                  {/* Nowrap: with eight columns the number otherwise breaks
+                      into three lines and doubles the row height. */}
+                  <TableCell className="whitespace-nowrap font-mono font-medium">
                     {o.orderNumber}
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
@@ -758,7 +793,7 @@ export function OrdersPage() {
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex flex-wrap items-center justify-end gap-2">
+                    <div className="flex flex-nowrap items-center justify-end gap-2">
                       <Button
                         size="sm"
                         variant="outline"
@@ -768,7 +803,7 @@ export function OrdersPage() {
                         }}
                       >
                         <Eye className="mr-1 h-3.5 w-3.5" />
-                        See Order Details
+                        Details
                       </Button>
                       <OrderRowActions order={o} onFail={flash} />
                     </div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Loader2, Plus, Search, Trash2, UserRound } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { apiError } from "@/lib/apiError";
@@ -107,9 +107,13 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
   const [couponCode, setCouponCode] = useState("");
   const [note, setNote] = useState("");
 
-  // Reset to a fresh form each time the dialog opens.
-  useEffect(() => {
-    if (open) {
+  // Reset to a fresh form each time the dialog opens. Done during render so a
+  // reopened dialog never shows the last order's lines for a frame.
+  const seedKey = open ? (defaultShopId ?? "any") : null;
+  const [seeded, setSeeded] = useState<string | null>(null);
+  if (seedKey !== seeded) {
+    setSeeded(seedKey);
+    {
       setShopId(defaultShopId ?? "");
       setCustomer(null);
       setCustomerSearch("");
@@ -123,7 +127,7 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
       setCouponCode("");
       setNote("");
     }
-  }, [open, defaultShopId]);
+  }
 
   const { data: shops } = useListShopsQuery({ page: 1, limit: 100 });
 

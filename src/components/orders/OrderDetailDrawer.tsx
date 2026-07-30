@@ -28,6 +28,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OrderCustomerPanel } from "./OrderCustomerPanel";
+import { useCan } from "@/hooks/useCan";
 
 interface Props {
   orderId: string | null;
@@ -69,8 +70,18 @@ function Thumb({
  * Right-hand drawer showing a single order in full: line items with product and
  * add-on photos, totals, the customer note, the status timeline, and the same
  * fulfilment actions as the row.
+ *
+ * Opened from the orders queue *and* from the kitchen and delivery boards, so
+ * every block is gated on the permission its API call needs. A chef sees the
+ * cake, the note and the timeline; the money and the customer are not theirs to
+ * see, and cancelling is not theirs to do — showing those buttons would only
+ * produce a 403 they can't act on.
  */
 export function OrderDetailDrawer({ orderId, onOpenChange }: Props) {
+  const { can } = useCan();
+  const showMoney = can("orders.manage");
+  const showCustomer = can("customers.view");
+  const canAdvance = can("orders.status");
   const { data: order, isLoading } = useGetOrderQuery(orderId as string, {
     skip: !orderId,
   });
@@ -142,10 +153,12 @@ export function OrderDetailDrawer({ orderId, onOpenChange }: Props) {
               {/* Order lines vs. who placed them — actions below stay visible
                   on both tabs. Keyed so opening another order resets to Order. */}
               <Tabs key={order.id} defaultValue="order">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="order">Order</TabsTrigger>
-                  <TabsTrigger value="customer">Customer</TabsTrigger>
-                </TabsList>
+                {showCustomer && (
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="order">Order</TabsTrigger>
+                    <TabsTrigger value="customer">Customer</TabsTrigger>
+                  </TabsList>
+                )}
 
                 <TabsContent value="order" className="mt-4 space-y-6">
                   {/* Items — each line carries the product photo and add-on photos. */}
@@ -163,9 +176,11 @@ export function OrderDetailDrawer({ orderId, onOpenChange }: Props) {
                               <span className="font-medium">
                                 {it.quantity}× {it.productName}
                               </span>
-                              <span className="whitespace-nowrap">
-                                ₹{Number(it.lineTotal)}
-                              </span>
+                              {showMoney && (
+                                <span className="whitespace-nowrap">
+                                  ₹{Number(it.lineTotal)}
+                                </span>
+                              )}
                             </div>
                             <p className="text-xs text-muted-foreground">
                               {it.variantLabel}
@@ -189,9 +204,11 @@ export function OrderDetailDrawer({ orderId, onOpenChange }: Props) {
                                 <span className="flex-1 text-muted-foreground">
                                   + {a.name}
                                 </span>
-                                <span className="text-muted-foreground">
-                                  ₹{Number(a.price)}
-                                </span>
+                                {showMoney && (
+                                  <span className="text-muted-foreground">
+                                    ₹{Number(a.price)}
+                                  </span>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -201,29 +218,31 @@ export function OrderDetailDrawer({ orderId, onOpenChange }: Props) {
                   </div>
 
                   {/* Totals */}
-                  <div className="space-y-1 border-t pt-4 text-sm">
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>Subtotal</span>
-                      <span>₹{Number(order.subtotal)}</span>
-                    </div>
-                    {Number(order.discountAmount) > 0 && (
-                      <div className="flex justify-between text-emerald-600">
-                        <span>Discount</span>
-                        <span>−₹{Number(order.discountAmount)}</span>
+                  {showMoney && (
+                    <div className="space-y-1 border-t pt-4 text-sm">
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>Subtotal</span>
+                        <span>₹{Number(order.subtotal)}</span>
                       </div>
-                    )}
-                    <div className="flex justify-between font-semibold">
-                      <span>Total</span>
-                      <span>₹{Number(order.totalAmount)}</span>
+                      {Number(order.discountAmount) > 0 && (
+                        <div className="flex justify-between text-emerald-600">
+                          <span>Discount</span>
+                          <span>−₹{Number(order.discountAmount)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between font-semibold">
+                        <span>Total</span>
+                        <span>₹{Number(order.totalAmount)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Payment</span>
+                        <span>
+                          {order.paymentMethod.toUpperCase()} ·{" "}
+                          {order.paymentStatus}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Payment</span>
-                      <span>
-                        {order.paymentMethod.toUpperCase()} ·{" "}
-                        {order.paymentStatus}
-                      </span>
-                    </div>
-                  </div>
+                  )}
 
                   {order.customerNote && (
                     <p className="rounded-md bg-muted p-3 text-xs">
@@ -258,26 +277,30 @@ export function OrderDetailDrawer({ orderId, onOpenChange }: Props) {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="customer" className="mt-4">
-                  <OrderCustomerPanel order={order} />
-                </TabsContent>
+                {showCustomer && (
+                  <TabsContent value="customer" className="mt-4">
+                    <OrderCustomerPanel order={order} />
+                  </TabsContent>
+                )}
               </Tabs>
 
               {/* Actions */}
               {!showCancel ? (
                 <div className="flex flex-wrap items-center gap-2 border-t pt-4">
-                  {NEXT_STATUSES[order.status].map((s) => (
-                    <Button
-                      key={s}
-                      size="lg"
-                      className="flex-1"
-                      disabled={advancing}
-                      onClick={() => advance(s)}
-                    >
-                      Mark {ORDER_STATUS_LABEL[s]}
-                    </Button>
-                  ))}
-                  {order.paymentStatus === "pending" &&
+                  {canAdvance &&
+                    NEXT_STATUSES[order.status].map((s) => (
+                      <Button
+                        key={s}
+                        size="lg"
+                        className="flex-1"
+                        disabled={advancing}
+                        onClick={() => advance(s)}
+                      >
+                        Mark {ORDER_STATUS_LABEL[s]}
+                      </Button>
+                    ))}
+                  {showMoney &&
+                    order.paymentStatus === "pending" &&
                     order.status !== "cancelled" && (
                       <Button
                         size="lg"
@@ -290,7 +313,7 @@ export function OrderDetailDrawer({ orderId, onOpenChange }: Props) {
                         Mark paid
                       </Button>
                     )}
-                  {CANCELLABLE.includes(order.status) && (
+                  {showMoney && CANCELLABLE.includes(order.status) && (
                     <Button
                       size="lg"
                       variant="ghost"
