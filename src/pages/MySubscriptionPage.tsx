@@ -176,7 +176,12 @@ export function MySubscriptionPage() {
   const [undoCancel, { isLoading: undoingCancel }] = useUndoCancelMutation();
 
   const navigate = useNavigate();
-  const [cycle, setCycle] = useState<string>("yearly");
+  // Monthly, not yearly. The plan card above this grid states the monthly
+  // price, and landing on yearly made the two disagree at a glance — a Growth
+  // trial reading "₹2,499/mo" over a card reading "₹24,990/yearly". Monthly is
+  // also the honest opening number; the longer cycles sell themselves on the
+  // months-free badges.
+  const [cycle, setCycle] = useState<string>("monthly");
 
   /** Checkout is a focused page now, not a drawer over the dashboard. */
   const goToCheckout = (planId: string, cycleCode: string) =>
