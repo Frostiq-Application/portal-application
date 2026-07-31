@@ -87,6 +87,12 @@ export interface PlanPickerProps {
   onCycleChange: (code: string) => void;
   /** The plan the account is on now — rendered as "Current plan". */
   currentPlanId?: string | null;
+  /**
+   * The current plan is only being *trialed*, not owned. A trial plan still has
+   * to be buyable — locking its card behind "Current plan" is what leaves an
+   * account on a trial of the tier it wants with no way to pay for it.
+   */
+  currentIsTrial?: boolean;
   selectedPlanId?: string | null;
   onSelect: (plan: PricingPlan) => void;
   ctaLabel?: (plan: PricingPlan, isCurrent: boolean) => string;
@@ -118,6 +124,7 @@ export function PlanPicker({
   cycle,
   onCycleChange,
   currentPlanId,
+  currentIsTrial = false,
   selectedPlanId,
   onSelect,
   ctaLabel,
@@ -177,6 +184,9 @@ export function PlanPicker({
         {plans.map((plan) => {
           const price = plan.cyclePrices.find((p) => p.code === cycle);
           const isCurrent = plan.id === currentPlanId;
+          /** Owned, so there is nothing to buy. A trialed plan is not owned. */
+          const settledOnThis = isCurrent && !currentIsTrial;
+          const trialingThis = isCurrent && currentIsTrial;
           const isSelected = plan.id === selectedPlanId;
           // Two tiers carry a badge now and they say different things. Only the
           // popular one takes the inverted card — two dark cards side by side
@@ -289,6 +299,14 @@ export function PlanPicker({
                     Free for {trialDays} days, no card
                   </p>
                 )}
+                {/* The card still has to sell: what the trial says here is
+                    which plan is running, not that it's been bought. */}
+                {trialingThis && (
+                  <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                    <Gift className="size-3.5" />
+                    You're trialing this now
+                  </p>
+                )}
               </div>
 
               <ul
@@ -376,11 +394,17 @@ export function PlanPicker({
                   featured &&
                     "bg-background text-foreground hover:bg-background/90",
                 )}
-                variant={isCurrent ? "outline" : isSelected ? "default" : "secondary"}
-                disabled={isCurrent}
+                variant={
+                  settledOnThis
+                    ? "outline"
+                    : isSelected || trialingThis
+                      ? "default"
+                      : "secondary"
+                }
+                disabled={settledOnThis}
                 onClick={() => onSelect(plan)}
               >
-                {isCurrent
+                {settledOnThis
                   ? "Current plan"
                   : (ctaLabel?.(plan, isCurrent) ?? "Choose plan")}
               </Button>
