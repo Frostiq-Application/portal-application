@@ -286,20 +286,56 @@ export function CheckoutPage() {
   // A bad code is reported on the quote rather than failing it, so the preview
   // keeps working while the message explains what's wrong.
   //
-  // Dropping the code happens during render so the next quote request already
-  // omits it; announcing it stays an effect, because a toast fired mid-render
-  // would run again on every replayed render.
+  // The rejection is *copied into state* rather than announced straight off
+  // `quote.couponError`, and that's load-bearing. Dropping the code during
+  // render makes React throw the render away and start again before it ever
+  // commits — so an effect keyed on `couponError` never sees the error at all:
+  // by the time a render survives, the code is gone, the quote request no
+  // longer carries it, and the value is back to undefined. That's how "This
+  // coupon has expired." went missing. A rejection held in state outlives the
+  // discarded render, and a fresh object each time re-fires the toast even when
+  // the same code is entered twice.
   const couponError = quote?.couponError;
-  const [rejectedCode, setRejectedCode] = useState<string | undefined>(
-    undefined,
-  );
-  if (couponError && appliedCoupon && appliedCoupon !== rejectedCode) {
-    setRejectedCode(appliedCoupon);
+  const [rejected, setRejected] = useState<
+    { code: string; message: string } | undefined
+  >(undefined);
+  if (couponError && appliedCoupon && appliedCoupon !== rejected?.code) {
+    setRejected({ code: appliedCoupon, message: couponError });
     setAppliedCoupon(undefined);
   }
   useEffect(() => {
-    if (couponError) toast.error(couponError);
-  }, [couponError]);
+    if (rejected) toast.error(rejected.message);
+  }, [rejected]);
+
+  /**
+   * Every apply is a fresh attempt, so the "already rejected this one" guard
+   * resets with it.
+   *
+   * Without the reset a code rejected once stayed rejected for the life of the
+   * page: entering it again — the first thing anyone does after a coupon
+   * bounces — left `appliedCoupon === rejected.code`, which skipped the clear
+   * above and parked the page in a contradiction. A green "DIWALI applied"
+   * chip, an error toast saying it doesn't apply, and a total with no discount
+   * in it. Same trap on the way back to a cycle the code doesn't cover.
+   */
+  const applyCoupon = (code: string) => {
+    setRejected(undefined);
+    setAppliedCoupon(code);
+  };
+
+  /**
+   * Whether the server has actually honoured the applied code — it echoes the
+   * coupon back on the quote, and `null` once it has rejected one.
+   *
+   * The chip reads this rather than `appliedCoupon`, because entering a code is
+   * a request, not a result. Rendering the green "applied" state off local
+   * intent flashed a success for the length of the quote round-trip and then
+   * yanked it back on a bad code, which reads as a bug even though the end
+   * state is right.
+   */
+  const couponConfirmed =
+    !!appliedCoupon &&
+    quote?.couponCode?.toUpperCase() === appliedCoupon.toUpperCase();
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -790,16 +826,40 @@ export function CheckoutPage() {
             </h2>
 
             {appliedCoupon ? (
-              <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
-                <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                  <CheckCircle2 className="size-4 shrink-0" />
+              <div
+                className={cn(
+                  "flex items-center justify-between gap-2 rounded-lg border px-3 py-2",
+                  couponConfirmed
+                    ? "border-emerald-500/30 bg-emerald-500/10"
+                    : "bg-muted/40",
+                )}
+              >
+                <span
+                  className={cn(
+                    "flex min-w-0 items-center gap-2 text-sm font-medium",
+                    couponConfirmed
+                      ? "text-emerald-700 dark:text-emerald-400"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {couponConfirmed ? (
+                    <CheckCircle2 className="size-4 shrink-0" />
+                  ) : (
+                    <Loader2 className="size-4 shrink-0 animate-spin" />
+                  )}
                   <span className="truncate">
-                    {appliedCoupon} applied
-                    {quote && Number(quote.discountAmount) > 0 && (
-                      <span className="font-normal">
-                        {" "}
-                        — saving {inr(quote.discountAmount)}
-                      </span>
+                    {couponConfirmed ? (
+                      <>
+                        {appliedCoupon} applied
+                        {Number(quote?.discountAmount ?? 0) > 0 && (
+                          <span className="font-normal">
+                            {" "}
+                            — saving {inr(quote!.discountAmount)}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <>Checking {appliedCoupon}…</>
                     )}
                   </span>
                 </span>
@@ -827,14 +887,14 @@ export function CheckoutPage() {
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && couponInput.trim()) {
                         e.preventDefault();
-                        setAppliedCoupon(couponInput.trim());
+                        applyCoupon(couponInput.trim());
                       }
                     }}
                   />
                   <Button
                     variant="secondary"
                     disabled={!couponInput.trim()}
-                    onClick={() => setAppliedCoupon(couponInput.trim())}
+                    onClick={() => applyCoupon(couponInput.trim())}
                   >
                     Apply
                   </Button>
@@ -849,7 +909,7 @@ export function CheckoutPage() {
                       <button
                         key={c.code}
                         type="button"
-                        onClick={() => setAppliedCoupon(c.code)}
+                        onClick={() => applyCoupon(c.code)}
                         className="flex w-full items-center justify-between gap-2 rounded-lg border border-dashed px-3 py-2 text-left transition-colors hover:border-primary hover:bg-primary/5"
                       >
                         <span className="min-w-0">
@@ -967,10 +1027,12 @@ export function CheckoutPage() {
                 icon={<CreditCard className="size-4" />}
                 onEdit={() => setStep(2)}
               >
+                {/* Confirmed, not requested — the review step states what is
+                    actually being charged. */}
                 <ReviewRow
                   label="Coupon"
-                  value={appliedCoupon || "None applied"}
-                  muted={!appliedCoupon}
+                  value={couponConfirmed ? appliedCoupon! : "None applied"}
+                  muted={!couponConfirmed}
                 />
                 <ReviewRow
                   label="Autopay"
