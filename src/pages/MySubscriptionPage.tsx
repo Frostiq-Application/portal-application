@@ -10,6 +10,7 @@ import {
   Receipt,
   Sparkles,
   TrendingUp,
+  Zap,
 } from "@/components/ui/icons";
 import {
   useMyPaymentsQuery,
@@ -474,13 +475,27 @@ export function MySubscriptionPage() {
             </dl>
 
             <div className="flex flex-wrap gap-2 pt-1">
+              {/* Buying the plan you're already trialing is the single most
+                  likely thing to want from this screen, and it used to be
+                  reachable only through a banner that another banner could
+                  outrank. It gets its own button. */}
+              {isTrial && (
+                <Button
+                  size="sm"
+                  onClick={() => goToCheckout(sub.planId, sub.billingCycle)}
+                >
+                  <Zap className="size-4" />
+                  Activate {sub.planName}
+                </Button>
+              )}
               <Button
                 size="sm"
+                variant={isTrial ? "outline" : "default"}
                 onClick={() => setTab("plans")}
                 disabled={plans.length < 2}
               >
                 <TrendingUp className="size-4" />
-                Change plan
+                {isTrial ? "See other plans" : "Change plan"}
               </Button>
               <Button
                 variant="outline"
