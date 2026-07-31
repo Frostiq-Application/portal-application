@@ -155,6 +155,12 @@ export const billingApi = baseApi.injectEndpoints({
       { planId: string; billingCycle: string }
     >({
       query: (params) => ({ url: "/billing/change/preview", params }),
+      // A quote is a statement about the account *right now* — days left in the
+      // period, current usage against the target plan's limits, the amount
+      // being asked for. Serving a cached one is showing someone a price that
+      // may no longer be theirs, so this result is dropped the moment the sheet
+      // closes and re-fetched every time it opens.
+      keepUnusedDataFor: 0,
     }),
 
     upgradePlan: build.mutation<
