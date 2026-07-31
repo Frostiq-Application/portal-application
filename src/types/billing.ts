@@ -345,7 +345,13 @@ export interface OverLimitRow {
 
 /** Preview of a plan change — immediate + prorated, or scheduled to renewal. */
 export interface ChangePreview {
-  mode: "immediate" | "scheduled";
+  /**
+   * `immediate` — prorated upgrade, charged now.
+   * `scheduled` — downgrade or cycle change, applied at renewal.
+   * `checkout` — first purchase (trial or ₹0 account): the full cycle, bought
+   * through checkout. Nothing to prorate and nothing to schedule against.
+   */
+  mode: "immediate" | "scheduled" | "checkout";
   upgrade: boolean;
   quote: Quote;
   prorationAmount: string;
@@ -354,6 +360,24 @@ export interface ChangePreview {
   overLimit: OverLimitRow[];
   effectiveAt: string;
   addonOptions?: AddonOption[];
+  /** `checkout` only — whether the account is coming off a trial. */
+  trial?: boolean;
+  trialEndsAt?: string | null;
+  /**
+   * `immediate` only — the figures the prorated charge was worked out from, so
+   * the drawer can show its working. Server-computed: re-deriving the formula in
+   * the UI is a second implementation that can disagree with what is charged.
+   */
+  basis?: {
+    currentPlanName: string;
+    currentCycleName: string;
+    currentCyclePrice: string;
+    newCyclePrice: string;
+    /** Cycles of different lengths are compared per day, not as a difference. */
+    perDay: boolean;
+    currentPerDay: string;
+    newPerDay: string;
+  };
 }
 
 export interface ArchivableItem {
