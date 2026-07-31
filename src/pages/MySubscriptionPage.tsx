@@ -881,7 +881,11 @@ export function MySubscriptionPage() {
         onOpenChange={setAddonsOpen}
         addons={data?.addons ?? []}
         renewalDate={sub.currentPeriodEnd}
-        isTrial={isOnFreePlan}
+        // The notice this drives says "not during the trial" — which is what
+        // the server enforces (`purchaseAddon` refuses TRIAL). It was being fed
+        // the ₹0-plan flag instead, so trial accounts never saw it and Free
+        // accounts saw a trial they weren't on.
+        isTrial={isTrial}
         onDone={() => refetch()}
       />
       <CancelDialog
