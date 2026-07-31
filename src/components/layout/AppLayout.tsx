@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Crown,
   LogOut,
@@ -230,7 +230,8 @@ function Brand({
 export function AppLayout() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const location = useLocation();
+  const { user, role } = useAuth();
   const {
     isExempt,
     isLoading,
@@ -271,18 +272,33 @@ export function AppLayout() {
     if (isAccountDeactivated) {
       return <AccountDeactivatedGate support={entitlements?.support} />;
     }
-    // Subscription has expired — a hard lockout the brand can't self-serve
-    // (only the platform admin records payments). Same gate, expiry message.
-    if (isSubscriptionExpired) {
+
+    // Every gate below hands the owner a button to fix the lockout, and that
+    // button points at `/my-subscription` — which lives *inside* this gate. So
+    // it navigated, the route matched, and the very same gate rendered again:
+    // the URL changed and the screen did not, which reads as a dead button.
+    //
+    // Checkout already sits outside AppLayout for exactly this reason (see
+    // App.tsx). This is the same escape hatch for the page that leads to it,
+    // rendered bare — the shell it would normally sit in is the thing being
+    // locked. Owners only: nobody else can buy anything.
+    if (role === "account_super_admin" && location.pathname.startsWith("/my-subscription")) {
       return (
-        <AccountDeactivatedGate
-          support={entitlements?.support}
-          reason="expired"
-        />
+        <div className="min-h-screen bg-muted/30 px-4 py-8">
+          <div className="mx-auto max-w-5xl">
+            <Outlet />
+          </div>
+        </div>
       );
     }
-    // Account is active but has no usable subscription — let them pick a plan.
-    if (!hasActiveSubscription) {
+    // A locked or cancelled subscription is no longer a hard lockout. That
+    // routing predates self-serve billing — back then only a platform admin
+    // could record a payment, so "contact the super admin" was the only honest
+    // advice. Now the owner can restore it themselves in a minute, and
+    // `NoSubscriptionGate` is the screen that says so (and still shows support
+    // contacts to everyone who can't buy). `AccountDeactivatedGate` keeps its
+    // real job: an account suspended or rejected by us, which no payment fixes.
+    if (isSubscriptionExpired || !hasActiveSubscription) {
       return <NoSubscriptionGate support={entitlements?.support} />;
     }
   }
