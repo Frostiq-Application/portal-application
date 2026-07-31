@@ -15,11 +15,19 @@ import type {
   SubscriptionEvent,
 } from "@/types/billing";
 
-/** Anything that changes the subscription invalidates the whole picture. */
+/**
+ * Anything that changes the subscription invalidates the whole picture —
+ * *every* part of it, including the two tabs sitting next to the one being
+ * looked at. Billing history and Activity were left out, so a payment that
+ * updated the plan card left its own receipt and its own event missing from the
+ * same screen until a hard reload.
+ */
 const SUB_TAGS = [
   { type: "Subscription" as const, id: "ME" },
   { type: "Subscription" as const, id: "ADDONS" },
   { type: "Subscription" as const, id: "PAYMENTS" },
+  { type: "Subscription" as const, id: "INVOICES" },
+  { type: "Subscription" as const, id: "TIMELINE" },
   { type: "Entitlements" as const, id: "ME" },
 ];
 
