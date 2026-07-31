@@ -137,6 +137,137 @@ function KeepPicker({
   );
 }
 
+/**
+ * How the prorated figure was arrived at.
+ *
+ * A single line reading "Upgrade to Growth Plus — 31 of 31 days remaining
+ * ₹1,500.00" is a number the customer has no way to check. It leaves out both
+ * halves of the sum: what they are already paying, and that the difference is
+ * being scaled by the days they have left. Showing the working is what makes a
+ * mid-cycle charge feel like arithmetic rather than a figure we picked.
+ *
+ * Every number here comes from the server's own proration, never recomputed —
+ * a second implementation of the formula is one that can disagree with the
+ * amount on the button.
+ */
+function ProrationWorking({
+  basis,
+  newPlanName,
+  newCycleName,
+  daysRemaining,
+  daysInCycle,
+  prorationAmount,
+}: {
+  basis: NonNullable<ChangePreview["basis"]>;
+  newPlanName: string;
+  newCycleName: string;
+  daysRemaining: number;
+  daysInCycle: number;
+  prorationAmount: string;
+}) {
+  const current = `${basis.currentPlanName} · ${basis.currentCycleName} — you already pay`;
+  const full = daysRemaining >= daysInCycle;
+
+  return (
+    <section className="space-y-2 rounded-xl border border-dashed p-4">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        How this is worked out
+      </h3>
+
+      {basis.perDay ? (
+        // A longer cycle buys a different amount of time, so the two totals
+        // can't simply be subtracted — one is a year and the other a month.
+        // Per day is the only comparison that means anything here, and it's the
+        // one the charge is actually computed from.
+        <>
+          <Row
+            label={`${newPlanName} · ${newCycleName}`}
+            value={`${inr(basis.newCyclePrice)} · ${inr(basis.newPerDay)}/day`}
+          />
+          <Row
+            label={current}
+            value={`${inr(basis.currentCyclePrice)} · ${inr(basis.currentPerDay)}/day`}
+          />
+          <Separator className="my-1" />
+          <Row
+            label="Difference per day"
+            value={`${inr(basis.newPerDay)} − ${inr(basis.currentPerDay)}`}
+            muted
+          />
+          <Row
+            label={`× ${daysRemaining} day${daysRemaining === 1 ? "" : "s"} left in this period`}
+            value={inr(prorationAmount)}
+            strong
+          />
+        </>
+      ) : (
+        <>
+          <Row
+            label={`${newPlanName} · ${newCycleName}`}
+            value={inr(basis.newCyclePrice)}
+          />
+          <Row label={current} value={`− ${inr(basis.currentCyclePrice)}`} />
+          <Separator className="my-1" />
+          <Row
+            label="Difference for a full period"
+            value={inr(
+              Number(basis.newCyclePrice) - Number(basis.currentCyclePrice),
+            )}
+            muted
+          />
+          <Row
+            label={
+              full
+                ? `For all ${daysInCycle} days left in this period`
+                : `For ${daysRemaining} of ${daysInCycle} days left in this period`
+            }
+            value={inr(prorationAmount)}
+            strong
+          />
+        </>
+      )}
+
+      <p className="pt-1 text-xs text-muted-foreground">
+        Your renewal date doesn't move — this covers only the days left in the
+        period you've already paid for. After that you're billed{" "}
+        {inr(basis.newCyclePrice)} each {newCycleName.toLowerCase()} cycle.
+      </p>
+    </section>
+  );
+}
+
+function Row({
+  label,
+  value,
+  muted,
+  strong,
+}: {
+  label: string;
+  value: string;
+  muted?: boolean;
+  strong?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 text-sm">
+      <span
+        className={cn(
+          "min-w-0",
+          muted || !strong ? "text-muted-foreground" : "font-medium",
+        )}
+      >
+        {label}
+      </span>
+      <span
+        className={cn(
+          "shrink-0 tabular-nums",
+          strong ? "font-semibold" : "text-muted-foreground",
+        )}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
 
 /**
  * Plan changes (SH-13/14/15).
@@ -490,6 +621,17 @@ export function ChangePlanSheet({
               )}
 
               <Separator />
+
+              {immediate && view.basis && plan && (
+                <ProrationWorking
+                  basis={view.basis}
+                  newPlanName={plan.name}
+                  newCycleName={cycle?.name ?? view.basis.currentCycleName}
+                  daysRemaining={view.daysRemaining ?? 0}
+                  daysInCycle={view.daysInCycle ?? 0}
+                  prorationAmount={view.prorationAmount}
+                />
+              )}
 
               {immediate ? (
                 <QuoteSummary quote={view.quote} title="Prorated charge now" />
