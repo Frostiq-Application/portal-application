@@ -23,12 +23,15 @@ export function PlanComparison({
   plans,
   cycle,
   currentPlanId,
+  currentIsTrial = false,
   onChoose,
   defaultOpen = false,
 }: {
   plans: PricingPlan[];
   cycle: CycleOption | null;
   currentPlanId?: string | null;
+  /** The current plan is only being trialed — it can still be bought. */
+  currentIsTrial?: boolean;
   onChoose?: (plan: PricingPlan) => void;
   defaultOpen?: boolean;
 }) {
@@ -110,19 +113,26 @@ export function PlanComparison({
                         <span className="text-lg font-bold tabular-nums">
                           {inrShort(price?.price ?? p.priceMonthly)}
                         </span>
-                        {isCurrent ? (
+                        {isCurrent && !currentIsTrial ? (
                           <Badge variant="outline" className="text-[10px]">
                             Current
                           </Badge>
                         ) : onChoose ? (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            className="mt-1 h-7 text-xs"
-                            onClick={() => onChoose(p)}
-                          >
-                            Choose
-                          </Button>
+                          <>
+                            {isCurrent && (
+                              <Badge variant="outline" className="text-[10px]">
+                                Trialing
+                              </Badge>
+                            )}
+                            <Button
+                              size="sm"
+                              variant={isCurrent ? "default" : "secondary"}
+                              className="mt-1 h-7 text-xs"
+                              onClick={() => onChoose(p)}
+                            >
+                              {isCurrent ? "Activate" : "Choose"}
+                            </Button>
+                          </>
                         ) : null}
                       </div>
                     </th>
