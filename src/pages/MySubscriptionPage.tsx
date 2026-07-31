@@ -600,13 +600,24 @@ export function MySubscriptionPage() {
               currentPlanId={
                 sub.billingCycle === activeCycle.code ? sub.planId : null
               }
+              // A trial is a plan you're using, not one you've bought — the
+              // card has to stay buyable or the tier being trialed is the one
+              // tier you can't pay for.
+              currentIsTrial={isTrial}
               showEnterprise
-              ctaLabel={(p) =>
+              ctaLabel={(p, isCurrent) =>
                 Number(p.priceMonthly) === 0
                   ? "Switch to Free"
-                  : Number(p.priceMonthly) > Number(sub.lockedMonthlyPrice)
-                    ? "Upgrade"
-                    : "Switch plan"
+                  : // On a trial nothing is being switched *from* — no money
+                    // has been taken yet, so every paid plan is simply a
+                    // choice, not an upgrade or a downgrade.
+                    isTrial
+                    ? isCurrent
+                      ? "Activate this plan"
+                      : "Choose this plan"
+                    : Number(p.priceMonthly) > Number(sub.lockedMonthlyPrice)
+                      ? "Upgrade"
+                      : "Switch plan"
               }
               onSelect={(p) =>
                 // Free ↔ free is instant and costless; anything paid goes
@@ -623,6 +634,7 @@ export function MySubscriptionPage() {
               plans={plans}
               cycle={activeCycle}
               currentPlanId={sub.planId}
+              currentIsTrial={isTrial}
               onChoose={(p) =>
                 Number(p.priceMonthly) === 0 && isOnFreePlan
                   ? handleFreeSwitch(p)
