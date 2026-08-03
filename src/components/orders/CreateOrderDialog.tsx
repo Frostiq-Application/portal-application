@@ -1,6 +1,20 @@
 import { useMemo, useState } from "react";
-import { Loader2, Plus, Search, Trash2, UserRound } from "@/components/ui/icons";
+import {
+  CalendarClock,
+  CreditCard,
+  Loader2,
+  Minus,
+  Plus,
+  Search,
+  ShoppingBag,
+  Store,
+  StickyNote,
+  Trash2,
+  UserRound,
+} from "@/components/ui/icons";
+import type { IconComponent } from "@/components/ui/icons";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { apiError } from "@/lib/apiError";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
@@ -18,8 +32,8 @@ import type {
   Product,
 } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -219,10 +233,18 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
     }
   };
 
+  const removeLine = (key: number) =>
+    setLines((prev) => prev.filter((l) => l.key !== key));
+
+  const readyLines = lines.filter((l) => l.productId && l.variantId);
+  const itemCount = readyLines.reduce((n, l) => n + l.quantity, 0);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
+      {/* Header and action bar are pinned; only the middle scrolls, so the
+          Create button stays reachable however long the item list gets. */}
+      <DialogContent className="flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0 pb-0 sm:max-w-4xl">
+        <DialogHeader className="shrink-0 border-b px-5 py-4 pr-12 sm:px-6">
           <DialogTitle>Create order</DialogTitle>
           <DialogDescription>
             Enter a phone or walk-in order for a customer. Prices come from the
@@ -230,393 +252,592 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5">
-          {/* Branch */}
-          <div className="space-y-2">
-            <Label>Branch</Label>
-            <Select value={shopId} onValueChange={setShopId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select branch" />
-              </SelectTrigger>
-              <SelectContent>
-                {(shops?.data ?? []).map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.branchName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Customer */}
-          <div className="space-y-2">
-            <Label>Customer</Label>
-            {customer ? (
-              <div className="flex items-center justify-between rounded-md border px-3 py-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <UserRound className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">
-                    {customer.name ?? "Unnamed customer"}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {customer.phone ?? customer.email ?? ""}
-                  </span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setCustomer(null);
-                    setAddressId("");
-                  }}
-                >
-                  Change
-                </Button>
-              </div>
-            ) : (
-              <>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    className="pl-9"
-                    placeholder="Search by name, phone or email…"
-                    value={customerSearch}
-                    onChange={(e) => setCustomerSearch(e.target.value)}
-                  />
-                </div>
-                <div className="max-h-44 overflow-y-auto rounded-md border">
-                  {searching ? (
-                    <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" /> Searching…
-                    </div>
-                  ) : (customerResults?.data ?? []).length === 0 ? (
-                    <div className="p-3 text-sm text-muted-foreground">
-                      No customers found.
-                    </div>
-                  ) : (
-                    (customerResults?.data ?? []).map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-accent"
-                        onClick={() => setCustomer(c)}
-                      >
-                        <span className="font-medium">
-                          {c.name ?? "Unnamed customer"}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {c.phone ?? c.email ?? ""}
-                        </span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Items */}
-          <div className="space-y-3">
-            <Label>Items</Label>
-            {!shopId ? (
-              <p className="text-sm text-muted-foreground">
-                Select a branch to load its catalog.
-              </p>
-            ) : (
-              lines.map((line) => {
-                const product = productById.get(line.productId);
-                const total = linePrice(line, product, addonPrice);
-                return (
-                  <div key={line.key} className="space-y-2 rounded-md border p-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Select
-                        value={line.productId}
-                        onValueChange={(v) => {
-                          const p = productById.get(v);
-                          updateLine(line.key, {
-                            productId: v,
-                            variantId:
-                              p?.variants.find((x) => x.isDefault)?.id ??
-                              p?.variants[0]?.id ??
-                              "",
-                            flavorOptionId: "",
-                          });
-                        }}
-                      >
-                        <SelectTrigger className="w-56 flex-1">
-                          <SelectValue placeholder="Product" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {products.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {product && (
-                        <Select
-                          value={line.variantId}
-                          onValueChange={(v) => updateLine(line.key, { variantId: v })}
-                        >
-                          <SelectTrigger className="w-40">
-                            <SelectValue placeholder="Variant" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {product.variants.map((v) => (
-                              <SelectItem key={v.id} value={v.id}>
-                                {v.label} · ₹{Number(v.price)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                      {product && product.flavorOptions.length > 0 && (
-                        <Select
-                          value={line.flavorOptionId || "none"}
-                          onValueChange={(v) =>
-                            updateLine(line.key, {
-                              flavorOptionId: v === "none" ? "" : v,
-                            })
-                          }
-                        >
-                          <SelectTrigger className="w-40">
-                            <SelectValue placeholder="Flavour" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">No flavour</SelectItem>
-                            {product.flavorOptions.map((f) => (
-                              <SelectItem key={f.id} value={f.id}>
-                                {f.flavorName}
-                                {Number(f.priceDelta) !== 0 &&
-                                  ` (+₹${Number(f.priceDelta)})`}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                      <Input
-                        type="number"
-                        min={1}
-                        max={99}
-                        className="w-20"
-                        value={line.quantity}
-                        onChange={(e) =>
-                          updateLine(line.key, {
-                            quantity: Math.max(1, Number(e.target.value) || 1),
-                          })
-                        }
-                      />
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive"
-                        disabled={lines.length === 1}
-                        onClick={() =>
-                          setLines((prev) => prev.filter((l) => l.key !== line.key))
-                        }
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {product && addons.length > 0 && (
-                      <div className="flex flex-wrap gap-x-4 gap-y-1">
-                        {addons.map((a) => (
-                          <label
-                            key={a.id}
-                            className="flex items-center gap-1.5 text-xs"
-                          >
-                            <Checkbox
-                              checked={line.addonIds.includes(a.id)}
-                              onCheckedChange={(checked) =>
-                                updateLine(line.key, {
-                                  addonIds: checked
-                                    ? [...line.addonIds, a.id]
-                                    : line.addonIds.filter((id) => id !== a.id),
-                                })
-                              }
-                            />
-                            {a.name} (+₹{Number(a.price)})
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                    {total > 0 && (
-                      <p className="text-right text-xs text-muted-foreground">
-                        Line total: ₹{total.toFixed(2)}
-                      </p>
-                    )}
-                  </div>
-                );
-              })
-            )}
-            {shopId && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setLines((prev) => [...prev, emptyLine()])}
-              >
-                <Plus className="mr-1 h-3.5 w-3.5" />
-                Add item
-              </Button>
-            )}
-          </div>
-
-          {/* Fulfilment */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Fulfilment</Label>
-              <Select
-                value={deliveryType}
-                onValueChange={(v) => {
-                  setDeliveryType(v as DeliveryType);
-                  setSlot("none");
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pickup">Pickup</SelectItem>
-                  <SelectItem value="delivery">Delivery</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {deliveryType === "delivery" && (
-              <div className="space-y-2">
-                <Label>Delivery address</Label>
-                <Select value={addressId} onValueChange={setAddressId}>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
+            {/* ---- what they're buying ------------------------------------ */}
+            <div className="space-y-6">
+              <Section icon={Store} title="Branch">
+                <Select value={shopId} onValueChange={setShopId}>
                   <SelectTrigger>
-                    <SelectValue
-                      placeholder={
-                        customer ? "Select address" : "Choose a customer first"
-                      }
-                    />
+                    <SelectValue placeholder="Select branch" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(customerDetail?.addresses ?? []).map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.label ? `${a.label} — ` : ""}
-                        {a.fullAddress}
+                    {(shops?.data ?? []).map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.branchName}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {customer && (customerDetail?.addresses ?? []).length === 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    This customer has no saved addresses — choose Pickup, or ask
-                    them to add one.
-                  </p>
-                )}
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label>Date</Label>
-              <Input
-                type="date"
-                value={scheduledDate}
-                onChange={(e) => {
-                  setScheduledDate(e.target.value);
-                  setSlot("none");
-                }}
-              />
-              {slotsData && !slotsData.open && (
-                <p className="text-xs text-amber-600">
-                  {slotsData.closedReason ?? "The branch is closed on this date"}
-                  {" — you can still create the order."}
-                </p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label>Time slot (optional)</Label>
-              <Select value={slot} onValueChange={setSlot}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Any time</SelectItem>
-                  {(slotsData?.slots ?? []).map((s) => (
-                    <SelectItem
-                      key={s.start}
-                      value={`${s.start}|${s.end}`}
-                      disabled={!s.available}
+              </Section>
+
+              <Section icon={UserRound} title="Customer">
+                {customer ? (
+                  <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2.5">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold uppercase text-primary">
+                        {(customer.name ?? "?").slice(0, 2)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {customer.name ?? "Unnamed customer"}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {customer.phone ?? customer.email ?? "No contact"}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() => {
+                        setCustomer(null);
+                        setAddressId("");
+                      }}
                     >
-                      {s.start.slice(0, 5)} – {s.end.slice(0, 5)}
-                      {!s.available
-                        ? " (full)"
-                        : s.remaining != null
-                          ? ` (${s.remaining} left)`
-                          : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+                      Change
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        className="pl-9"
+                        placeholder="Search by name, phone or email…"
+                        value={customerSearch}
+                        onChange={(e) => setCustomerSearch(e.target.value)}
+                      />
+                    </div>
+                    <div className="max-h-44 divide-y overflow-y-auto rounded-lg border">
+                      {searching ? (
+                        <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
+                          <Loader2 className="size-4 animate-spin" /> Searching…
+                        </div>
+                      ) : (customerResults?.data ?? []).length === 0 ? (
+                        <div className="p-3 text-sm text-muted-foreground">
+                          No customers found.
+                        </div>
+                      ) : (
+                        (customerResults?.data ?? []).map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
+                            onClick={() => setCustomer(c)}
+                          >
+                            <span className="truncate font-medium">
+                              {c.name ?? "Unnamed customer"}
+                            </span>
+                            <span className="shrink-0 text-xs text-muted-foreground">
+                              {c.phone ?? c.email ?? ""}
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </Section>
 
-          {/* Payment & extras */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Payment method</Label>
-              <Select
-                value={paymentMethod}
-                onValueChange={(v) => setPaymentMethod(v as OrderPaymentMethod)}
+              <Section
+                icon={ShoppingBag}
+                title="Items"
+                action={
+                  shopId && lines.length > 0 ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLines((prev) => [...prev, emptyLine()])}
+                    >
+                      <Plus className="mr-1 size-3.5" />
+                      Add item
+                    </Button>
+                  ) : null
+                }
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(PAYMENT_LABEL) as OrderPaymentMethod[]).map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {PAYMENT_LABEL[p]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                {!shopId ? (
+                  <EmptyItems message="Select a branch to load its catalog." />
+                ) : lines.length === 0 ? (
+                  <EmptyItems
+                    message="No items on this order yet."
+                    onAdd={() => setLines([emptyLine()])}
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {lines.map((line) => (
+                      <LineCard
+                        key={line.key}
+                        line={line}
+                        product={productById.get(line.productId)}
+                        products={products}
+                        addons={addons}
+                        total={linePrice(
+                          line,
+                          productById.get(line.productId),
+                          addonPrice,
+                        )}
+                        onChange={(patch) => updateLine(line.key, patch)}
+                        onRemove={() => removeLine(line.key)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </Section>
             </div>
-            <div className="space-y-2">
-              <Label>Coupon code (optional)</Label>
-              <Input
-                placeholder="e.g. FLAT100"
-                value={couponCode}
-                onChange={(e) => setCouponCode(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch checked={markAsPaid} onCheckedChange={setMarkAsPaid} />
-            <Label className="font-normal">Already paid</Label>
-          </div>
 
-          <div className="space-y-2">
-            <Label>Note (optional)</Label>
-            <Textarea
-              rows={2}
-              placeholder="e.g. Phone order — write “Happy Birthday Riya” on the cake."
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-            />
+            {/* ---- when, how and how they pay ---------------------------- */}
+            <aside className="space-y-6">
+              <Section icon={CalendarClock} title="Fulfilment">
+                <div className="space-y-3">
+                  <Field label="Type">
+                    <Select
+                      value={deliveryType}
+                      onValueChange={(v) => {
+                        setDeliveryType(v as DeliveryType);
+                        setSlot("none");
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pickup">Pickup</SelectItem>
+                        <SelectItem value="delivery">Delivery</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+
+                  {deliveryType === "delivery" && (
+                    <Field label="Delivery address">
+                      <Select value={addressId} onValueChange={setAddressId}>
+                        <SelectTrigger>
+                          <SelectValue
+                            placeholder={
+                              customer
+                                ? "Select address"
+                                : "Choose a customer first"
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(customerDetail?.addresses ?? []).map((a) => (
+                            <SelectItem key={a.id} value={a.id}>
+                              {a.label ? `${a.label} — ` : ""}
+                              {a.fullAddress}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {customer &&
+                        (customerDetail?.addresses ?? []).length === 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            This customer has no saved addresses — choose
+                            Pickup, or ask them to add one.
+                          </p>
+                        )}
+                    </Field>
+                  )}
+
+                  <Field label="Date">
+                    <DatePicker
+                      className="w-full"
+                      value={scheduledDate}
+                      onChange={(v) => {
+                        setScheduledDate(v);
+                        setSlot("none");
+                      }}
+                    />
+                    {slotsData && !slotsData.open && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        {slotsData.closedReason ??
+                          "The branch is closed on this date"}
+                        {" — you can still create the order."}
+                      </p>
+                    )}
+                  </Field>
+
+                  <Field label="Time slot" hint="Optional">
+                    <Select value={slot} onValueChange={setSlot}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Any time</SelectItem>
+                        {(slotsData?.slots ?? []).map((s) => (
+                          <SelectItem
+                            key={s.start}
+                            value={`${s.start}|${s.end}`}
+                            disabled={!s.available}
+                          >
+                            {s.start.slice(0, 5)} – {s.end.slice(0, 5)}
+                            {!s.available
+                              ? " (full)"
+                              : s.remaining != null
+                                ? ` (${s.remaining} left)`
+                                : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </div>
+              </Section>
+
+              <Section icon={CreditCard} title="Payment">
+                <div className="space-y-3">
+                  <Field label="Method">
+                    <Select
+                      value={paymentMethod}
+                      onValueChange={(v) =>
+                        setPaymentMethod(v as OrderPaymentMethod)
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(Object.keys(PAYMENT_LABEL) as OrderPaymentMethod[]).map(
+                          (p) => (
+                            <SelectItem key={p} value={p}>
+                              {PAYMENT_LABEL[p]}
+                            </SelectItem>
+                          ),
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+
+                  <Field label="Coupon code" hint="Optional">
+                    <Input
+                      placeholder="e.g. FLAT100"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value)}
+                    />
+                  </Field>
+
+                  <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2.5">
+                    <span className="text-sm">Already paid</span>
+                    <Switch
+                      checked={markAsPaid}
+                      onCheckedChange={setMarkAsPaid}
+                    />
+                  </label>
+                </div>
+              </Section>
+
+              <Section icon={StickyNote} title="Note" hint="Optional">
+                <Textarea
+                  rows={3}
+                  placeholder="e.g. Phone order — write “Happy Birthday Riya” on the cake."
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                />
+              </Section>
+            </aside>
           </div>
         </div>
 
-        <DialogFooter className="mt-2 items-center gap-3 sm:justify-between">
-          <span className="text-sm text-muted-foreground">
-            Subtotal preview:{" "}
-            <span className="font-medium text-foreground">
+        <DialogFooter className="shrink-0 items-center gap-3 border-t px-5 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:flex-row sm:justify-between sm:px-6 sm:pb-4">
+          <div className="text-sm text-muted-foreground">
+            {itemCount > 0 && (
+              <span className="mr-2">
+                {itemCount} item{itemCount === 1 ? "" : "s"} ·
+              </span>
+            )}
+            Subtotal{" "}
+            <span className="font-semibold text-foreground">
               ₹{subtotal.toFixed(2)}
             </span>
-          </span>
+          </div>
           <div className="flex gap-2">
-            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
-            <Button onClick={submit} disabled={saving}>
-              {saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+            <Button type="button" onClick={submit} disabled={saving}>
+              {saving && <Loader2 className="mr-1 size-4 animate-spin" />}
               Create order
             </Button>
           </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** A titled block in the dialog body, with an optional right-aligned action. */
+function Section({
+  icon: Icon,
+  title,
+  hint,
+  action,
+  children,
+}: {
+  icon: IconComponent;
+  title: string;
+  hint?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-2.5">
+      <div className="flex min-h-8 items-center justify-between gap-2">
+        <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <Icon className="size-3.5" />
+          {title}
+          {hint && (
+            <span className="font-normal normal-case tracking-normal opacity-70">
+              · {hint}
+            </span>
+          )}
+        </h3>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** Label + control, for the narrow right-hand column. */
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs font-normal text-muted-foreground">
+        {label}
+        {hint && <span className="ml-1 opacity-70">· {hint}</span>}
+      </Label>
+      {children}
+    </div>
+  );
+}
+
+function EmptyItems({
+  message,
+  onAdd,
+}: {
+  message: string;
+  onAdd?: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed bg-muted/20 px-4 py-8 text-center">
+      <ShoppingBag className="size-6 text-muted-foreground" />
+      <p className="text-sm text-muted-foreground">{message}</p>
+      {onAdd && (
+        <Button type="button" variant="outline" size="sm" onClick={onAdd}>
+          <Plus className="mr-1 size-3.5" />
+          Add item
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/** One order line: product on top, its options beneath, add-ons as chips. */
+function LineCard({
+  line,
+  product,
+  products,
+  addons,
+  total,
+  onChange,
+  onRemove,
+}: {
+  line: Line;
+  product: Product | undefined;
+  products: Product[];
+  addons: { id: string; name: string; price: string | number }[];
+  total: number;
+  onChange: (patch: Partial<Line>) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="space-y-3 rounded-xl border bg-card p-3 shadow-sm">
+      <div className="flex items-center gap-2">
+        <Select
+          value={line.productId}
+          onValueChange={(v) => {
+            const p = products.find((x) => x.id === v);
+            onChange({
+              productId: v,
+              variantId:
+                p?.variants.find((x) => x.isDefault)?.id ??
+                p?.variants[0]?.id ??
+                "",
+              flavorOptionId: "",
+            });
+          }}
+        >
+          <SelectTrigger className="flex-1">
+            <SelectValue placeholder="Choose a product" />
+          </SelectTrigger>
+          <SelectContent>
+            {products.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="Remove item"
+          title="Remove item"
+          className="shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          onClick={onRemove}
+        >
+          <Trash2 className="size-4" />
+        </Button>
+      </div>
+
+      {product && (
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+          <Select
+            value={line.variantId}
+            onValueChange={(v) => onChange({ variantId: v })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Size" />
+            </SelectTrigger>
+            <SelectContent>
+              {product.variants.map((v) => (
+                <SelectItem key={v.id} value={v.id}>
+                  {v.label} · ₹{Number(v.price)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {product.flavorOptions.length > 0 ? (
+            <Select
+              value={line.flavorOptionId || "none"}
+              onValueChange={(v) =>
+                onChange({ flavorOptionId: v === "none" ? "" : v })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Flavour" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No flavour</SelectItem>
+                {product.flavorOptions.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.flavorName}
+                    {Number(f.priceDelta) !== 0 &&
+                      ` (+₹${Number(f.priceDelta)})`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <span className="hidden sm:block" />
+          )}
+
+          <QuantityStepper
+            value={line.quantity}
+            onChange={(quantity) => onChange({ quantity })}
+          />
+        </div>
+      )}
+
+      {product && addons.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {addons.map((a) => {
+            const on = line.addonIds.includes(a.id);
+            return (
+              <button
+                key={a.id}
+                type="button"
+                aria-pressed={on}
+                onClick={() =>
+                  onChange({
+                    addonIds: on
+                      ? line.addonIds.filter((id) => id !== a.id)
+                      : [...line.addonIds, a.id],
+                  })
+                }
+                className={cn(
+                  "rounded-full border px-2.5 py-1 text-xs transition-colors",
+                  on
+                    ? "border-primary bg-primary/10 font-medium text-primary"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                )}
+              >
+                {a.name} +₹{Number(a.price)}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {total > 0 && (
+        <div className="flex justify-between border-t pt-2 text-xs text-muted-foreground">
+          <span>Line total</span>
+          <span className="font-semibold text-foreground">
+            ₹{total.toFixed(2)}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Quantity as -/+ around a typable field — faster than a spinner on touch. */
+function QuantityStepper({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  const clamp = (n: number) => Math.min(99, Math.max(1, n));
+  return (
+    <div className="flex h-9 items-center rounded-md border">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-label="Decrease quantity"
+        className="size-8 rounded-r-none"
+        disabled={value <= 1}
+        onClick={() => onChange(clamp(value - 1))}
+      >
+        <Minus className="size-3.5" />
+      </Button>
+      <input
+        aria-label="Quantity"
+        inputMode="numeric"
+        className="w-9 border-0 bg-transparent text-center text-sm tabular-nums outline-none"
+        value={value}
+        onChange={(e) => onChange(clamp(Number(e.target.value) || 1))}
+      />
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-label="Increase quantity"
+        className="size-8 rounded-l-none"
+        disabled={value >= 99}
+        onClick={() => onChange(clamp(value + 1))}
+      >
+        <Plus className="size-3.5" />
+      </Button>
+    </div>
   );
 }
