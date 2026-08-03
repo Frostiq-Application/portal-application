@@ -131,7 +131,7 @@ export function CreateAccountDialog() {
             <div className="flex flex-1 flex-col gap-4 overflow-y-auto py-6">
               <Field label="Brand name" error={errors.name?.message}>
                 <Input
-                  placeholder="Divine Cake"
+                  placeholder="Enter brand name"
                   {...register("name", {
                     onChange: (e) => {
                       if (!slugTouched) {
@@ -149,7 +149,7 @@ export function CreateAccountDialog() {
                 hint="Auto-filled from the brand name."
               >
                 <Input
-                  placeholder="divine-cake"
+                  placeholder="Enter app slug"
                   {...register("appSlug", {
                     onChange: () => setSlugTouched(true),
                     // Normalise on blur, not per keystroke, so a trailing dash can be typed.
@@ -161,7 +161,7 @@ export function CreateAccountDialog() {
                 />
               </Field>
               <Field label="Owner name" error={errors.ownerName?.message}>
-                <Input placeholder="Asha Mehta" {...register("ownerName")} />
+                <Input placeholder="Enter owner name" {...register("ownerName")} />
               </Field>
               <Field label="Owner phone" error={errors.ownerPhone?.message}>
                 <PhoneInput
@@ -174,7 +174,7 @@ export function CreateAccountDialog() {
               <Field label="Owner email" error={errors.ownerEmail?.message}>
                 <Input
                   type="email"
-                  placeholder="asha@divinecake.com"
+                  placeholder="Enter owner email"
                   {...register("ownerEmail")}
                 />
               </Field>
@@ -297,7 +297,7 @@ function ThemeColorPicker({
         <Input
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="#E91E63"
+          placeholder="Enter hex code"
           className="max-w-[10rem] font-mono"
         />
         {!isPreset && value && (

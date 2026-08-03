@@ -8,8 +8,10 @@ import { setCredentials } from "@/features/auth/authSlice";
 import { useRegisterAccountMutation } from "@/features/api/accountsApi";
 import { useLoginMutation } from "@/features/api/authApi";
 import { useAuth } from "@/hooks/useAuth";
-import { cn, slugify } from "@/lib/utils";
+import { slugify } from "@/lib/utils";
 import { apiError } from "@/lib/apiError";
+import { passwordStrength } from "@/lib/password";
+import { PasswordStrengthMeter } from "@/components/common/PasswordStrengthMeter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,10 +19,12 @@ import { Label } from "@/components/ui/label";
 const extractError = (err: unknown) =>
   apiError(err, "Something went wrong. Please try again.");
 
-/** The storefront domain a slug will produce, for the live preview. */
-const STOREFRONT_HOST =
-  (import.meta.env.VITE_STOREFRONT_HOST as string | undefined) ??
-  "frostique.in";
+/** How many "-2", "-3"… addresses to try before giving up on a shop name. */
+const SLUG_ATTEMPTS = 5;
+
+/** The server rejects a duplicate storefront address by name; spot that case. */
+const isSlugTaken = (err: unknown) =>
+  /slug is already taken/i.test(apiError(err, ""));
 
 /**
  * Self-serve signup for a bakery.
@@ -43,9 +47,6 @@ export function RegisterPage() {
   const [login, { isLoading: loggingIn }] = useLoginMutation();
 
   const [name, setName] = useState("");
-  // Only what the user typed is stored; the effective slug is derived below.
-  const [typedSlug, setTypedSlug] = useState("");
-  const [slugTouched, setSlugTouched] = useState(false);
   const [ownerName, setOwnerName] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
   const [ownerPhone, setOwnerPhone] = useState("");
@@ -56,12 +57,15 @@ export function RegisterPage() {
     if (isAuthenticated) navigate("/", { replace: true });
   }, [isAuthenticated, navigate]);
 
-  // Derive the URL from the shop name until someone edits it themselves —
-  // then stop overwriting their choice. Derived rather than stored in state, so
-  // the preview can't lag a keystroke behind the name it is built from.
-  const appSlug = slugTouched ? typedSlug : slugify(name);
+  // The storefront address is no longer asked for — it comes from the shop
+  // name. A name that slugifies to nothing (symbols only) still can't be sent,
+  // which is what `incomplete` checks below.
+  const appSlug = slugify(name);
 
-  const passwordStrongEnough = password.length >= 8;
+  // The API wants 8+ characters with a letter and a number; checking length
+  // alone here let a password through the button and straight into a server
+  // rejection. The meter below scores against the same rule.
+  const { meetsMinimum: passwordStrongEnough } = passwordStrength(password);
   const emailLooksValid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(ownerEmail);
   const phoneLooksValid = ownerPhone.replace(/\D/g, "").length >= 10;
   const incomplete =
@@ -79,14 +83,25 @@ export function RegisterPage() {
     if (incomplete) return;
 
     try {
-      await register({
-        name: name.trim(),
-        appSlug,
-        ownerName: ownerName.trim(),
-        ownerEmail: ownerEmail.trim().toLowerCase(),
-        ownerPhone: ownerPhone.trim(),
-        password,
-      }).unwrap();
+      // Two bakeries can share a name, and the address they'd derive is unique
+      // server-side. With no field to correct, the second one would be stuck on
+      // an error it can't act on — so take the next free address instead.
+      for (let attempt = 0; ; attempt++) {
+        const candidate = attempt === 0 ? appSlug : `${appSlug}-${attempt + 1}`;
+        try {
+          await register({
+            name: name.trim(),
+            appSlug: candidate,
+            ownerName: ownerName.trim(),
+            ownerEmail: ownerEmail.trim().toLowerCase(),
+            ownerPhone: ownerPhone.trim(),
+            password,
+          }).unwrap();
+          break;
+        } catch (err) {
+          if (attempt >= SLUG_ATTEMPTS - 1 || !isSlugTaken(err)) throw err;
+        }
+      }
 
       // Sign them straight in regardless of verification. The account is real
       // and the password works, so there is no reason to make them log in
@@ -165,35 +180,11 @@ export function RegisterPage() {
                   id="shop-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Sweet Cake Bake"
+                  placeholder="Enter shop name"
                   autoComplete="organization"
                   autoFocus
                   required
                 />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="slug">Your storefront address</Label>
-                <div className="flex items-center rounded-md border focus-within:ring-1 focus-within:ring-ring">
-                  <Input
-                    id="slug"
-                    value={appSlug}
-                    onChange={(e) => {
-                      setSlugTouched(true);
-                      setTypedSlug(slugify(e.target.value));
-                    }}
-                    placeholder="sweet-cake-bake"
-                    className="border-0 font-mono text-sm shadow-none focus-visible:ring-0"
-                    required
-                  />
-                  <span className="shrink-0 pr-3 text-sm text-muted-foreground">
-                    .{STOREFRONT_HOST}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  This is where your customers will order. It can't be changed
-                  later, so pick something you'll be happy with.
-                </p>
               </div>
 
               <div className="grid gap-2">
@@ -202,7 +193,7 @@ export function RegisterPage() {
                   id="owner-name"
                   value={ownerName}
                   onChange={(e) => setOwnerName(e.target.value)}
-                  placeholder="Arbaj Ansari"
+                  placeholder="Enter your full name"
                   autoComplete="name"
                   required
                 />
@@ -215,7 +206,7 @@ export function RegisterPage() {
                   type="email"
                   value={ownerEmail}
                   onChange={(e) => setOwnerEmail(e.target.value)}
-                  placeholder="you@example.com"
+                  placeholder="Enter email address"
                   autoComplete="email"
                   required
                 />
@@ -228,7 +219,7 @@ export function RegisterPage() {
                   type="tel"
                   value={ownerPhone}
                   onChange={(e) => setOwnerPhone(e.target.value)}
-                  placeholder="+91 98765 43210"
+                  placeholder="Enter phone number"
                   autoComplete="tel"
                   required
                 />
@@ -242,7 +233,7 @@ export function RegisterPage() {
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="At least 8 characters"
+                    placeholder="Enter password"
                     autoComplete="new-password"
                     className="pr-10"
                     required
@@ -262,18 +253,7 @@ export function RegisterPage() {
                     )}
                   </button>
                 </div>
-                <p
-                  className={cn(
-                    "text-xs",
-                    password && !passwordStrongEnough
-                      ? "text-amber-600 dark:text-amber-400"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  {password && !passwordStrongEnough
-                    ? "A little longer — 8 characters minimum."
-                    : "8 characters minimum."}
-                </p>
+                <PasswordStrengthMeter password={password} className="mt-0.5" />
               </div>
 
               <Button
