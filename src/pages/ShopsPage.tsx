@@ -1,8 +1,9 @@
 import { useCallback, useState } from "react";
-import { MoreHorizontal, Search, MapPin, Clock, Phone, CalendarOff, Store, MessageCircle } from "@/components/ui/icons";
+import { MoreHorizontal, Search, MapPin, Clock, Phone, CalendarOff, Store, MessageCircle, Loader2 } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { useLimitState } from "@/hooks/useLimitState";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useInfiniteList } from "@/hooks/useInfiniteList";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import {
   LimitCounter,
@@ -23,6 +24,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { ShopStatusBadge } from "@/components/StatusBadge";
 import { ShopDialog } from "@/components/shops/ShopDialog";
 import { BranchDetails } from "@/components/shops/BranchDetails";
+import { BranchTicketSkeletonGrid } from "@/components/shops/BranchTicketSkeleton";
 import { InfiniteScroll } from "@/components/common/InfiniteScroll";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,15 +90,33 @@ function MyBranch() {
 
 /** Account / platform admin view: the searchable multi-branch grid. */
 function BranchGrid() {
-  const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const debounced = useDebouncedValue(search, 350);
-  const [items, setItems] = useState<Shop[]>([]);
-  const { data, isFetching, isLoading } = useListShopsQuery({
+
+  // The debounce window is dead time the user can see: they have typed, the
+  // request hasn't left yet. Count it as loading, so the grid never sits there
+  // showing results for a term that is already gone.
+  const isTyping = search !== debounced;
+
+  const { page, items, hasMore, total, ingest, loadMore: loadNextPage } =
+    useInfiniteList<Shop>(debounced);
+
+  // `currentData`, not `data`: RTK keeps the PREVIOUS search's response in
+  // `data` (same object identity) while the new one is in flight, which both
+  // hides the fact that we're loading and, when the new term is already cached,
+  // looks like "nothing changed" to the accumulator.
+  const { currentData, isFetching } = useListShopsQuery({
     page,
     limit: PAGE_SIZE,
     search: debounced || undefined,
   });
+  ingest(currentData);
+
+  // Skeletons whenever we have nothing to show for what the user is asking for
+  // — the debounce window, the first load, and every search change. Paging past
+  // page 1 keeps the grid up and shows the loader underneath instead.
+  const showSkeletons = isTyping || (page === 1 && isFetching && !currentData);
+
   const [suspend] = useSuspendShopMutation();
   const [activate] = useActivateShopMutation();
   const { isExempt, entitlements } = useEntitlements();
@@ -112,37 +132,12 @@ function BranchGrid() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Shop | null>(null);
 
-  // Reset the accumulator whenever the search term changes. Done during render,
-  // not in an effect, so the previous search's rows are never painted under the
-  // new term before being cleared.
-  const [seenSearch, setSeenSearch] = useState(debounced);
-  if (debounced !== seenSearch) {
-    setSeenSearch(debounced);
-    setPage(1);
-    setItems([]);
-  }
-
-  // Accumulate pages for infinite scroll. Page 1 (initial load, search change,
-  // or a mutation refetch that invalidates LIST) replaces the accumulator.
-  const [seenData, setSeenData] = useState<typeof data>(undefined);
-  if (data && data !== seenData) {
-    setSeenData(data);
-    setItems((prev) =>
-      data.meta.page === 1
-        ? data.data
-        : [
-            ...prev.filter((p) => !data.data.some((n) => n.id === p.id)),
-            ...data.data,
-          ],
-    );
-  }
-
-  const totalPages = data?.meta.totalPages ?? 1;
-  const hasMore = page < totalPages;
-
+  // Memoized: InfiniteScroll rebuilds its IntersectionObserver whenever this
+  // identity changes, and a fresh observer re-fires on a sentinel that is
+  // already in view — which would skip a page.
   const loadMore = useCallback(() => {
-    if (!isFetching) setPage((p) => p + 1);
-  }, [isFetching]);
+    if (!isFetching) loadNextPage();
+  }, [isFetching, loadNextPage]);
 
   const openNew = () => {
     if (atBranchLimit) {
@@ -204,19 +199,21 @@ function BranchGrid() {
       <div className="mb-4 relative max-w-sm">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          className="pl-9"
+          className="pl-9 pr-9"
           placeholder="Search branches…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          aria-busy={showSkeletons}
         />
+        {/* Reassurance inside the field itself: the keystroke registered and a
+            result is coming, even before the debounce lets the request go. */}
+        {showSkeletons && (
+          <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+        )}
       </div>
 
-      {isLoading ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <Skeleton key={i} className="h-56 w-full rounded-xl" />
-          ))}
-        </div>
+      {showSkeletons ? (
+        <BranchTicketSkeletonGrid />
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-background py-20 text-center">
           <Store className="mb-3 h-8 w-8 text-muted-foreground" />
@@ -227,16 +224,10 @@ function BranchGrid() {
           hasMore={hasMore}
           loading={isFetching}
           onLoadMore={loadMore}
-          loader={
-            <div className="grid grid-cols-1 gap-4 pt-4 sm:grid-cols-2 lg:grid-cols-3">
-              {[0, 1, 2].map((i) => (
-                <Skeleton key={i} className="h-56 w-full rounded-xl" />
-              ))}
-            </div>
-          }
+          loader={<BranchTicketSkeletonGrid count={3} className="pt-4" />}
           endMessage={
             <p className="pt-6 text-center text-xs text-muted-foreground">
-              {items.length} branch{items.length === 1 ? "" : "es"}
+              {total} branch{total === 1 ? "" : "es"}
             </p>
           }
         >
