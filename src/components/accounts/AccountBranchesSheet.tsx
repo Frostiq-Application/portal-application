@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { toast } from "sonner";
-import { Ban, CalendarOff, Check, Clock, MapPin, MoreHorizontal, Pencil, Phone, Plus, Store } from "@/components/ui/icons";
-import { apiError } from "@/lib/apiError";
+import { Ban, CalendarOff, Check, Clock, Loader2, MapPin, MoreHorizontal, Pencil, Phone, Plus, Store } from "@/components/ui/icons";
+import { useRowAction } from "@/hooks/useRowAction";
 import {
   useActivateShopMutation,
   useListShopsQuery,
@@ -46,6 +45,7 @@ export function AccountBranchesSheet({
   );
   const [suspend] = useSuspendShopMutation();
   const [activate] = useActivateShopMutation();
+  const { busyLabel, run } = useRowAction();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Shop | null>(null);
 
@@ -58,15 +58,6 @@ export function AccountBranchesSheet({
   const openEdit = (s: Shop) => {
     setEditing(s);
     setDialogOpen(true);
-  };
-
-  const run = async (fn: () => Promise<unknown>, ok: string) => {
-    try {
-      await fn();
-      toast.success(ok);
-    } catch (err) {
-      toast.error(apiError(err));
-    }
   };
 
   return (
@@ -114,12 +105,27 @@ export function AccountBranchesSheet({
                   <BranchRow
                     key={s.id}
                     shop={s}
+                    busy={busyLabel(s.id)}
                     onEdit={() => openEdit(s)}
                     onSuspend={() =>
-                      run(() => suspend(s.id).unwrap(), "Branch deactivated")
+                      run(
+                        {
+                          id: s.id,
+                          pending: "Deactivating branch…",
+                          success: "Branch deactivated",
+                        },
+                        () => suspend(s.id).unwrap(),
+                      )
                     }
                     onActivate={() =>
-                      run(() => activate(s.id).unwrap(), "Branch activated")
+                      run(
+                        {
+                          id: s.id,
+                          pending: "Activating branch…",
+                          success: "Branch activated",
+                        },
+                        () => activate(s.id).unwrap(),
+                      )
                     }
                   />
                 ))}
@@ -145,9 +151,17 @@ interface BranchRowProps {
   onEdit: () => void;
   onSuspend: () => void;
   onActivate: () => void;
+  /** What this branch is currently doing — "Activating branch…" — or null. */
+  busy?: string | null;
 }
 
-function BranchRow({ shop: s, onEdit, onSuspend, onActivate }: BranchRowProps) {
+function BranchRow({
+  shop: s,
+  onEdit,
+  onSuspend,
+  onActivate,
+  busy = null,
+}: BranchRowProps) {
   const hours =
     s.openingTime && s.closingTime
       ? `${s.openingTime.slice(0, 5)}–${s.closingTime.slice(0, 5)}`
@@ -156,11 +170,23 @@ function BranchRow({ shop: s, onEdit, onSuspend, onActivate }: BranchRowProps) {
 
   return (
     <div
+      aria-busy={!!busy}
       className={cn(
-        "overflow-hidden rounded-xl border bg-background shadow-sm transition-shadow hover:shadow-md",
+        "relative overflow-hidden rounded-xl border bg-background shadow-sm transition-shadow hover:shadow-md",
         s.status !== "active" && "opacity-80",
       )}
     >
+      {/* The row the action was taken on says it's working, rather than the
+          only sign being a toast that arrives once it's already over. */}
+      {busy && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center gap-2 bg-background/75 backdrop-blur-[1px]">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          <span className="text-xs font-medium text-muted-foreground">
+            {busy}
+          </span>
+        </div>
+      )}
+
       <div className="flex gap-3 p-3">
         {/* Thumbnail */}
         <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-primary/5">
@@ -191,6 +217,7 @@ function BranchRow({ shop: s, onEdit, onSuspend, onActivate }: BranchRowProps) {
                     size="icon"
                     className="h-7 w-7"
                     aria-label={`Actions for ${s.branchName}`}
+                    disabled={!!busy}
                   >
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>

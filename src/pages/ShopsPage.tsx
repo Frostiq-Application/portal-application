@@ -4,12 +4,12 @@ import { toast } from "sonner";
 import { useLimitState } from "@/hooks/useLimitState";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
+import { useRowAction } from "@/hooks/useRowAction";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import {
   LimitCounter,
   LimitNotice,
 } from "@/components/gating/LimitNotice";
-import { apiError } from "@/lib/apiError";
 import {
   useActivateShopMutation,
   useListShopsQuery,
@@ -119,6 +119,7 @@ function BranchGrid() {
 
   const [suspend] = useSuspendShopMutation();
   const [activate] = useActivateShopMutation();
+  const { busyLabel, run } = useRowAction();
   const { isExempt, entitlements } = useEntitlements();
 
   // Plan branch cap (gated roles only). Platform admin is exempt → no cap.
@@ -152,15 +153,6 @@ function BranchGrid() {
   const openEdit = (s: Shop) => {
     setEditing(s);
     setDialogOpen(true);
-  };
-
-  const run = async (fn: () => Promise<unknown>, ok: string) => {
-    try {
-      await fn();
-      toast.success(ok);
-    } catch (err) {
-      toast.error(apiError(err));
-    }
   };
 
   return (
@@ -236,12 +228,27 @@ function BranchGrid() {
               <BranchTicket
                 key={s.id}
                 shop={s}
+                busy={busyLabel(s.id)}
                 onEdit={() => openEdit(s)}
                 onSuspend={() =>
-                  run(() => suspend(s.id).unwrap(), "Branch suspended")
+                  run(
+                    {
+                      id: s.id,
+                      pending: "Suspending branch…",
+                      success: "Branch suspended",
+                    },
+                    () => suspend(s.id).unwrap(),
+                  )
                 }
                 onActivate={() =>
-                  run(() => activate(s.id).unwrap(), "Branch activated")
+                  run(
+                    {
+                      id: s.id,
+                      pending: "Activating branch…",
+                      success: "Branch activated",
+                    },
+                    () => activate(s.id).unwrap(),
+                  )
                 }
               />
             ))}
@@ -259,9 +266,17 @@ interface BranchTicketProps {
   onEdit: () => void;
   onSuspend: () => void;
   onActivate: () => void;
+  /** What this branch is currently doing — "Suspending branch…" — or null. */
+  busy?: string | null;
 }
 
-function BranchTicket({ shop, onEdit, onSuspend, onActivate }: BranchTicketProps) {
+function BranchTicket({
+  shop,
+  onEdit,
+  onSuspend,
+  onActivate,
+  busy = null,
+}: BranchTicketProps) {
   const hours =
     shop.openingTime && shop.closingTime
       ? `${shop.openingTime.slice(0, 5)}–${shop.closingTime.slice(0, 5)}`
@@ -270,11 +285,23 @@ function BranchTicket({ shop, onEdit, onSuspend, onActivate }: BranchTicketProps
 
   return (
     <div
+      aria-busy={!!busy}
       className={cn(
         "group relative flex flex-col overflow-hidden rounded-xl border bg-background shadow-sm transition-shadow hover:shadow-md",
         shop.status !== "active" && "opacity-80",
       )}
     >
+      {/* The card the action was taken on says it's working, rather than the
+          only sign being a toast that arrives once it's already over. */}
+      {busy && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-background/75 backdrop-blur-[1px]">
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          <span className="px-3 text-center text-xs font-medium text-muted-foreground">
+            {busy}
+          </span>
+        </div>
+      )}
+
       {/* Property photo — fixed 16:9 */}
       <div className="relative aspect-video w-full shrink-0 overflow-hidden bg-primary/5">
         {shop.bannerUrl ? (
@@ -303,6 +330,8 @@ function BranchTicket({ shop, onEdit, onSuspend, onActivate }: BranchTicketProps
                 variant="secondary"
                 size="icon"
                 className="h-7 w-7 bg-background/80 backdrop-blur"
+                aria-label={`Actions for ${shop.branchName}`}
+                disabled={!!busy}
               >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>

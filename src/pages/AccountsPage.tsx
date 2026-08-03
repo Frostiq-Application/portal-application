@@ -4,6 +4,7 @@ import { Loader2, Search, Store } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
+import { useRowAction } from "@/hooks/useRowAction";
 import {
   useApproveAccountMutation,
   useListAccountsQuery,
@@ -46,13 +47,6 @@ const STATUS_OPTIONS: { label: string; value: AccountStatus | "all" }[] = [
   { label: "Rejected", value: "rejected" },
 ];
 
-function extractError(err: unknown): string {
-  const data = (err as { data?: { message?: string | string[] } })?.data;
-  const msg = data?.message;
-  if (Array.isArray(msg)) return msg.join(", ");
-  return msg ?? "Action failed.";
-}
-
 const PAGE_SIZE = 24;
 
 export function AccountsPage() {
@@ -90,11 +84,13 @@ export function AccountsPage() {
   const [suspend] = useSuspendAccountMutation();
   const [reactivate] = useReactivateAccountMutation();
   const [reject] = useRejectAccountMutation();
+  const { busyLabel, run } = useRowAction();
 
   const [rejectTarget, setRejectTarget] = useState<Account | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [editTarget, setEditTarget] = useState<Account | null>(null);
   const [branchesTarget, setBranchesTarget] = useState<Account | null>(null);
+  const rejecting = !!rejectTarget && !!busyLabel(rejectTarget.id);
 
   // Memoized: InfiniteScroll rebuilds its IntersectionObserver whenever this
   // identity changes, and a fresh observer re-fires on a sentinel that is
@@ -103,28 +99,24 @@ export function AccountsPage() {
     if (!isFetching) loadNextPage();
   }, [isFetching, loadNextPage]);
 
-  const run = async (
-    fn: () => Promise<unknown>,
-    okMsg: string,
-  ): Promise<void> => {
-    try {
-      await fn();
-      toast.success(okMsg);
-    } catch (err) {
-      toast.error(extractError(err));
-    }
-  };
-
   const submitReject = async () => {
     if (!rejectTarget) return;
     if (rejectReason.trim().length < 3) {
       toast.error("Please provide a reason.");
       return;
     }
-    await run(
+    // The dialog stays up, with the button spinning, until the API answers —
+    // closing it first would leave nothing on screen to say the work is out,
+    // and on a failure it would throw away the reason they just typed.
+    const ok = await run(
+      {
+        id: rejectTarget.id,
+        pending: "Rejecting shop…",
+        success: "Shop rejected.",
+      },
       () => reject({ id: rejectTarget.id, reason: rejectReason }).unwrap(),
-      "Shop rejected.",
     );
+    if (!ok) return;
     setRejectTarget(null);
     setRejectReason("");
   };
@@ -203,16 +195,38 @@ export function AccountsPage() {
               <AccountCard
                 key={a.id}
                 account={a}
+                busy={busyLabel(a.id)}
                 onEdit={() => setEditTarget(a)}
                 onApprove={() =>
-                  run(() => approve(a.id).unwrap(), "Shop approved.")
+                  run(
+                    {
+                      id: a.id,
+                      pending: "Approving shop…",
+                      success: "Shop approved.",
+                    },
+                    () => approve(a.id).unwrap(),
+                  )
                 }
                 onReject={() => setRejectTarget(a)}
                 onSuspend={() =>
-                  run(() => suspend({ id: a.id }).unwrap(), "Shop suspended.")
+                  run(
+                    {
+                      id: a.id,
+                      pending: "Suspending shop…",
+                      success: "Shop suspended.",
+                    },
+                    () => suspend({ id: a.id }).unwrap(),
+                  )
                 }
                 onReactivate={() =>
-                  run(() => reactivate(a.id).unwrap(), "Shop reactivated.")
+                  run(
+                    {
+                      id: a.id,
+                      pending: "Reactivating shop…",
+                      success: "Shop reactivated.",
+                    },
+                    () => reactivate(a.id).unwrap(),
+                  )
                 }
                 onViewSubscription={() =>
                   navigate(`/subscriptions?accountId=${a.id}`)
@@ -228,7 +242,9 @@ export function AccountsPage() {
       <Dialog
         open={!!rejectTarget}
         onOpenChange={(o) => {
-          if (!o) {
+          // Escape / click-away is off while the request is out: the dialog is
+          // the only place the reason is held.
+          if (!o && !rejecting) {
             setRejectTarget(null);
             setRejectReason("");
           }
@@ -247,13 +263,23 @@ export function AccountsPage() {
             value={rejectReason}
             onChange={(e) => setRejectReason(e.target.value)}
             rows={4}
+            disabled={rejecting}
           />
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setRejectTarget(null)}>
+            <Button
+              variant="ghost"
+              onClick={() => setRejectTarget(null)}
+              disabled={rejecting}
+            >
               Cancel
             </Button>
-            <Button variant="destructive" onClick={submitReject}>
-              Reject shop
+            <Button
+              variant="destructive"
+              onClick={submitReject}
+              disabled={rejecting}
+            >
+              {rejecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {rejecting ? "Rejecting…" : "Reject shop"}
             </Button>
           </DialogFooter>
         </DialogContent>

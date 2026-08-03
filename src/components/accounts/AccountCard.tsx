@@ -1,4 +1,4 @@
-import { Ban, Check, CreditCard, MoreHorizontal, Pencil, RotateCcw, Store, X } from "@/components/ui/icons";
+import { Ban, Check, CreditCard, Loader2, MoreHorizontal, Pencil, RotateCcw, Store, X } from "@/components/ui/icons";
 import { formatDate } from "@/lib/utils";
 import { useListShopsQuery } from "@/features/api/shopsApi";
 import type { Account } from "@/types";
@@ -20,6 +20,8 @@ interface Props {
   onReactivate: () => void;
   onViewSubscription: () => void;
   onViewBranches: () => void;
+  /** What this shop is currently doing — "Suspending shop…" — or null. */
+  busy?: string | null;
 }
 
 export function AccountCard({
@@ -31,13 +33,28 @@ export function AccountCard({
   onReactivate,
   onViewSubscription,
   onViewBranches,
+  busy = null,
 }: Props) {
   // limit: 1 keeps the request cheap — only meta.total is used here.
   const { data: shops } = useListShopsQuery({ accountId: a.id, page: 1, limit: 1 });
   const branchCount = shops?.meta.total ?? 0;
 
   return (
-    <div className="group relative flex h-full flex-col overflow-hidden rounded-xl border bg-background text-left shadow-sm transition-shadow hover:shadow-md">
+    <div
+      aria-busy={!!busy}
+      className="group relative flex h-full flex-col overflow-hidden rounded-xl border bg-background text-left shadow-sm transition-shadow hover:shadow-md"
+    >
+      {/* The status change is a round-trip to the API. Say so on the card the
+          action was taken on, not only in a toast that lands once it's over. */}
+      {busy && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-background/75 backdrop-blur-[1px]">
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          <span className="px-3 text-center text-xs font-medium text-muted-foreground">
+            {busy}
+          </span>
+        </div>
+      )}
+
       {/* Banner image on top, with logo + name pinned bottom-left and status top-left. */}
       <div className="relative aspect-video w-full shrink-0 overflow-hidden bg-muted">
         {a.bannerUrl ? (
@@ -110,6 +127,7 @@ export function AccountCard({
               size="icon"
               className="h-7 w-7 bg-background/80 backdrop-blur"
               aria-label={`Actions for ${a.name}`}
+              disabled={!!busy}
             >
               <MoreHorizontal className="h-4 w-4" />
             </Button>
