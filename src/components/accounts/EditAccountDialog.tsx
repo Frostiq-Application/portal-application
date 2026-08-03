@@ -60,9 +60,12 @@ export function EditAccountDialog({ open, onOpenChange, account }: Props) {
           name: name.trim(),
           ownerName: ownerName.trim(),
           ownerPhone: ownerPhone.trim(),
-          logoUrl: logoUrl || undefined,
-          bannerUrl: bannerUrl || undefined,
-          themeColor: themeColor || undefined,
+          // null, not undefined: undefined drops the key from the JSON body,
+          // so clearing an image read as "don't touch it" and the old one came
+          // straight back on the next fetch.
+          logoUrl: logoUrl || null,
+          bannerUrl: bannerUrl || null,
+          themeColor: themeColor || null,
         },
       }).unwrap();
       toast.success("Shop updated");

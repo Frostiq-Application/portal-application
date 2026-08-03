@@ -275,7 +275,9 @@ export function ShopDialog({
       branchName: branchName.trim(),
       slug: slug.trim(),
       displayArea: displayArea.trim() || undefined,
-      bannerUrl: bannerUrl || undefined,
+      // null, not undefined: undefined drops the key from the JSON body, so
+      // clearing the banner read as "don't touch it" on an edit.
+      bannerUrl: bannerUrl || null,
       address: address.trim() || undefined,
       latitude: latitude.trim() ? Number(latitude) : undefined,
       longitude: longitude.trim() ? Number(longitude) : undefined,

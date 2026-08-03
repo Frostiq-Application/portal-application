@@ -30,9 +30,10 @@ export interface UpdateAccountBody {
   name?: string;
   ownerName?: string;
   ownerPhone?: string;
-  logoUrl?: string;
-  bannerUrl?: string;
-  themeColor?: string;
+  /** null clears the image; leaving the key out keeps whatever is there. */
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
+  themeColor?: string | null;
   currentPlanId?: string;
 }
 

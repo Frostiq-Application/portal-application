@@ -12,7 +12,8 @@ export interface CreateShopBody {
   branchName: string;
   slug: string;
   displayArea?: string;
-  bannerUrl?: string;
+  /** null clears the banner; leaving the key out keeps whatever is there. */
+  bannerUrl?: string | null;
   address?: string;
   latitude?: number;
   longitude?: number;
