@@ -7,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   PRESET_LABELS,
   rangeFor,
@@ -52,21 +52,21 @@ export function DateRangePicker({
 
       {preset === "custom" && (
         <div className="flex items-center gap-1.5">
-          <Input
-            type="date"
+          <DatePicker
             className="w-[150px]"
+            placeholder="From"
             max={value.to ?? today}
             value={value.from ?? ""}
-            onChange={(e) => onChange({ ...value, from: e.target.value || undefined })}
+            onChange={(v) => onChange({ ...value, from: v || undefined })}
           />
           <span className="text-sm text-muted-foreground">to</span>
-          <Input
-            type="date"
+          <DatePicker
             className="w-[150px]"
+            placeholder="To"
             min={value.from}
             max={today}
             value={value.to ?? ""}
-            onChange={(e) => onChange({ ...value, to: e.target.value || undefined })}
+            onChange={(v) => onChange({ ...value, to: v || undefined })}
           />
         </div>
       )}

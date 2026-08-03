@@ -23,6 +23,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { ShopSelect } from "@/components/ShopSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -480,11 +481,10 @@ function BlackoutCard({ shopId }: { shopId: string }) {
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1.5">
             <Label>Date</Label>
-            <Input
-              type="date"
+            <DatePicker
               min={todayIso()}
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={setDate}
               className="w-44"
             />
           </div>
@@ -577,11 +577,10 @@ function SlotPreviewCard({
       <CardContent className="space-y-4">
         <div className="flex flex-col gap-1.5">
           <Label>Date</Label>
-          <Input
-            type="date"
+          <DatePicker
             min={todayIso()}
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={setDate}
             className="w-44"
           />
         </div>

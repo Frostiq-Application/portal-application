@@ -17,6 +17,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -449,20 +450,24 @@ function CouponEditor({
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="c-from">Valid from</Label>
-              <Input
+              <DatePicker
                 id="c-from"
-                type="date"
+                className="w-full"
+                placeholder="No start date"
+                max={validUntil || undefined}
                 value={validFrom}
-                onChange={(e) => setValidFrom(e.target.value)}
+                onChange={setValidFrom}
               />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="c-until">Valid until</Label>
-              <Input
+              <DatePicker
                 id="c-until"
-                type="date"
+                className="w-full"
+                placeholder="No end date"
+                min={validFrom || undefined}
                 value={validUntil}
-                onChange={(e) => setValidUntil(e.target.value)}
+                onChange={setValidUntil}
               />
             </div>
           </div>

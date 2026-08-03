@@ -12,6 +12,7 @@ import { apiError } from "@/lib/apiError";
 import type { Coupon, CouponType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateTimePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -312,18 +313,23 @@ export function CouponDialog({ open, onOpenChange, coupon }: Props) {
           </div>
           <div className="flex flex-col gap-1.5">
             <Label>Valid from</Label>
-            <Input
-              type="datetime-local"
+            <DateTimePicker
+              className="w-full"
+              placeholder="Starts immediately"
+              max={validUntil || undefined}
               value={validFrom}
-              onChange={(e) => setValidFrom(e.target.value)}
+              onChange={setValidFrom}
             />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label>Valid until</Label>
-            <Input
-              type="datetime-local"
+            <DateTimePicker
+              className="w-full"
+              placeholder="No end date"
+              min={validFrom || undefined}
+              defaultTime="23:59"
               value={validUntil}
-              onChange={(e) => setValidUntil(e.target.value)}
+              onChange={setValidUntil}
             />
           </div>
           <div className="flex items-center gap-2">

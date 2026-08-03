@@ -68,6 +68,7 @@ import { OrderDetailDrawer } from "@/components/orders/OrderDetailDrawer";
 import { CreateOrderDialog } from "@/components/orders/CreateOrderDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -677,12 +678,12 @@ export function OrdersPage() {
             </SelectContent>
           </Select>
 
-          <Input
-            type="date"
+          <DatePicker
             className="w-44"
             title="Jump to an exact delivery date"
+            placeholder="Any date"
             value={scheduledDate}
-            onChange={(e) => pickExactDate(e.target.value)}
+            onChange={pickExactDate}
           />
 
           {hasFilters && (

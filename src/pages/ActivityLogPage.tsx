@@ -24,6 +24,7 @@ import { InfiniteScroll } from "@/components/common/InfiniteScroll";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -265,22 +266,22 @@ export function ActivityLogPage() {
 
         <div className="grid gap-1.5">
           <Label className="text-xs text-muted-foreground">From</Label>
-          <Input
-            type="date"
+          <DatePicker
             className="w-40"
+            placeholder="Any date"
             value={from}
             max={to || undefined}
-            onChange={(e) => setFrom(e.target.value)}
+            onChange={setFrom}
           />
         </div>
         <div className="grid gap-1.5">
           <Label className="text-xs text-muted-foreground">To</Label>
-          <Input
-            type="date"
+          <DatePicker
             className="w-40"
+            placeholder="Any date"
             value={to}
             min={from || undefined}
-            onChange={(e) => setTo(e.target.value)}
+            onChange={setTo}
           />
         </div>
 
