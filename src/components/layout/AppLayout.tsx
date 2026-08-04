@@ -340,8 +340,17 @@ export function AppLayout() {
       return <AccountDeactivatedGate support={entitlements?.support} />;
     }
 
-    // Every gate below hands the owner a button to fix the lockout, and that
-    // button points at `/my-subscription` — which lives *inside* this gate. So
+    // A locked or cancelled subscription is no longer a hard lockout. That
+    // routing predates self-serve billing — back then only a platform admin
+    // could record a payment, so "contact the super admin" was the only honest
+    // advice. Now the owner can restore it themselves in a minute, and
+    // `NoSubscriptionGate` is the screen that says so (and still shows support
+    // contacts to everyone who can't buy). `AccountDeactivatedGate` keeps its
+    // real job: an account suspended or rejected by us, which no payment fixes.
+    const lockedOut = isSubscriptionExpired || !hasActiveSubscription;
+
+    // The gate below hands the owner a button to fix the lockout, and that
+    // button points at `/my-subscription` — which lives *inside* the gate. So
     // it navigated, the route matched, and the very same gate rendered again:
     // the URL changed and the screen did not, which reads as a dead button.
     //
@@ -349,7 +358,15 @@ export function AppLayout() {
     // App.tsx). This is the same escape hatch for the page that leads to it,
     // rendered bare — the shell it would normally sit in is the thing being
     // locked. Owners only: nobody else can buy anything.
-    if (role === "account_super_admin" && location.pathname.startsWith("/my-subscription")) {
+    //
+    // Only while actually locked out. This is a hole in the gate, not a rule
+    // about the route: an account in good standing has a working shell, and
+    // must keep it here like everywhere else.
+    if (
+      lockedOut &&
+      role === "account_super_admin" &&
+      location.pathname.startsWith("/my-subscription")
+    ) {
       return (
         <div className="min-h-screen bg-muted/30 px-4 py-8">
           <div className="mx-auto max-w-5xl">
@@ -358,14 +375,8 @@ export function AppLayout() {
         </div>
       );
     }
-    // A locked or cancelled subscription is no longer a hard lockout. That
-    // routing predates self-serve billing — back then only a platform admin
-    // could record a payment, so "contact the super admin" was the only honest
-    // advice. Now the owner can restore it themselves in a minute, and
-    // `NoSubscriptionGate` is the screen that says so (and still shows support
-    // contacts to everyone who can't buy). `AccountDeactivatedGate` keeps its
-    // real job: an account suspended or rejected by us, which no payment fixes.
-    if (isSubscriptionExpired || !hasActiveSubscription) {
+
+    if (lockedOut) {
       return <NoSubscriptionGate support={entitlements?.support} />;
     }
   }
