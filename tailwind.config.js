@@ -147,6 +147,23 @@ export default {
   			'lane-pulse': {
   				'0%, 100%': { transform: 'scale(1)', opacity: '1' },
   				'50%': { transform: 'scale(1.05)', opacity: '0.9' }
+  			},
+  			/* Boot splash. The mark breathes rather than spins — a spinner says
+  			   "waiting", a slow rise and fall says "warming up". */
+  			'splash-bob': {
+  				'0%, 100%': { transform: 'translateY(0) scale(1)' },
+  				'50%': { transform: 'translateY(-6px) scale(1.02)' }
+  			},
+  			/* Rings leaving the mark, so a slow first load still reads as
+  			   working rather than stalled. */
+  			'splash-ring': {
+  				'0%': { transform: 'scale(0.85)', opacity: '0.45' },
+  				'70%, 100%': { transform: 'scale(1.45)', opacity: '0' }
+  			},
+  			/* Indeterminate track — movement without a fabricated percentage. */
+  			'splash-track': {
+  				'0%': { transform: 'translateX(-100%)' },
+  				'100%': { transform: 'translateX(300%)' }
   			}
   		},
   		animation: {
@@ -164,7 +181,10 @@ export default {
   			'card-in': 'card-in 0.34s cubic-bezier(0.2,0.8,0.3,1) backwards',
   			'card-land': 'card-land 0.5s cubic-bezier(0.2,1.1,0.35,1)',
   			'card-deny': 'card-deny 0.4s ease-in-out',
-  			'lane-pulse': 'lane-pulse 1.2s ease-in-out infinite'
+  			'lane-pulse': 'lane-pulse 1.2s ease-in-out infinite',
+  			'splash-bob': 'splash-bob 2.6s ease-in-out infinite',
+  			'splash-ring': 'splash-ring 2.6s cubic-bezier(0.24,0.6,0.3,1) infinite',
+  			'splash-track': 'splash-track 1.5s ease-in-out infinite'
   		}
   	}
   },

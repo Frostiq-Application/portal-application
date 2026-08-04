@@ -12,9 +12,205 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#E91E63" />
     <title>Frostique Portal</title>
+
+    <!--
+      Boot splash.
+
+      Everything below runs before a single line of the app is parsed, which is
+      the window that used to be a plain white page: React cannot paint its own
+      loading screen until it has mounted, and on a cold load that is the
+      longest wait of the session. So this is hand-written CSS with no build
+      step and no stylesheet to fetch — the markup lives inside #root, and
+      React clears it the moment it renders.
+    -->
+    <style>
+      #boot {
+        --boot-bg: hsl(42 45% 96%);
+        --boot-card: hsl(40 50% 99%);
+        --boot-border: hsl(35 30% 87%);
+        --boot-fg: hsl(25 40% 18%);
+        --boot-muted: hsl(25 15% 42%);
+        --boot-primary: hsl(344 62% 52%);
+
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.5rem;
+        background: var(--boot-bg);
+        color: var(--boot-fg);
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        text-align: center;
+      }
+
+      #boot.boot-dark {
+        --boot-bg: hsl(25 28% 9%);
+        --boot-card: hsl(25 24% 12%);
+        --boot-border: hsl(25 18% 21%);
+        --boot-fg: hsl(35 30% 92%);
+        --boot-muted: hsl(30 12% 65%);
+        --boot-primary: hsl(344 68% 68%);
+      }
+
+      .boot-stage {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 8rem;
+        height: 8rem;
+      }
+
+      /* Rings leaving the mark, so a slow load reads as working, not stalled. */
+      .boot-ring {
+        position: absolute;
+        width: 6rem;
+        height: 6rem;
+        border-radius: 9999px;
+        background: var(--boot-primary);
+        opacity: 0.15;
+        animation: boot-ring 2.6s cubic-bezier(0.24, 0.6, 0.3, 1) infinite;
+      }
+      .boot-ring + .boot-ring {
+        animation-delay: 1.3s;
+      }
+
+      /* Round medallion — the mark is clipped to a circle whatever its shape. */
+      .boot-mark {
+        position: relative;
+        width: 6rem;
+        height: 6rem;
+        border-radius: 9999px;
+        overflow: hidden;
+        background: var(--boot-card);
+        border: 1px solid var(--boot-border);
+        box-shadow: 0 10px 24px -8px rgb(0 0 0 / 0.25);
+        animation: boot-bob 2.6s ease-in-out infinite;
+      }
+      .boot-mark img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        border-radius: 9999px;
+        padding: 0.625rem;
+        box-sizing: border-box;
+      }
+
+      .boot-title {
+        margin: 0;
+        font-size: 0.875rem;
+        font-weight: 500;
+      }
+      .boot-message {
+        margin: 0.25rem 0 0;
+        font-size: 0.75rem;
+        color: var(--boot-muted);
+      }
+
+      /* Indeterminate track: movement, without inventing a percentage. */
+      .boot-track {
+        width: 10rem;
+        height: 0.25rem;
+        border-radius: 9999px;
+        overflow: hidden;
+        background: var(--boot-border);
+      }
+      .boot-track span {
+        display: block;
+        width: 33%;
+        height: 100%;
+        border-radius: 9999px;
+        background: var(--boot-primary);
+        opacity: 0.7;
+        animation: boot-track 1.5s ease-in-out infinite;
+      }
+
+      @keyframes boot-bob {
+        0%,
+        100% {
+          transform: translateY(0) scale(1);
+        }
+        50% {
+          transform: translateY(-6px) scale(1.02);
+        }
+      }
+      @keyframes boot-ring {
+        0% {
+          transform: scale(0.85);
+          opacity: 0.45;
+        }
+        70%,
+        100% {
+          transform: scale(1.45);
+          opacity: 0;
+        }
+      }
+      @keyframes boot-track {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(300%);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .boot-mark,
+        .boot-track span {
+          animation: none;
+        }
+        .boot-ring {
+          display: none;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="boot" role="status" aria-live="polite">
+        <div class="boot-stage">
+          <span class="boot-ring" aria-hidden="true"></span>
+          <span class="boot-ring" aria-hidden="true"></span>
+          <div class="boot-mark">
+            <!-- The animated cake. Falls back to the still favicon — the same
+                 artwork — so this is never a broken image. -->
+            <img
+              src="/loading.gif"
+              alt=""
+              aria-hidden="true"
+              onerror="this.onerror=null;this.src='/favicon-512.png'"
+            />
+          </div>
+        </div>
+        <div>
+          <p class="boot-title">Getting things ready</p>
+          <p class="boot-message">One moment while we load your bakery.</p>
+        </div>
+        <div class="boot-track" aria-hidden="true"><span></span></div>
+      </div>
+    </div>
+
+    <script>
+      // Match the theme the app is about to pick, so a dark-mode user doesn't
+      // get a white flash before the bundle lands. Same key as the ui slice.
+      (function () {
+        try {
+          var stored = localStorage.getItem("frostique-portal-theme");
+          var dark =
+            stored === "dark" ||
+            (stored !== "light" &&
+              window.matchMedia &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) document.getElementById("boot").className = "boot-dark";
+        } catch (e) {
+          /* first visit, or storage blocked — light is the default */
+        }
+      })();
+    </script>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

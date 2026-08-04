@@ -18,6 +18,7 @@ import {
   selectHasUnseenEnquiries,
 } from "@/features/notifications/notificationsSlice";
 import { FrostiqueMark } from "@/components/common/FrostiqueMark";
+import { SplashScreen } from "@/components/common/SplashScreen";
 import { OrderNotifications } from "@/components/orders/OrderNotifications";
 import { EnquiryNotifications } from "@/components/enquiries/EnquiryNotifications";
 import { AccountDeactivatedGate } from "@/components/gating/AccountDeactivatedGate";
@@ -331,13 +332,7 @@ export function AppLayout() {
   // Gated roles get one of two blocking screens when they can't use the app.
   // The whole shell is unreachable until the underlying issue is resolved.
   if (!isExempt) {
-    if (isLoading) {
-      return (
-        <div className="flex min-h-screen items-center justify-center bg-muted/30 text-sm text-muted-foreground">
-          Loading…
-        </div>
-      );
-    }
+    if (isLoading) return <SplashScreen />;
     // The account itself is deactivated (suspended/rejected/pending) — a plan
     // can't fix it, so send them to contact the super admin.
     if (isAccountDeactivated) {
