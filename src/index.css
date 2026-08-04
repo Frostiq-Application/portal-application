@@ -39,21 +39,21 @@
     --input: 35 30% 87%;
     --ring: 344 62% 52%;
 
-    --sidebar: 222 50% 94%;
-    --sidebar-foreground: 25 40% 22%;
-    --sidebar-accent: 222 45% 88%;
-    --sidebar-border: 222 40% 86%;
-
     --radius: 0.6rem;
 
-    --sidebar-background: 222 50% 94%;
-
-    --sidebar-primary: 344 62% 52%;
-
-    --sidebar-primary-foreground: 350 60% 98%;
-
+    /* The sidebar sits in the same cream family as the canvas, a touch deeper
+       so it reads as a panel — the way the dark theme offsets its chocolate
+       base. These were left on shadcn's stock periwinkle (hue 222), which is
+       the accent colour here, not a surface: the rail came out cold blue
+       against a warm page while dark mode looked right. */
+    --sidebar: 40 38% 94%;
+    --sidebar-background: 40 38% 94%;
+    --sidebar-foreground: 25 40% 22%;
+    --sidebar-accent: 40 33% 88%;
     --sidebar-accent-foreground: 25 40% 20%;
-
+    --sidebar-border: 35 30% 87%;
+    --sidebar-primary: 344 62% 52%;
+    --sidebar-primary-foreground: 350 60% 98%;
     --sidebar-ring: 344 62% 52%;
 
     /* Dataviz categorical palette (validated — see .agents dataviz skill). Fixed slot order, never re-sorted. */
