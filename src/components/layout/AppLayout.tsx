@@ -1,14 +1,12 @@
-import { Fragment, useEffect, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Fragment, useEffect } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Crown,
   LogOut,
-  Menu,
   Moon,
   Plus,
   Sun,
   UserRound,
-  X,
 } from "@/components/ui/icons";
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import { logout } from "@/features/auth/authSlice";
@@ -31,6 +29,27 @@ import { applyBrandTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuBadge,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { useSidebar } from "@/components/ui/sidebar-context";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,10 +74,12 @@ const GROUP_ORDER: NavItem["group"][] = [
  * The sidebar. Exported so its plan-gating behaviour can be tested directly —
  * locking the wrong item is a silent revenue bug, not a visual one.
  */
-export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
+export function SidebarNav() {
   const { role } = useAuth();
   const { can } = useCan();
   const { hasFeature } = useEntitlements();
+  const { pathname } = useLocation();
+  const { setOpenMobile } = useSidebar();
   const hasUnseenOrders = useAppSelector(selectHasUnseenOrders);
   const hasUnseenEnquiries = useAppSelector(selectHasUnseenEnquiries);
   // Plan-gated items are shown, not hidden. A feature the bakery can't see is a
@@ -77,122 +98,144 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const isLocked = (i: NavItem) =>
     Boolean(i.feature) && !hasFeature(i.feature!);
 
+  // Active state is derived here rather than left to NavLink's render prop:
+  // collapsed to icons, the highlight comes from the menu button's own
+  // `data-active`, which needs the answer as a prop before it renders.
+  const isActivePath = (item: NavItem) =>
+    item.exact || item.path === "/"
+      ? pathname === item.path
+      : pathname === item.path || pathname.startsWith(`${item.path}/`);
+
+  /** Tapping a destination on mobile should close the drawer behind it. */
+  const closeOnMobile = () => setOpenMobile(false);
+
   return (
-    <nav className="flex flex-col gap-6 px-3 py-4">
+    <>
       {GROUP_ORDER.map((group) => {
         const groupItems = items.filter((i) => i.group === group);
         if (groupItems.length === 0) return null;
         return (
-          <div key={group}>
-            <p className="px-3 pb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              {group}
-            </p>
-            <div className="flex flex-col gap-1">
-              {groupItems
-                .filter((i) => !i.parent)
-                .map((item) => (
-                  <Fragment key={item.path}>
-                    {renderItem(item)}
-                    {/* Sub-items are parts of the parent feature. When the plan
-                        doesn't include it there is nothing to nest and the
-                        parent row already carries the upgrade prompt — a second
-                        crowned row for the same add-on just reads as clutter. */}
-                    {!isLocked(item) &&
-                      items
-                        .filter((c) => c.parent === item.path)
-                        .map((child) => renderItem(child, true))}
-                  </Fragment>
-                ))}
-            </div>
-          </div>
+          <SidebarGroup key={group}>
+            <SidebarGroupLabel>{group}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {groupItems
+                  .filter((i) => !i.parent)
+                  .map((item) => (
+                    <Fragment key={item.path}>{renderItem(item)}</Fragment>
+                  ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
         );
       })}
-    </nav>
+    </>
   );
 
-  /** One sidebar row. `nested` indents a sub-item under its parent feature. */
-  function renderItem(item: NavItem, nested = false) {
+  /** One top-level row, plus its sub-items when the plan carries the parent. */
+  function renderItem(item: NavItem) {
     const Icon = item.icon;
+
     if (item.soon) {
       return (
-        <span
-          key={item.path}
-          className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground/60"
-          title="Coming soon"
-        >
-          <Icon className="h-4 w-4" />
-          {item.label}
-          <span className="ml-auto rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase">
-            soon
-          </span>
-        </span>
+        <SidebarMenuItem>
+          <SidebarMenuButton disabled tooltip={`${item.label} — coming soon`}>
+            <Icon />
+            <span>{item.label}</span>
+          </SidebarMenuButton>
+          <SidebarMenuBadge>soon</SidebarMenuBadge>
+        </SidebarMenuItem>
       );
     }
+
     const locked = isLocked(item);
+    // Sub-items are parts of the parent feature. When the plan doesn't include
+    // it there is nothing to nest and the parent row already carries the
+    // upgrade prompt — a second crowned row for the same add-on reads as
+    // clutter.
+    const children = locked
+      ? []
+      : items.filter((c) => c.parent === item.path);
+
     return (
-      <NavLink
-        key={item.path}
-        to={item.path}
-        end={item.path === "/" || item.exact}
-        onClick={onNavigate}
-        aria-label={locked ? `${item.label} — not in your plan` : undefined}
-        data-locked={locked || undefined}
-        title={
-          locked
-            ? `${item.label} isn't in your plan — tap to see upgrade options`
-            : undefined
-        }
-        className={({ isActive }) =>
-          cn(
-            "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-            isActive
-              ? "bg-primary text-primary-foreground"
-              : "text-foreground/80 hover:bg-muted",
-            // Indented and quieter: a part of the row above it,
-            // not a peer of it.
-            nested && "ml-3 py-1.5 text-[13px]",
-          )
-        }
-      >
-        {/* Render-prop children so the crown can react to the
-          active row, where amber on the brand fill would clash. */}
-        {({ isActive }) => (
-          <>
-            <Icon className={nested ? "h-3.5 w-3.5" : "h-4 w-4"} />
-            {item.label}
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          asChild
+          isActive={isActivePath(item)}
+          tooltip={locked ? `${item.label} — not in your plan` : item.label}
+        >
+          <NavLink
+            to={item.path}
+            end={item.path === "/" || item.exact}
+            onClick={closeOnMobile}
+            aria-label={locked ? `${item.label} — not in your plan` : undefined}
+            data-locked={locked || undefined}
+            title={
+              locked
+                ? `${item.label} isn't in your plan — tap to see upgrade options`
+                : undefined
+            }
+          >
+            <Icon />
+            <span>{item.label}</span>
             {locked && (
-              /* Contained rather than a bare glyph: a floating
-               icon at the row's edge reads as stray decoration,
-               while a tinted chip reads as a deliberate mark and
-               gives the amber somewhere to sit. */
+              /* Contained rather than a bare glyph: a floating icon at the
+                 row's edge reads as stray decoration, while a tinted chip
+                 reads as a deliberate mark and gives the amber somewhere to
+                 sit. Collapsed to icons there is no room for it — the tooltip
+                 says the same thing. */
               <span
                 className={cn(
                   "ml-auto flex size-5 shrink-0 items-center justify-center rounded-md",
-                  isActive
-                    ? "bg-primary-foreground/15 text-primary-foreground"
-                    : "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+                  "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+                  "group-data-[active=true]/menu-item:bg-sidebar-accent-foreground/15",
+                  "group-data-[collapsible=icon]:hidden",
                 )}
                 aria-hidden
               >
                 <Crown className="size-3" />
               </span>
             )}
-            {item.path === "/orders" && hasUnseenOrders && (
+            {unseen(item.path) && (
+              /* Survives the collapse: the whole point is to be seen when the
+                 label isn't there, so it moves to the icon's corner. */
               <span
-                className="ml-auto h-2 w-2 shrink-0 rounded-full bg-red-500"
-                title="New orders"
+                className="ml-auto size-2 shrink-0 rounded-full bg-red-500 group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:right-1 group-data-[collapsible=icon]:top-1 group-data-[collapsible=icon]:ml-0"
+                title={item.path === "/orders" ? "New orders" : "New queries"}
               />
             )}
-            {item.path === "/queries" && hasUnseenEnquiries && (
-              <span
-                className="ml-auto h-2 w-2 shrink-0 rounded-full bg-red-500"
-                title="New queries"
-              />
-            )}
-          </>
+          </NavLink>
+        </SidebarMenuButton>
+
+        {children.length > 0 && (
+          <SidebarMenuSub>
+            {children.map((child) => {
+              const ChildIcon = child.icon;
+              return (
+                <SidebarMenuSubItem key={child.path}>
+                  <SidebarMenuSubButton asChild isActive={isActivePath(child)}>
+                    <NavLink
+                      to={child.path}
+                      end={child.exact}
+                      onClick={closeOnMobile}
+                    >
+                      <ChildIcon />
+                      <span>{child.label}</span>
+                    </NavLink>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              );
+            })}
+          </SidebarMenuSub>
         )}
-      </NavLink>
+      </SidebarMenuItem>
     );
+  }
+
+  function unseen(path: string) {
+    if (path === "/orders") return hasUnseenOrders;
+    if (path === "/queries") return hasUnseenEnquiries;
+    return false;
   }
 }
 
@@ -207,9 +250,11 @@ function Brand({
   brand: { name: string; logoUrl: string | null } | null;
 }) {
   return (
-    <div className="flex items-center gap-2 px-5 py-4">
+    // The mark keeps its size through the collapse and stays centred in the
+    // icon rail; only the wordmark beside it goes.
+    <div className="flex items-center gap-2 p-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0">
       {brand?.logoUrl ? (
-        <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-primary text-primary-foreground">
+        <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary text-primary-foreground">
           <img
             src={brand.logoUrl}
             alt={brand.name}
@@ -217,13 +262,41 @@ function Brand({
           />
         </div>
       ) : (
-        <FrostiqueMark className="h-8 w-8" />
+        <FrostiqueMark className="size-8 shrink-0" />
       )}
-      <div className="leading-tight">
-        <p className="text-sm font-semibold">{brand?.name ?? "Frostique"}</p>
-        <p className="text-xs text-muted-foreground">Admin Portal</p>
+      <div className="grid min-w-0 flex-1 leading-tight group-data-[collapsible=icon]:hidden">
+        <p className="truncate text-sm font-semibold">
+          {brand?.name ?? "Frostique"}
+        </p>
+        <p className="truncate text-xs text-muted-foreground">Admin Portal</p>
       </div>
     </div>
+  );
+}
+
+/**
+ * The app shell's sidebar: brand, then the role's navigation.
+ *
+ * `collapsible="icon"` — it narrows to an icon rail rather than sliding away,
+ * so the whole menu stays one click from anywhere. Toggled by the trigger in
+ * the header, the rail's own edge, or ⌘/Ctrl+B, and the choice is remembered
+ * in a cookie across sessions.
+ */
+function AppSidebar({
+  brand,
+}: {
+  brand: { name: string; logoUrl: string | null } | null;
+}) {
+  return (
+    <Sidebar collapsible="icon">
+      <SidebarHeader>
+        <Brand brand={brand} />
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarNav />
+      </SidebarContent>
+      <SidebarRail />
+    </Sidebar>
   );
 }
 
@@ -242,7 +315,6 @@ export function AppLayout() {
     hasFeature,
   } = useEntitlements();
   const theme = useAppSelector((s) => s.ui.theme);
-  const [mobileOpen, setMobileOpen] = useState(false);
 
   // Reflect the brand in the browser tab so the whole portal reads as theirs.
   useEffect(() => {
@@ -300,54 +372,18 @@ export function AppLayout() {
   };
 
   return (
-    <div className="flex min-h-screen bg-muted/30">
+    <SidebarProvider>
       {/* App-wide order alerts: one SSE connection, bell + toast + sidebar dot. */}
       <OrderNotifications />
       {/* App-wide enquiry alerts (platform super admin only): same pattern. */}
       <EnquiryNotifications />
 
-      {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 border-r bg-background lg:block">
-        <div className="sticky top-0 flex h-screen flex-col overflow-y-auto">
-          <Brand brand={brand} />
-          <SidebarNav />
-        </div>
-      </aside>
+      <AppSidebar brand={brand} />
 
-      {/* Mobile drawer */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setMobileOpen(false)}
-          />
-          <aside className="absolute left-0 top-0 h-full w-64 overflow-y-auto border-r bg-background">
-            <div className="flex items-center justify-between pr-2">
-              <Brand brand={brand} />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setMobileOpen(false)}
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-            <SidebarNav onNavigate={() => setMobileOpen(false)} />
-          </aside>
-        </div>
-      )}
-
-      {/* Main column */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden"
-            onClick={() => setMobileOpen(true)}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
+      <SidebarInset className="min-w-0 bg-muted/30">
+        <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur">
+          <SidebarTrigger className="-ml-1" />
+          <Separator orientation="vertical" className="mr-1 h-4" />
           <div className="ml-auto flex items-center gap-2">
             {!isExempt && hasFeature("can_use_custom_cake") && (
               <Button
@@ -405,10 +441,10 @@ export function AppLayout() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6">
+        <div className="flex-1 p-4 sm:p-6">
           <Outlet />
-        </main>
-      </div>
-    </div>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

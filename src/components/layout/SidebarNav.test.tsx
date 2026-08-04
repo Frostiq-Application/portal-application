@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { NAV_ITEMS, navForRole } from "@/config/nav";
+import { SidebarProvider } from "@/components/ui/sidebar";
 
 /**
  * The sidebar's plan-gating contract (SH-23).
@@ -35,10 +36,15 @@ vi.mock("@/app/hooks", () => ({
 // Import after the mocks so the component picks them up.
 const { SidebarNav } = await import("./AppLayout");
 
+// The nav reads sidebar state (to close the mobile drawer on navigation and to
+// dim labels in the icon rail), so it needs the provider the same way it needs
+// a router.
 const renderNav = () =>
   render(
     <MemoryRouter>
-      <SidebarNav />
+      <SidebarProvider>
+        <SidebarNav />
+      </SidebarProvider>
     </MemoryRouter>,
   );
 
