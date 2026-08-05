@@ -5,6 +5,13 @@ interface InfiniteScrollProps {
   loading: boolean;
   onLoadMore: () => void;
   children: ReactNode;
+  /**
+   * Scroll container the sentinel is watched inside. Defaults to the viewport,
+   * which is right for a whole page; pass the element when the list scrolls in
+   * its own box, otherwise `rootMargin` expands the viewport — not the box —
+   * and the next page only loads once the sentinel is fully in view.
+   */
+  root?: Element | null;
   /** Distance (px) before the sentinel enters view to trigger a load. */
   rootMargin?: string;
   loader?: ReactNode;
@@ -16,6 +23,7 @@ export function InfiniteScroll({
   loading,
   onLoadMore,
   children,
+  root = null,
   rootMargin = "300px",
   loader,
   endMessage,
@@ -32,12 +40,12 @@ export function InfiniteScroll({
           onLoadMore();
         }
       },
-      { rootMargin },
+      { root, rootMargin },
     );
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, [hasMore, loading, onLoadMore, rootMargin]);
+  }, [hasMore, loading, onLoadMore, root, rootMargin]);
 
   return (
     <>

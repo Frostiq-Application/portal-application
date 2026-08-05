@@ -143,7 +143,7 @@ function Brief({ enquiry }: { enquiry: Enquiry }) {
         <p className="mt-2 whitespace-pre-wrap text-sm">
           {enquiry.message || (
             <span className="text-muted-foreground">
-              Nothing written in — worth asking on the call.
+              Nothing written in. Worth asking on the call.
             </span>
           )}
         </p>

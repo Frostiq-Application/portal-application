@@ -279,7 +279,7 @@ export function ShopDashboard() {
         <div>
           <h3 className="text-base font-semibold">Wishlist insights</h3>
           <p className="text-sm text-muted-foreground">
-            What shoppers are saving for later — and how often it turns into an order.
+            What shoppers are saving for later, and how often it turns into an order.
           </p>
         </div>
         {canUseWishlist ? (
@@ -348,20 +348,20 @@ function OrderAnalytics({
         />
         <KpiCard
           label="Revenue"
-          value={data ? inr(data.revenue) : "—"}
+          value={data ? inr(data.revenue) : "-"}
           icon={TrendingUp}
           loading={loading}
           accent="#10b981"
         />
         <KpiCard
           label="Avg order value"
-          value={data ? inr(data.averageOrderValue) : "—"}
+          value={data ? inr(data.averageOrderValue) : "-"}
           icon={IndianRupee}
           loading={loading}
         />
         <KpiCard
           label="Pending payment"
-          value={data ? inr(data.pendingPaymentTotal) : "—"}
+          value={data ? inr(data.pendingPaymentTotal) : "-"}
           icon={Receipt}
           loading={loading}
           accent="#f59e0b"

@@ -172,7 +172,7 @@ export function GalleryTab({ shopId }: { shopId: string }) {
       }
       if (failed.length) {
         toast.error(
-          `${failed.length} ${failed.length === 1 ? "photo" : "photos"} failed to upload — retry from the grid.`,
+          `${failed.length} ${failed.length === 1 ? "photo" : "photos"} failed to upload. Retry from the grid.`,
         );
       }
     },
@@ -185,7 +185,7 @@ export function GalleryTab({ shopId }: { shopId: string }) {
       const picked = Array.from(files).filter((f) => f.type.startsWith("image/"));
       if (picked.length === 0) return;
       if (picked.length > MAX_PER_BATCH) {
-        toast.info(`Taking the first ${MAX_PER_BATCH} — add the rest in a second batch.`);
+        toast.info(`Taking the first ${MAX_PER_BATCH}. Add the rest in a second batch.`);
       }
       const batch: PendingUpload[] = picked.slice(0, MAX_PER_BATCH).map((file, i) => ({
         localId: `${Date.now()}-${i}-${file.name}`,
@@ -309,7 +309,7 @@ export function GalleryTab({ shopId }: { shopId: string }) {
           <p className="text-muted-foreground">
             No featured images yet. The carousel on the storefront home screen
             shows <strong className="text-foreground">featured</strong> images
-            only — star a few so it appears.
+            only. Star a few so it appears.
           </p>
         </Card>
       )}
@@ -328,7 +328,7 @@ export function GalleryTab({ shopId }: { shopId: string }) {
             </EmptyMedia>
             <EmptyTitle>No gallery images yet</EmptyTitle>
             <EmptyDescription>
-              Upload photos of cakes you&rsquo;ve already made — they become the
+              Upload photos of cakes you&rsquo;ve already made. They become the
               inspiration customers order from.
             </EmptyDescription>
           </EmptyHeader>

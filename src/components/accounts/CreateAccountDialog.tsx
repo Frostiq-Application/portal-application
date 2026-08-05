@@ -87,7 +87,7 @@ export function CreateAccountDialog() {
       }).unwrap();
       setOwnerEmail(res.ownerEmail);
       setInviteToken(res.ownerInviteToken);
-      toast.success(`Shop "${res.name}" created — invite sent to ${res.ownerEmail}.`);
+      toast.success(`Shop "${res.name}" created. Invite sent to ${res.ownerEmail}.`);
       reset({ activate: false, ownerPhone: "" });
       setSlugTouched(false);
       setLogoUrl("");
@@ -197,7 +197,7 @@ export function CreateAccountDialog() {
               </Field>
               <Field
                 label="Theme color"
-                hint="The brand's accent — colours buttons, the active menu item and highlights in their portal."
+                hint="The brand's accent. It colours buttons, the active menu item and highlights in their portal."
               >
                 <ThemeColorPicker value={themeColor} onChange={setThemeColor} />
               </Field>

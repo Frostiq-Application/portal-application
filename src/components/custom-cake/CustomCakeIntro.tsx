@@ -12,7 +12,7 @@ const STEPS = [
   {
     icon: CakeSlice,
     title: "Requests come in",
-    body: "Customers submit made-to-order cake briefs from the storefront — flavour, design, reference photos, and delivery details.",
+    body: "Customers submit made-to-order cake briefs from the storefront: flavour, design, reference photos, and delivery details.",
   },
   {
     icon: Receipt,
@@ -27,7 +27,7 @@ const STEPS = [
   {
     icon: ShoppingBag,
     title: "Convert to an order",
-    body: "Once accepted, turn a request into a regular order in one tap — it joins your normal order queue.",
+    body: "Once accepted, turn a request into a regular order in one tap. It joins your normal order queue.",
   },
 ];
 
@@ -49,7 +49,7 @@ export function CustomCakeIntro({
           </div>
           <DialogTitle>Welcome to Custom Cakes</DialogTitle>
           <DialogDescription>
-            A quote-request workflow for made-to-order cakes — here's how it
+            A quote-request workflow for made-to-order cakes. Here's how it
             works.
           </DialogDescription>
         </DialogHeader>

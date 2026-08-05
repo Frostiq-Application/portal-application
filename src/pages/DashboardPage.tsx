@@ -31,7 +31,7 @@ function StatCard({
         <Icon className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{loading ? "—" : value}</div>
+        <div className="text-2xl font-bold">{loading ? "-" : value}</div>
       </CardContent>
     </Card>
   );
@@ -143,17 +143,17 @@ function PlatformDashboard() {
         <StatCard label="Suspended" value={suspended.total} icon={PauseCircle} loading={suspended.isLoading} />
         <StatCard
           label="MRR"
-          value={reports ? `₹${Math.round(mrr).toLocaleString("en-IN")}` : "—"}
+          value={reports ? `₹${Math.round(mrr).toLocaleString("en-IN")}` : "-"}
           icon={TrendingUp}
           loading={!reports}
         />
         <StatCard
           label="Collected"
-          value={reports ? `₹${Math.round(collected).toLocaleString("en-IN")}` : "—"}
+          value={reports ? `₹${Math.round(collected).toLocaleString("en-IN")}` : "-"}
           icon={IndianRupee}
           loading={!reports}
         />
-        <StatCard label="Trials" value={reports?.statusCounts.trial ?? "—"} icon={Clock} loading={!reports} />
+        <StatCard label="Trials" value={reports?.statusCounts.trial ?? "-"} icon={Clock} loading={!reports} />
         <StatCard
           label="Payment overdue"
           value={(reports?.statusCounts.grace ?? 0) + (reports?.statusCounts.locked ?? 0)}

@@ -14,6 +14,7 @@ import type { LoginResponse } from "@/types";
 import { apiError } from "@/lib/apiError";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 
 const extractError = (err: unknown) =>
@@ -141,9 +142,8 @@ export function LoginPage() {
                         Forgot password?
                       </Link>
                     </div>
-                    <Input
+                    <PasswordInput
                       id="password"
-                      type="password"
                       autoComplete="current-password"
                       placeholder="••••••••"
                       value={password}

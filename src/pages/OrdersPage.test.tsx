@@ -12,7 +12,9 @@ import { isoToday } from "@/lib/orders";
  * re-order the queue. So: the day tabs drive the request, the delivery window
  * is readable rather than a raw `13:30:00`, anything left over from a past day
  * is visibly late, and the sort headers reach the server (a client-side sort
- * would only reorder the current page, which is a lie on page 2).
+ * would only reorder what has been scrolled in, which is a lie about the rest).
+ * The queue scrolls rather than pages, so the batch boundary never interrupts
+ * someone working their way down the list.
  */
 
 const TODAY = isoToday();
@@ -39,6 +41,11 @@ const mockState = vi.hoisted(() => ({
   // Args the page last passed to each query — how we assert what it asked for.
   listArgs: undefined as Record<string, unknown> | undefined,
   rows: [] as Record<string, unknown>[],
+  /** Server-side page depth, so the scroll footer can be exercised. */
+  meta: { page: 1, totalPages: 1, total: 0 } as Record<string, number>,
+  /** The signed-in user's effective permissions — what the page gates on. */
+  permissions: [] as string[],
+  role: "shop_admin" as string,
 }));
 
 vi.mock("@/app/hooks", () => ({
@@ -47,6 +54,14 @@ vi.mock("@/app/hooks", () => ({
     select({
       branch: { selectedBranchId: "shop-1" },
       notifications: { streamStatus: "open" },
+      auth: {
+        accessToken: "t",
+        user: {
+          id: "u1",
+          role: mockState.role,
+          permissions: mockState.permissions,
+        },
+      },
     }),
 }));
 vi.mock("@/hooks/useEntitlements", () => ({
@@ -65,9 +80,16 @@ vi.mock("@/features/api/ordersApi", () => ({
   useListOrdersQuery: (args: Record<string, unknown>) => {
     mockState.listArgs = args;
     return {
-      data: {
+      // The queue reads `currentData`, so a filter change never paints the
+      // previous filter's rows.
+      currentData: {
         data: mockState.rows,
-        meta: { total: mockState.rows.length, page: 1, limit: 20, totalPages: 1 },
+        meta: {
+          total: mockState.meta.total || mockState.rows.length,
+          page: mockState.meta.page,
+          limit: 20,
+          totalPages: mockState.meta.totalPages,
+        },
       },
       isLoading: false,
       isFetching: false,
@@ -97,6 +119,14 @@ const rowFor = (orderNumber: string) =>
 
 beforeEach(() => {
   mockState.listArgs = undefined;
+  mockState.meta = { page: 1, totalPages: 1, total: 0 };
+  mockState.role = "shop_admin";
+  mockState.permissions = [
+    "orders.view",
+    "orders.status",
+    "orders.create",
+    "orders.manage",
+  ];
   mockState.rows = [
     order({ id: "o1", orderNumber: "DIV-0001" }),
     order({
@@ -197,7 +227,7 @@ describe("overdue orders", () => {
 });
 
 describe("sorting", () => {
-  it("starts on the fulfilment running order — soonest first", () => {
+  it("starts on the fulfilment running order, soonest first", () => {
     renderPage();
     expect(mockState.listArgs).toMatchObject({
       sortBy: "schedule",
@@ -221,7 +251,7 @@ describe("sorting", () => {
     });
   });
 
-  it("opens a new column at its own natural direction — biggest orders first", async () => {
+  it("opens a new column at its own natural direction, biggest orders first", async () => {
     renderPage();
     await userEvent.click(screen.getByRole("button", { name: /Total/ }));
     expect(mockState.listArgs).toMatchObject({
@@ -247,6 +277,59 @@ describe("row actions", () => {
     expect(row.querySelector("button[aria-label^='More actions']")).not.toBeNull();
     expect(within(row).queryByRole("button", { name: "Mark paid" })).toBeNull();
     expect(within(row).queryByRole("button", { name: /Decline/ })).toBeNull();
+  });
+});
+
+describe("raising an order", () => {
+  it("offers it to a chef, who now holds orders.create", () => {
+    mockState.role = "chef";
+    mockState.permissions = [
+      "orders.view",
+      "orders.status",
+      "orders.create",
+      "kitchen.view",
+    ];
+    renderPage();
+    expect(screen.getByRole("button", { name: /Create order/ })).toBeVisible();
+  });
+
+  it("hides the button from a role that cannot, rather than 403ing on submit", () => {
+    // A rider watches the queue but does not write orders up.
+    mockState.role = "delivery_manager";
+    mockState.permissions = ["orders.view", "orders.status", "delivery.view"];
+    renderPage();
+    expect(screen.queryByRole("button", { name: /Create order/ })).toBeNull();
+  });
+});
+
+describe("scrolling the queue", () => {
+  it("has no pager to press, the next batch comes in on scroll", () => {
+    mockState.meta = { page: 1, totalPages: 3, total: 60 };
+    renderPage();
+    expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Previous" })).toBeNull();
+  });
+
+  it("says how much of the queue is loaded, so the scroll has an end in sight", () => {
+    mockState.meta = { page: 1, totalPages: 3, total: 60 };
+    renderPage();
+    expect(screen.getByText("Showing 4 of 60 orders")).toBeVisible();
+    expect(screen.getByText("Loading more orders…")).toBeVisible();
+  });
+
+  it("calls the end of the queue rather than dangling a loader forever", () => {
+    mockState.meta = { page: 1, totalPages: 1, total: 4 };
+    renderPage();
+    expect(screen.getByText("That's every order in this queue.")).toBeVisible();
+    expect(screen.queryByText("Loading more orders…")).toBeNull();
+  });
+
+  it("counts depth from the server's page, not the last one clicked", () => {
+    // Returning to a tab replays its accumulated pages: three loaded, three
+    // total, so there is nothing left to fetch even though nobody scrolled yet.
+    mockState.meta = { page: 3, totalPages: 3, total: 4 };
+    renderPage();
+    expect(screen.getByText("That's every order in this queue.")).toBeVisible();
   });
 });
 

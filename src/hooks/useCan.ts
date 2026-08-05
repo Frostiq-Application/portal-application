@@ -23,6 +23,7 @@ const FALLBACK_PERMISSIONS: Record<Role, PermissionKey[]> = {
   account_super_admin: [
     "orders.view",
     "orders.status",
+    "orders.create",
     "orders.manage",
     "kitchen.view",
     "delivery.view",
@@ -42,6 +43,7 @@ const FALLBACK_PERMISSIONS: Record<Role, PermissionKey[]> = {
   shop_admin: [
     "orders.view",
     "orders.status",
+    "orders.create",
     "orders.manage",
     "kitchen.view",
     "delivery.view",
@@ -58,11 +60,12 @@ const FALLBACK_PERMISSIONS: Record<Role, PermissionKey[]> = {
   staff: [
     "orders.view",
     "orders.status",
+    "orders.create",
     "orders.manage",
     "kitchen.view",
     "delivery.view",
   ],
-  chef: ["orders.view", "orders.status", "kitchen.view"],
+  chef: ["orders.view", "orders.status", "orders.create", "kitchen.view"],
   delivery_manager: [
     "orders.view",
     "orders.status",

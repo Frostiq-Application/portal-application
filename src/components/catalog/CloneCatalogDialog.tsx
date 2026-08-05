@@ -272,7 +272,7 @@ function UpgradePrompt() {
       <p className="mx-auto mt-1 max-w-xs text-sm text-muted-foreground">
         Set up a new branch in seconds by copying an existing branch's products,
         categories and add-ons
-        {entitlements?.planName ? ` — not included in ${entitlements.planName}` : ""}.
+        {entitlements?.planName ? `, not included in ${entitlements.planName}` : ""}.
       </p>
       <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
         <Sparkles className="h-3.5 w-3.5" />

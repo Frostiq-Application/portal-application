@@ -87,7 +87,7 @@ export function CancelDialog({
           </DialogTitle>
           <DialogDescription>
             {periodEnd
-              ? `You'll keep everything until ${formatDate(periodEnd)} — you've already paid for it.`
+              ? `You'll keep everything until ${formatDate(periodEnd)}, since you've already paid for it.`
               : "You'll keep access until the end of your current period."}
           </DialogDescription>
         </DialogHeader>
@@ -131,7 +131,7 @@ export function CancelDialog({
 
           <ul className="space-y-1 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
             <li>• Your storefront stays live until the end of the period.</li>
-            <li>• Autopay is switched off — you won't be charged again.</li>
+            <li>• Autopay is switched off, so you won't be charged again.</li>
             <li>• Subscription fees are non-refundable.</li>
             <li>
               • Your data is archived for {archiveDays} days, not deleted. Come

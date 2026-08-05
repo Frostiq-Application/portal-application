@@ -93,7 +93,7 @@ describe("isOverdue", () => {
     expect(isOverdue("2026-07-30", "placed", today)).toBe(false);
   });
 
-  it("never flags finished orders — they are not outstanding work", () => {
+  it("never flags finished orders, they are not outstanding work", () => {
     expect(isOverdue("2026-07-20", "delivered", today)).toBe(false);
     expect(isOverdue("2026-07-20", "cancelled", today)).toBe(false);
   });

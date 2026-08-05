@@ -133,7 +133,7 @@ export function dayDistanceLabel(iso: string, today: string): string {
 /** "2026-07-29" -> "Wed, 29 Jul". */
 export function shortDayDate(iso: string): string {
   const d = new Date(`${iso.slice(0, 10)}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleDateString(undefined, {
     weekday: "short",
     day: "numeric",

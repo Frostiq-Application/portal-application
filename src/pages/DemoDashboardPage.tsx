@@ -248,7 +248,7 @@ export function DemoDashboardPage() {
               <div>
                 <h1 className="text-xl font-semibold">Dashboard</h1>
                 <p className="text-sm text-muted-foreground">
-                  Welcome back, Aisha — here&apos;s how Bloom &amp; Batter is doing.
+                  Welcome back, Aisha. Here&apos;s how Bloom &amp; Batter is doing.
                 </p>
               </div>
               <button className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm font-medium shadow-sm">

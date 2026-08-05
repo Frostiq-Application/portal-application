@@ -29,7 +29,7 @@ export function StarterCatalogCard({ shopId }: { shopId: string }) {
       const res = await seed({ shopId }).unwrap();
       setDone(true);
       toast.success(
-        `Added ${res.created} starter cake${res.created === 1 ? "" : "s"} — edit them to match what you bake.`,
+        `Added ${res.created} starter cake${res.created === 1 ? "" : "s"}. Edit them to match what you bake.`,
       );
     } catch (err) {
       toast.error(
@@ -48,7 +48,7 @@ export function StarterCatalogCard({ shopId }: { shopId: string }) {
         <p className="font-semibold">Start with five cakes</p>
         <p className="mt-0.5 text-sm text-muted-foreground">
           We'll add five common cakes with sizes and prices already filled in.
-          Rename them, change the prices, add your own photos — or delete the
+          Rename them, change the prices, add your own photos, or delete the
           ones you don't make.
         </p>
       </div>

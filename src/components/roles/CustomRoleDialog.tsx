@@ -81,7 +81,7 @@ export function CustomRoleDialog({
     if (name.trim().length < 2) return toast.error("Name is required");
     if (mode === "restrict" && selected.size === 0) {
       return toast.error(
-        "Tick at least one permission — a restricted role with none can't reach any page.",
+        "Tick at least one permission. A restricted role with none can't reach any page.",
       );
     }
     const body = {
@@ -189,7 +189,7 @@ export function CustomRoleDialog({
           {mode === "restrict" && selected.size === 0 && (
             <p className="rounded-md bg-amber-50 px-2.5 py-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
               Nothing ticked. A restricted role with no permissions can&rsquo;t
-              open a single page — tick what this person actually needs.
+              open a single page. Tick what this person actually needs.
             </p>
           )}
 

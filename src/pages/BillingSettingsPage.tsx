@@ -139,7 +139,7 @@ export function BillingSettingsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Billing settings"
-        description="GST, invoicing, dunning timings and the data-retention lifecycle. Every value here is read at runtime — no deploy needed."
+        description="GST, invoicing, dunning timings and the data-retention lifecycle. Every value here is read at runtime. No deploy needed."
         actions={
           <Button onClick={save} disabled={saving}>
             {saving && <Loader2 className="size-4 animate-spin" />}
@@ -189,7 +189,7 @@ export function BillingSettingsPage() {
                   </Label>
                   <Hint>
                     Off means invoices go out as plain receipts with no tax
-                    lines — which is correct until registration completes.
+                    lines, which is correct until registration completes.
                     Turning it on starts adding GST to every new charge; issued
                     invoices are frozen and never change. Needs a GSTIN below
                     first.
@@ -233,7 +233,7 @@ export function BillingSettingsPage() {
                     Applied to plan, add-on and gateway-fee amounts on every
                     charge. Split half-and-half into CGST + SGST for buyers in
                     your home state, or charged as a single IGST line otherwise.
-                    Changing it affects future invoices only — issued ones are
+                    Changing it affects future invoices only. Issued ones are
                     frozen.
                   </Hint>
                 </div>
@@ -363,7 +363,7 @@ export function BillingSettingsPage() {
                   />
                   <Hint>
                     How long a shop keeps trading after a renewal fails. The
-                    storefront stays <strong>live</strong> the whole time — on
+                    storefront stays <strong>live</strong> the whole time, on
                     purpose, so a card problem never strands an order a customer
                     already placed. Retries run during this window.
                   </Hint>
@@ -408,7 +408,7 @@ export function BillingSettingsPage() {
                   <Hint>
                     How long a cancelled account's catalogue, orders and
                     customers are kept before it is <em>flagged</em> for
-                    deletion. Nothing is ever deleted automatically — the flag
+                    deletion. Nothing is ever deleted automatically. The flag
                     just makes it eligible for the manual Delete fully action on
                     the Data retention tab.
                   </Hint>
@@ -430,8 +430,8 @@ export function BillingSettingsPage() {
                     }
                   />
                   <Hint>
-                    Only affects accounts still on an old time-limited trial —
-                    the Free tier replaced trials, so nothing new ever enters
+                    Only affects accounts still on an old time-limited trial.
+                    The Free tier replaced trials, so nothing new ever enters
                     this state. Leave it as-is unless you are winding those
                     accounts down.
                   </Hint>
@@ -460,8 +460,8 @@ export function BillingSettingsPage() {
                   Days after a failed renewal on which to retry the auto-debit,
                   comma separated. Each attempt is recorded as its own row in
                   billing history with its failure reason, and the shop is
-                  emailed every time. Only applies to accounts with autopay —
-                  manual payers just get the pay link.
+                  emailed every time. Only applies to accounts with autopay.
+                  Manual payers just get the pay link.
                 </Hint>
               </div>
 
@@ -506,7 +506,7 @@ export function BillingSettingsPage() {
                   <Hint>
                     On: the gateway's cut is added to the bakery's bill as a
                     visible line item. Off: you absorb it and the bakery pays
-                    exactly the plan price. Either is fine — but the line is
+                    exactly the plan price. Either is fine, but the line is
                     always shown before payment, never hidden in the total.
                   </Hint>
                 </div>
@@ -532,7 +532,7 @@ export function BillingSettingsPage() {
                     What you add on top of every charge to cover Razorpay's cut.
                     Only applied when the pass-through switch above is on, and
                     it shows as its own line at checkout so nothing is hidden.
-                    Set it to roughly your real blended rate — UPI is usually
+                    Set it to roughly your real blended rate. UPI is usually
                     near zero, cards are not.
                   </Hint>
                 </div>
@@ -553,7 +553,7 @@ export function BillingSettingsPage() {
                     it, an autopay mandate charges silently; above it, the
                     bakery has to approve each debit with a UPI PIN, so the
                     renewal waits for them. ₹15,000 is the operative figure for
-                    SaaS — the higher ₹1,00,000 tier covers insurance, mutual
+                    SaaS. The higher ₹1,00,000 tier covers insurance, mutual
                     funds and credit-card bills, not us. Raising it past ₹15,000
                     will not make debits succeed; the bank still refuses.
                   </Hint>
@@ -586,7 +586,7 @@ export function BillingSettingsPage() {
                 Accounts that cancelled more than{" "}
                 {draft.archiveDays ?? 90} days ago, set by "Keep data after
                 cancellation" on the Lifecycle tab. Nothing here has been
-                deleted — <strong>nothing ever is, automatically</strong>. This
+                deleted. <strong>Nothing ever is, automatically</strong>. This
                 list is just what has become <em>eligible</em>. Deleting drops
                 the account's entire tenant schema; it is manual, irreversible
                 and recorded against your name in the audit log.
@@ -645,7 +645,7 @@ export function BillingSettingsPage() {
               Permanently delete {confirmTarget?.accountName}?
             </DialogTitle>
             <DialogDescription>
-              This destroys the account's entire tenant schema — catalogue,
+              This destroys the account's entire tenant schema: catalogue,
               orders, customers, everything. It cannot be undone, and it will be
               recorded against your name in the audit log.
             </DialogDescription>

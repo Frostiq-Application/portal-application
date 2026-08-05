@@ -221,7 +221,7 @@ export function WishlistAnalyticsView({
         />
         <MiniKpi
           label="Wishlist → order"
-          value={data ? pct(data.overallConversionRate) : "—"}
+          value={data ? pct(data.overallConversionRate) : "-"}
           icon={ShoppingCart}
           loading={loading}
         />

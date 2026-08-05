@@ -139,7 +139,7 @@ export function PlanEditorDialog({
         await update({ id: plan.id, body }).unwrap();
         toast.success(
           plan.priceMonthly !== String(price.toFixed(2))
-            ? `${name} saved. The new price applies from each subscriber's next renewal — they've been emailed.`
+            ? `${name} saved. The new price applies from each subscriber's next renewal. They've been emailed.`
             : `${name} saved.`,
         );
       } else {
@@ -164,7 +164,7 @@ export function PlanEditorDialog({
         <DialogHeader>
           <DialogTitle>{plan ? `Edit ${plan.name}` : "New plan"}</DialogTitle>
           <DialogDescription>
-            Set one monthly price — every cycle price is derived from it.
+            Set one monthly price. Every cycle price is derived from it.
           </DialogDescription>
         </DialogHeader>
 
@@ -261,7 +261,7 @@ export function PlanEditorDialog({
                 }
               />
               <p className="text-xs text-muted-foreground">
-                0 means no trial. Keep this on one plan only — signups are
+                0 means no trial. Keep this on one plan only. Signups are
                 offered the cheapest plan that has a trial, once per account.
               </p>
             </div>
@@ -302,7 +302,7 @@ export function PlanEditorDialog({
                   Hidden plan
                 </Label>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Kept off the pricing page — for Enterprise and per-deal plans.
+                  Kept off the pricing page, for Enterprise and per-deal plans.
                 </p>
               </div>
               <Switch
@@ -348,8 +348,8 @@ export function PlanEditorDialog({
             <div>
               <h3 className="text-sm font-semibold">Limits</h3>
               <p className="text-xs text-muted-foreground">
-                Numeric caps. Accounts can extend these with add-ons on any plan
-                — unless you mark them unlimited.
+                Numeric caps. Accounts can extend these with add-ons on any plan,
+                unless you mark them unlimited.
               </p>
             </div>
             {countFeatures.map((f) => {
@@ -363,7 +363,7 @@ export function PlanEditorDialog({
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium">{f.label}</p>
                     <p className="text-xs text-muted-foreground">
-                      Trial cap {f.trialLimit ?? "—"}
+                      Trial cap {f.trialLimit ?? "-"}
                       {f.addonStep && ` · add-on step +${f.addonStep}`}
                     </p>
                   </div>
@@ -405,7 +405,7 @@ export function PlanEditorDialog({
             <div>
               <h3 className="text-sm font-semibold">Features</h3>
               <p className="text-xs text-muted-foreground">
-                On/off capabilities. These are the reason to upgrade — they're
+                On/off capabilities. These are the reason to upgrade. They're
                 never sold as add-ons.
               </p>
             </div>
@@ -448,7 +448,7 @@ export function PlanEditorDialog({
               </Badge>
               account{plan.subscriberCount === 1 ? " is" : "s are"} on this
               plan. Changing the price never affects a period they've already
-              paid for — it applies from each account's next renewal, and
+              paid for. It applies from each account's next renewal, and
               they'll be emailed in advance.
             </p>
           )}

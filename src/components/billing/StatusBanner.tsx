@@ -82,8 +82,8 @@ export function StatusBanner({
       title: "Your storefront is offline",
       body: (
         <>
-          Customers can't order right now. Paying restores everything instantly —
-          nothing has been deleted.
+          Customers can't order right now. Paying restores everything instantly.
+          Nothing has been deleted.
           {s.lockedUntil && (
             <> Cancels automatically on {formatDate(s.lockedUntil)}.</>
           )}
@@ -146,7 +146,7 @@ export function StatusBanner({
       body: (
         <>
           Ends {formatDate(s.trialEndsAt)}. Activate before then and your
-          storefront never skips a beat — the "Powered by Frostique" badge
+          storefront never skips a beat. The "Powered by Frostique" badge
           disappears too.
         </>
       ),
@@ -172,7 +172,7 @@ export function StatusBanner({
       body: (
         <>
           You can't add more {full.label.toLowerCase()} until there's room. Move
-          up a plan, or buy extra capacity for this one — nothing you've already
+          up a plan, or buy extra capacity for this one. Nothing you've already
           created is affected either way.
         </>
       ),
@@ -241,7 +241,7 @@ export function StatusBanner({
       {banners.length > 1 && (
         <p className="w-full text-xs text-muted-foreground">
           +{banners.length - 1} other update
-          {banners.length - 1 === 1 ? "" : "s"} — see the details below.
+          {banners.length - 1 === 1 ? "" : "s"}. See the details below.
         </p>
       )}
     </div>

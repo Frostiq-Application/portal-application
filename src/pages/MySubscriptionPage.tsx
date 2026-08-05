@@ -136,14 +136,14 @@ function UsageMeter({ row }: { row: UsageRow }) {
 
       <p className="text-xs text-muted-foreground">
         {row.trialCapped ? (
-          <>Trial limit — your plan's full limit unlocks when you activate.</>
+          <>Trial limit. Your plan's full limit unlocks when you activate.</>
         ) : row.addonValue > 0 ? (
           <>
             {row.planValue} from your plan · +{row.addonValue} from add-ons
           </>
         ) : atLimit ? (
           <span className="text-destructive">
-            You're at your limit — upgrade or add capacity to create more.
+            You're at your limit. Upgrade or add capacity to create more.
           </span>
         ) : (
           <>Included in your plan</>
@@ -240,7 +240,7 @@ export function MySubscriptionPage() {
   async function handleStartFree(plan: PricingPlan) {
     try {
       await startFree().unwrap();
-      toast.success(`You're on ${plan.name} — your storefront is live.`);
+      toast.success(`You're on ${plan.name}. Your storefront is live.`);
       refetch();
     } catch (err) {
       toast.error(
@@ -295,9 +295,9 @@ export function MySubscriptionPage() {
           title="Choose your plan"
           description={
             trialOffer
-              ? `Try ${trialOffer.planName} free for ${trialOffer.days} days — no card. Or start on a plan straight away.`
+              ? `Try ${trialOffer.planName} free for ${trialOffer.days} days, no card. Or start on a plan straight away.`
               : data?.freePlanAvailable
-                ? "Start free — no card, no time limit. Your storefront is live from day one, and you upgrade only when you outgrow it."
+                ? "Start free, no card, no time limit. Your storefront is live from day one, and you upgrade only when you outgrow it."
                 : "Pick a plan to get your storefront back online."
           }
         />
@@ -311,8 +311,8 @@ export function MySubscriptionPage() {
                   Try {trialOffer.planName} free for {trialOffer.days} days.
                 </strong>{" "}
                 No card, and it's the only plan we offer a trial on. When the{" "}
-                {trialOffer.days} days are up you pick a plan to carry on —
-                nothing is charged automatically.
+                {trialOffer.days} days are up you pick a plan to carry on.
+                  Nothing is charged automatically.
               </p>
             </CardContent>
           </Card>
@@ -327,7 +327,7 @@ export function MySubscriptionPage() {
                   Free forever, no card.
                 </strong>{" "}
                 Real orders, real customers, your own branded storefront.
-                Nothing expires — move up whenever you need more room.
+                Nothing expires. Move up whenever you need more room.
               </p>
             </CardContent>
           </Card>
@@ -390,7 +390,7 @@ export function MySubscriptionPage() {
         onUndoCancel={async () => {
           try {
             await undoCancel().unwrap();
-            toast.success("Cancellation undone — welcome back.");
+            toast.success("Cancellation undone. Welcome back.");
           } catch {
             toast.error("Couldn't undo that.");
           }
@@ -455,7 +455,7 @@ export function MySubscriptionPage() {
                 <dd className="mt-0.5 font-medium tabular-nums">
                   {data?.nextRenewal
                     ? inr(data.nextRenewal.quote.totalAmount)
-                    : "—"}
+                    : "-"}
                 </dd>
                 {data?.coupon && data.coupon.cyclesLeft > 0 && (
                   <dd className="text-xs text-emerald-600 dark:text-emerald-400">
@@ -565,8 +565,8 @@ export function MySubscriptionPage() {
                   {extra.dataType === "count" && (
                     <span className="text-muted-foreground">
                       {extra.isUnlimited
-                        ? " — unlimited"
-                        : ` — ${extra.bonusValue} extra`}
+                        ? " (unlimited)"
+                        : ` (${extra.bonusValue} extra)`}
                     </span>
                   )}
                   {extra.expiresAt && (
@@ -655,7 +655,7 @@ export function MySubscriptionPage() {
               {(data?.addons ?? []).length === 0 ? (
                 <EmptyState
                   title="No add-ons yet"
-                  description="Add-ons raise a limit without changing your plan — useful when you need one more branch but not a bigger tier."
+                  description="Add-ons raise a limit without changing your plan, useful when you need one more branch but not a bigger tier."
                 >
                   <Button
                     onClick={() => setAddonsOpen(true)}
@@ -713,7 +713,7 @@ export function MySubscriptionPage() {
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Receipt className="size-4" />
-                  Upcoming renewal — {formatDate(data.nextRenewal.date)}
+                  Upcoming renewal: {formatDate(data.nextRenewal.date)}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -768,7 +768,7 @@ export function MySubscriptionPage() {
                             <span className="whitespace-nowrap">
                               {p.periodStart && p.periodEnd
                                 ? `${formatDate(p.periodStart)} – ${formatDate(p.periodEnd)}`
-                                : "—"}
+                                : "-"}
                             </span>
                             {p.capacity?.length > 0 && (
                               <p className="mt-0.5 max-w-56 text-xs">
@@ -811,7 +811,7 @@ export function MySubscriptionPage() {
                               </Button>
                             ) : (
                               <span className="text-xs text-muted-foreground">
-                                —
+                                -
                               </span>
                             )}
                           </TableCell>

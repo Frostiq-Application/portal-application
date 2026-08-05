@@ -77,7 +77,7 @@ export function OrderNotifications() {
                 New order {e.orderNumber}
               </span>
               <span className="block text-xs text-muted-foreground">
-                A fresh order just landed — tap to open the queue.
+                A fresh order just landed. Tap to open the queue.
               </span>
             </span>
           </button>

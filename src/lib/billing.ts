@@ -26,10 +26,10 @@ export const SUBSCRIPTION_STATUS_TONE: Record<SubscriptionStatus, string> = {
 /** One-line explanation of what each status means for the storefront. */
 export const SUBSCRIPTION_STATUS_HELP: Record<SubscriptionStatus, string> = {
   trial:
-    "Your storefront is fully live and taking real orders. Pick a plan before the trial ends to keep it that way — nothing is charged automatically.",
+    "Your storefront is fully live and taking real orders. Pick a plan before the trial ends to keep it that way. Nothing is charged automatically.",
   active: "Everything's running normally.",
   grace:
-    "Your storefront is still live so pending orders aren't disrupted — but payment is overdue.",
+    "Your storefront is still live so pending orders aren't disrupted, but payment is overdue.",
   locked:
     "Your storefront is offline. Paying restores it instantly; nothing has been deleted.",
   cancelled:
@@ -131,9 +131,9 @@ export function inrShort(value: string | number | null | undefined): string {
 }
 
 export function formatDateTime(value?: string | Date | null): string {
-  if (!value) return "—";
+  if (!value) return "-";
   const d = typeof value === "string" ? new Date(value) : value;
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleString("en-IN", {
     day: "numeric",
     month: "short",

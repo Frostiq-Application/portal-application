@@ -1,10 +1,9 @@
-import { Fragment, useEffect } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Crown,
   LogOut,
   Moon,
-  Plus,
   Sun,
   UserRound,
 } from "@/components/ui/icons";
@@ -25,6 +24,7 @@ import { AccountDeactivatedGate } from "@/components/gating/AccountDeactivatedGa
 import { NoSubscriptionGate } from "@/components/gating/NoSubscriptionGate";
 import { navFor, type NavItem } from "@/config/nav";
 import { useCan } from "@/hooks/useCan";
+import { useSessionSync } from "@/hooks/useSessionSync";
 import { roleLabel } from "@/lib/roles";
 import { applyBrandTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -50,7 +50,10 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { useSidebar } from "@/components/ui/sidebar-context";
+import {
+  initialSidebarOpen,
+  useSidebar,
+} from "@/components/ui/sidebar-context";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -140,7 +143,7 @@ export function SidebarNav() {
     if (item.soon) {
       return (
         <SidebarMenuItem>
-          <SidebarMenuButton disabled tooltip={`${item.label} — coming soon`}>
+          <SidebarMenuButton disabled tooltip={`${item.label} (coming soon)`}>
             <Icon />
             <span>{item.label}</span>
           </SidebarMenuButton>
@@ -163,17 +166,17 @@ export function SidebarNav() {
         <SidebarMenuButton
           asChild
           isActive={isActivePath(item)}
-          tooltip={locked ? `${item.label} — not in your plan` : item.label}
+          tooltip={locked ? `${item.label} (not in your plan)` : item.label}
         >
           <NavLink
             to={item.path}
             end={item.path === "/" || item.exact}
             onClick={closeOnMobile}
-            aria-label={locked ? `${item.label} — not in your plan` : undefined}
+            aria-label={locked ? `${item.label} (not in your plan)` : undefined}
             data-locked={locked || undefined}
             title={
               locked
-                ? `${item.label} isn't in your plan — tap to see upgrade options`
+                ? `${item.label} isn't in your plan. Tap to see upgrade options`
                 : undefined
             }
           >
@@ -314,9 +317,13 @@ export function AppLayout() {
     isSubscriptionExpired,
     entitlements,
     brand,
-    hasFeature,
   } = useEntitlements();
   const theme = useAppSelector((s) => s.ui.theme);
+  // Read once, on mount — the provider owns the state from then on, so a later
+  // re-render must not yank the sidebar back to whatever the width implies.
+  const [defaultSidebarOpen] = useState(initialSidebarOpen);
+  // Pull the session's permissions forward before anything gates on them.
+  useSessionSync();
 
   // Reflect the brand in the browser tab so the whole portal reads as theirs.
   useEffect(() => {
@@ -349,7 +356,16 @@ export function AppLayout() {
     // App.tsx). This is the same escape hatch for the page that leads to it,
     // rendered bare — the shell it would normally sit in is the thing being
     // locked. Owners only: nobody else can buy anything.
-    if (role === "account_super_admin" && location.pathname.startsWith("/my-subscription")) {
+    //
+    // It is conditional on the lockout that motivates it. Unconditional, it
+    // stripped the shell from *every* owner's subscription page, healthy plan
+    // and all — you could reach Subscription from the sidebar and then find no
+    // sidebar to leave by.
+    if (
+      role === "account_super_admin" &&
+      location.pathname.startsWith("/my-subscription") &&
+      (isSubscriptionExpired || !hasActiveSubscription)
+    ) {
       return (
         <div className="min-h-screen bg-muted/30 px-4 py-8">
           <div className="mx-auto max-w-5xl">
@@ -383,7 +399,7 @@ export function AppLayout() {
   };
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={defaultSidebarOpen}>
       {/* App-wide order alerts: one SSE connection, bell + toast + sidebar dot. */}
       <OrderNotifications />
       {/* App-wide enquiry alerts (platform super admin only): same pattern. */}
@@ -396,16 +412,6 @@ export function AppLayout() {
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-1 h-4" />
           <div className="ml-auto flex items-center gap-2">
-            {!isExempt && hasFeature("can_use_custom_cake") && (
-              <Button
-                size="sm"
-                className="gap-1.5"
-                onClick={() => navigate("/custom-cakes")}
-              >
-                <Plus className="h-4 w-4" />
-                New Order
-              </Button>
-            )}
             <Button
               variant="ghost"
               size="icon"

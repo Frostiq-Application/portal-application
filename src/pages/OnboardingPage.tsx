@@ -158,7 +158,7 @@ export function OnboardingPage() {
               </span>
               <p className="mt-3 font-semibold">Having trouble?</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Get in touch and we'll walk you through it — setup shouldn't be
+                Get in touch and we'll walk you through it. Setup shouldn't be
                 the hard part.
               </p>
               <Button
@@ -669,11 +669,11 @@ function BranchStep({ state }: { state: OnboardingState }) {
       description={
         sub === 1
           ? editing
-            ? "Update anything here — the slug is fixed, since it's your branch's public URL."
+            ? "Update anything here. The slug is fixed, since it's your branch's public URL."
             : "Where you bake. You can add more branches later from the Branches page."
           : sub === 2
             ? "When you're open and how customers reach you. All of it is editable later."
-            : "Give your team access to this branch. Entirely optional — you can do all of this later from Team."
+            : "Give your team access to this branch. Entirely optional, you can do all of this later from Team."
       }
       submitLabel={
         sub === 1
@@ -828,7 +828,7 @@ function BranchStep({ state }: { state: OnboardingState }) {
         {coords ? (
           <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
             <Check className="size-3.5" />
-            Location set — {formatCoordinates(coords.lat, coords.lng)}
+            Location set: {formatCoordinates(coords.lat, coords.lng)}
             <a
               className="ml-1 font-normal text-muted-foreground underline-offset-2 hover:underline"
               href={`https://www.google.com/maps/search/?api=1&query=${coords.lat},${coords.lng}`}
@@ -1126,8 +1126,8 @@ function PlanStep() {
         <h2 className="text-lg font-semibold">Choose a plan</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           {trialOffer
-            ? `Pick the plan that fits today — or try ${trialOffer.planName} free for ${trialOffer.days} days first, no card. You can move up whenever you outgrow a plan, and what you've paid for is prorated.`
-            : "Pick the plan that fits today — you can move up whenever you outgrow it, and what you've paid for is prorated."}
+            ? `Pick the plan that fits today, or try ${trialOffer.planName} free for ${trialOffer.days} days first, no card. You can move up whenever you outgrow a plan, and what you've paid for is prorated.`
+            : "Pick the plan that fits today. You can move up whenever you outgrow it, and what you've paid for is prorated."}
         </p>
       </div>
 
@@ -1159,7 +1159,7 @@ function PlanStep() {
       />
 
       <p className="text-center text-xs text-muted-foreground">
-        Every limit can be raised later with add-on capacity — you don't have to
+        Every limit can be raised later with add-on capacity, so you don't have to
         change tier for one more branch.
       </p>
     </div>

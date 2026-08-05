@@ -1,6 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { CakeSlice, Eye, Images, Search, Settings2 } from "@/components/ui/icons";
+import {
+  CakeSlice,
+  Eye,
+  Images,
+  Plus,
+  Search,
+  Settings2,
+} from "@/components/ui/icons";
 import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import {
@@ -27,6 +34,7 @@ import { formatDate } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { useCustomCakeStream } from "@/hooks/useCustomCakeStream";
+import { CreateCustomCakeDialog } from "@/components/custom-cake/CreateCustomCakeDialog";
 import { CustomCakeDetailSheet } from "@/components/custom-cake/CustomCakeDetailSheet";
 import { CustomCakeOptionsDrawer } from "@/components/custom-cake/CustomCakeOptionsDrawer";
 import { CustomCakeIntro } from "@/components/custom-cake/CustomCakeIntro";
@@ -70,6 +78,7 @@ export function CustomCakesPage() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 350);
   const [selected, setSelected] = useState<CustomCakeRequest | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [introOpen, setIntroOpen] = useState(
     () => localStorage.getItem(INTRO_SEEN_KEY) !== "1",
@@ -184,14 +193,25 @@ export function CustomCakesPage() {
           )}
           <ShopSelect />
           {section === "requests" && (
-            <Button
-              variant="outline"
-              onClick={() => setOptionsOpen(true)}
-              disabled={!shopId}
-            >
-              <Settings2 className="mr-2 h-4 w-4" />
-              Form options
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setOptionsOpen(true)}
+                disabled={!shopId}
+              >
+                <Settings2 className="mr-2 h-4 w-4" />
+                Form options
+              </Button>
+              {/* A cake phoned in or asked for at the counter still starts life
+                  as a request that needs quoting — so it is raised here, in the
+                  queue that handles it, rather than from the order desk. The
+                  route already proves the plan and the permission, so the
+                  button needs no gate of its own. */}
+              <Button onClick={() => setCreateOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Custom cake order
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -254,6 +274,11 @@ export function CustomCakesPage() {
         </>
       )}
 
+      <CreateCustomCakeDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        defaultShopId={shopId || null}
+      />
       <CustomCakeDetailSheet
         request={selected}
         onOpenChange={(o) => !o && setSelected(null)}

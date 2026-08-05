@@ -16,7 +16,7 @@ export function DeliveryPage() {
     <>
       <PageHeader
         title="Delivery"
-        description="Drag a card to the next lane, or use the button — what's ready and what's on the road"
+        description="Drag a card to the next lane, or use the button. What's ready, and what's on the road"
         actions={<FloorBranchFilter />}
       />
       <FloorBoard
@@ -49,7 +49,7 @@ export function DeliveryPage() {
           if (order.deliveryType === "pickup") {
             return (
               <p className="rounded-xl bg-muted px-4 py-3 text-base font-semibold">
-                Pickup — customer collects from the branch
+                Pickup, customer collects from the branch
               </p>
             );
           }

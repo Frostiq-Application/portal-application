@@ -24,4 +24,16 @@ globalThis.ResizeObserver ??= class {
   disconnect() {}
 } as never;
 
+// Nor IntersectionObserver, which every infinitely-scrolled list watches its
+// sentinel with. Nothing ever intersects in jsdom, so pages render their first
+// batch and stay there — which is what the tests assert against.
+globalThis.IntersectionObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+} as never;
+
 afterEach(cleanup);

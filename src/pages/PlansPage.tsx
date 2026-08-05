@@ -82,7 +82,7 @@ export function PlansPage() {
     <div className="space-y-6">
       <PageHeader
         title="Catalogue"
-        description="Plans, features and billing cycles — everything that defines what accounts can buy."
+        description="Plans, features and billing cycles: everything that defines what accounts can buy."
       />
 
       <Tabs defaultValue="plans">
@@ -244,7 +244,7 @@ export function PlansPage() {
         <TabsContent value="features" className="mt-4 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="max-w-2xl text-sm text-muted-foreground">
-              Boolean features are obtained by upgrading a plan — they're never
+              Boolean features are obtained by upgrading a plan. They're never
               sold as add-ons. Count features are numeric limits, extendable with
               add-ons on any plan.
             </p>
@@ -327,7 +327,7 @@ export function PlansPage() {
                           )}
                         </TableCell>
                         <TableCell className="tabular-nums">
-                          {f.dataType === "count" ? (f.trialLimit ?? "—") : "—"}
+                          {f.dataType === "count" ? (f.trialLimit ?? "-") : "-"}
                         </TableCell>
                         <TableCell>
                           <Switch
@@ -363,7 +363,7 @@ export function PlansPage() {
         <TabsContent value="cycles" className="mt-4 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="max-w-2xl text-sm text-muted-foreground">
-              A cycle is total months plus free months — nothing else. The
+              A cycle is total months plus free months, nothing else. The
               discount is always expressed as months free rather than a
               percentage, so it can never stack with itself. Adding a cycle needs
               no code change.

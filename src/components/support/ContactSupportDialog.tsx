@@ -214,7 +214,7 @@ export function ContactSupportDialog({
 
             <p className="mt-6 flex items-start gap-2 rounded-lg border bg-muted p-3 text-xs text-muted-foreground">
               <Clock className="mt-px size-3.5 shrink-0" />
-              Setting up out of hours? Leave a request anyway — it's first in
+              Setting up out of hours? Leave a request anyway. It's first in
               the queue the next morning.
             </p>
           </aside>
@@ -231,7 +231,7 @@ export function ContactSupportDialog({
                 </h2>
                 <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">
                   Someone will call you on {phone} about{" "}
-                  {chosen?.title.toLowerCase()} — usually within a few hours on
+                  {chosen?.title.toLowerCase()}, usually within a few hours on
                   a working day.
                 </p>
                 <Button
@@ -301,7 +301,7 @@ export function ContactSupportDialog({
                   <Label htmlFor="support-phone">
                     Your number
                     <span className="ml-1 font-normal text-muted-foreground">
-                      — so we can call you back
+                      (so we can call you back)
                     </span>
                   </Label>
                   <PhoneInput

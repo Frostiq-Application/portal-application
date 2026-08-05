@@ -436,8 +436,8 @@ export function PlanPicker({
               </span>
               <span className="mt-1 block text-sm text-muted-foreground">
                 Many branches, high volume, or something we don't build yet.
-                Tell us what you need and we'll price it around your operation
-                — including features we'd build for you.
+                Tell us what you need and we'll price it around your operation,
+                including features we'd build for you.
               </span>
             </span>
             <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border bg-background px-4 py-2 text-sm font-medium transition-colors group-hover:bg-foreground group-hover:text-background">

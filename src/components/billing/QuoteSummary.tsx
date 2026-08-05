@@ -84,7 +84,7 @@ export function QuoteSummary({
           <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
           <span>
             This amount is above the ₹15,000 RBI ceiling for automatic recurring
-            debits, so each renewal will need your approval — even with autopay
+            debits, so each renewal will need your approval, even with autopay
             on. We'll email you when it's due.
           </span>
         </p>

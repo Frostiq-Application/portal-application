@@ -121,7 +121,7 @@ export function PaymentProcessingOverlay({
         : "Confirming your payment";
 
   const subline = failed
-    ? "Your money is safe. If it was debited, the payment settles on its own within a few minutes and your plan switches on — no need to pay again."
+    ? "Your money is safe. If it was debited, the payment settles on its own within a few minutes and your plan switches on. No need to pay again."
     : done
       ? "Payment confirmed and your plan is live. Taking you through…"
       : "This usually takes a few seconds. Please keep this window open.";
@@ -250,7 +250,7 @@ export function PaymentProcessingOverlay({
               <ShieldCheck className="mt-px size-3.5 shrink-0" />
             )}
             {nudged
-              ? "Please don't close or refresh yet — we're still writing your payment to your account. It'll only be a moment."
+              ? "Please don't close or refresh yet. We're still writing your payment to your account. It'll only be a moment."
               : "Don't close or refresh this window while we finish up."}
           </p>
         )}

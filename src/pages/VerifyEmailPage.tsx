@@ -60,7 +60,7 @@ export function VerifyEmailPage() {
               }),
             ).unwrap();
             dispatch(setUser(fresh));
-            toast.success("Email verified — let's set up your shop.");
+            toast.success("Email verified. Let's set up your shop.");
             navigate("/onboarding", { replace: true });
           }}
         />

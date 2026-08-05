@@ -58,13 +58,25 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
         key: "orders.status",
         label: "Advance order status",
         description:
-          "Move an order along the pipeline — confirmed, baking, ready, delivered.",
+          "Move an order along the pipeline: confirmed, baking, ready, delivered.",
         access: {
           account_super_admin: "full",
           shop_admin: "scoped",
           staff: "scoped",
           chef: "scoped",
           delivery_manager: "scoped",
+        },
+      },
+      {
+        key: "orders.create",
+        label: "Enter orders",
+        description:
+          "Write up a walk-in or phone order. Also opens the branch, customer and catalog lookups that entering one needs (read-only), and not the customer directory itself.",
+        access: {
+          account_super_admin: "full",
+          shop_admin: "scoped",
+          staff: "scoped",
+          chef: "scoped",
         },
       },
       {
@@ -95,8 +107,9 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
       },
       {
         key: "orders.manage",
-        label: "Update & cancel orders",
-        description: "Advance status, mark paid, cancel orders.",
+        label: "Cancel orders & write off payment",
+        description:
+          "Cancel an order or mark it paid. Raising one is separate (see above).",
         access: {
           platform_super_admin: "none",
           account_super_admin: "full",

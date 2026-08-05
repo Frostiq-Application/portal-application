@@ -176,8 +176,8 @@ export function SubscriptionsPage() {
                 {reports!.failedPayments30d} failed payment
                 {reports!.failedPayments30d === 1 ? "" : "s"}
               </strong>{" "}
-              in the last 30 days. Accounts in grace are still serving customers
-              — retries run on days 1, 3, 5 and 7.
+              in the last 30 days. Accounts in grace are still serving customers.
+              Retries run on days 1, 3, 5 and 7.
             </p>
           </CardContent>
         </Card>

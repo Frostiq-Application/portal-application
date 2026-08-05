@@ -46,6 +46,14 @@ const notificationsSlice = createSlice({
     setEnquiryStreamStatus(state, action: PayloadAction<StreamStatus>) {
       state.enquiryStreamStatus = action.payload;
     },
+    /**
+     * Back to a blank slate when the session ends. These dots say "something
+     * arrived for *you* while you weren't looking" — carrying one into the next
+     * person's session points them at another brand's order.
+     */
+    resetNotifications() {
+      return initialState;
+    },
   },
 });
 
@@ -56,6 +64,7 @@ export const {
   enquiryArrived,
   enquiriesSeen,
   setEnquiryStreamStatus,
+  resetNotifications,
 } = notificationsSlice.actions;
 
 export const selectHasUnseenOrders = (s: RootState) =>

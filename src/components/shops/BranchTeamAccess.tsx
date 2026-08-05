@@ -50,7 +50,7 @@ const INVITE_ROLES = [
   {
     value: "shop_admin" as const,
     label: "Branch manager",
-    hint: "Runs the branch — orders, products, hours and staff.",
+    hint: "Runs the branch: orders, products, hours and staff.",
   },
   {
     value: "staff" as const,
@@ -95,8 +95,8 @@ function InviteList({
       <p className="text-sm font-medium">Invite someone to this branch</p>
       <p className="mt-0.5 text-xs text-muted-foreground">
         They're created with the branch and can only see it. Send them a
-        set-password link from <strong>Team</strong> whenever you're ready —
-        nothing is emailed automatically.
+        set-password link from <strong>Team</strong> whenever you're ready.
+        Nothing is emailed automatically.
       </p>
 
       {invites.length > 0 && (
@@ -264,7 +264,7 @@ export function BranchTeamAccess({
           <p className="mt-1 text-xs text-muted-foreground">
             {owner ? `As the owner, ${owner.name.split(" ")[0]} sees` : "Owners see"}{" "}
             every branch automatically. Add bakers or counter staff below and
-            they'll see this branch's orders and nothing else — which keeps
+            they'll see this branch's orders and nothing else, which keeps
             their day simple and your other branches private.
           </p>
         </div>
@@ -323,7 +323,7 @@ export function BranchTeamAccess({
           <p className="flex items-start gap-2 text-xs text-muted-foreground">
             <Info className="mt-px size-3.5 shrink-0" />
             Assigned staff see only this branch's orders, products and
-            customers — less to scroll through for them, and your other
+            customers, less to scroll through for them, and your other
             branches stay private. Leave it empty and only owners and admins
             will have access.
           </p>

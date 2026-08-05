@@ -400,10 +400,10 @@ function BranchTicket({
 
       {/* Feature strip at the bottom */}
       <div className="mt-auto grid grid-cols-3 divide-x border-t bg-muted/30 text-center">
-        <Feature icon={Clock} label={hours ?? "—"} caption="Hours" />
+        <Feature icon={Clock} label={hours ?? "-"} caption="Hours" />
         <Feature
           icon={Phone}
-          label={shop.whatsappNumber ?? "—"}
+          label={shop.whatsappNumber ?? "-"}
           caption="WhatsApp"
         />
         <Feature

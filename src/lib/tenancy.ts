@@ -12,7 +12,7 @@ export const MIGRATION_STATE: Record<
 > = {
   applied: { label: "Applied", variant: "success", hint: "Recorded and verified against the live schema." },
   pending: { label: "Pending", variant: "warning", hint: "Never run on this tenant." },
-  failed: { label: "Failed", variant: "destructive", hint: "Last attempt errored — see the message below." },
+  failed: { label: "Failed", variant: "destructive", hint: "Last attempt errored. See the message below." },
   checksum_mismatch: {
     label: "Changed since",
     variant: "destructive",
@@ -21,7 +21,7 @@ export const MIGRATION_STATE: Record<
   structural_drift: {
     label: "Drifted",
     variant: "destructive",
-    hint: "Recorded as applied, but the schema no longer has the change — usually a restore or a manual edit.",
+    hint: "Recorded as applied, but the schema no longer has the change. Usually a restore or a manual edit.",
   },
 };
 

@@ -1,30 +1,36 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Check, Eye, EyeOff, Loader2, Store } from "@/components/ui/icons";
+import { Check, Loader2, Store } from "@/components/ui/icons";
+import { isValidPhoneNumber } from "react-phone-number-input";
 import { FrostiqueMark } from "@/components/common/FrostiqueMark";
 import { toast } from "sonner";
 import { useAppDispatch } from "@/app/hooks";
 import { setCredentials } from "@/features/auth/authSlice";
-import { useRegisterAccountMutation } from "@/features/api/accountsApi";
+import {
+  useRegisterAccountMutation,
+  useRegistrationAvailabilityQuery,
+} from "@/features/api/accountsApi";
 import { useLoginMutation } from "@/features/api/authApi";
 import { useAuth } from "@/hooks/useAuth";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { slugify } from "@/lib/utils";
 import { apiError } from "@/lib/apiError";
 import { passwordStrength } from "@/lib/password";
 import { PasswordStrengthMeter } from "@/components/common/PasswordStrengthMeter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 
 const extractError = (err: unknown) =>
   apiError(err, "Something went wrong. Please try again.");
 
-/** How many "-2", "-3"… addresses to try before giving up on a shop name. */
-const SLUG_ATTEMPTS = 5;
+const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-/** The server rejects a duplicate storefront address by name; spot that case. */
-const isSlugTaken = (err: unknown) =>
-  /slug is already taken/i.test(apiError(err, ""));
+/** The one thing only the owner can fix — spot it to mark the field, not just toast. */
+const isEmailTakenError = (err: unknown) =>
+  /email already exists|email already in use/i.test(apiError(err, ""));
 
 /**
  * Self-serve signup for a bakery.
@@ -37,6 +43,12 @@ const isSlugTaken = (err: unknown) =>
  * a confirmation, then log in separately is three chances to lose them before
  * they have seen the product — so the session is live from the first submit and
  * the emailed code is the only thing standing between them and setup.
+ *
+ * Both uniqueness questions are asked while the form is being filled in rather
+ * than left to the submit: a taken email is a dead end the owner has to know
+ * about *before* typing a password, and a taken shop name isn't a dead end at
+ * all — the server allocates `golden-cake-4f9c2a` — but the address is theirs
+ * from here on, so it is shown to them rather than sprung on them later.
  */
 export function RegisterPage() {
   const dispatch = useAppDispatch();
@@ -51,7 +63,9 @@ export function RegisterPage() {
   const [ownerEmail, setOwnerEmail] = useState("");
   const [ownerPhone, setOwnerPhone] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  // Set when the server rejects the email at submit — the pre-check below can't
+  // have landed if someone types fast and submits faster.
+  const [rejectedEmail, setRejectedEmail] = useState<string | null>(null);
 
   useEffect(() => {
     if (isAuthenticated) navigate("/", { replace: true });
@@ -66,13 +80,48 @@ export function RegisterPage() {
   // alone here let a password through the button and straight into a server
   // rejection. The meter below scores against the same rule.
   const { meetsMinimum: passwordStrongEnough } = passwordStrength(password);
-  const emailLooksValid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(ownerEmail);
-  const phoneLooksValid = ownerPhone.replace(/\D/g, "").length >= 10;
+  const emailLooksValid = EMAIL_PATTERN.test(ownerEmail);
+
+  // ---- is this email free? ------------------------------------------------
+  // Only asked once the address is well-formed, and only after typing settles:
+  // the route is throttled per IP, and half an address is never taken anyway.
+  const normalizedEmail = ownerEmail.trim().toLowerCase();
+  const debouncedEmail = useDebouncedValue(normalizedEmail, 450);
+  const emailToCheck = EMAIL_PATTERN.test(debouncedEmail) ? debouncedEmail : "";
+  // `currentData`, not `data`: it must never answer for an address the owner has
+  // already typed past, which is exactly what `data`'s fallback would do.
+  const { currentData: emailCheck, isFetching: checkingEmail } =
+    useRegistrationAvailabilityQuery(
+      { email: emailToCheck },
+      { skip: !emailToCheck },
+    );
+  const emailTaken =
+    emailCheck?.emailAvailable === false || rejectedEmail === normalizedEmail;
+
+  // ---- and what address will the shop get? -------------------------------
+  const debouncedSlug = useDebouncedValue(appSlug, 450);
+  const { currentData: slugCheck } = useRegistrationAvailabilityQuery(
+    { appSlug: debouncedSlug },
+    { skip: !debouncedSlug },
+  );
+  // Only trust the answer once it's about the name currently on screen —
+  // otherwise the line under the field lags a keystroke behind the preview.
+  const slugAnswered = !!debouncedSlug && debouncedSlug === appSlug;
+  const slugTaken = slugAnswered && slugCheck?.slugAvailable === false;
+  // What the server said it would hand out. Shown, not sent: registration
+  // re-resolves it, so a name taken in the meantime still gets a free address.
+  const assignedSlug = (slugTaken && slugCheck?.suggestedSlug) || appSlug;
+  // The picker hands back E.164, so validate the number against its own country
+  // rather than counting digits — a ten-digit rule quietly rejects every country
+  // whose numbers aren't ten digits long. Same check the admin-side account form
+  // uses, so a self-serve signup can't store a shape the portal would reject.
+  const phoneLooksValid = !!ownerPhone && isValidPhoneNumber(ownerPhone);
   const incomplete =
     !name.trim() ||
     !appSlug ||
     !ownerName.trim() ||
     !emailLooksValid ||
+    emailTaken ||
     !phoneLooksValid ||
     !passwordStrongEnough;
 
@@ -83,31 +132,32 @@ export function RegisterPage() {
     if (incomplete) return;
 
     try {
-      // Two bakeries can share a name, and the address they'd derive is unique
-      // server-side. With no field to correct, the second one would be stuck on
-      // an error it can't act on — so take the next free address instead.
-      for (let attempt = 0; ; attempt++) {
-        const candidate = attempt === 0 ? appSlug : `${appSlug}-${attempt + 1}`;
-        try {
-          await register({
-            name: name.trim(),
-            appSlug: candidate,
-            ownerName: ownerName.trim(),
-            ownerEmail: ownerEmail.trim().toLowerCase(),
-            ownerPhone: ownerPhone.trim(),
-            password,
-          }).unwrap();
-          break;
-        } catch (err) {
-          if (attempt >= SLUG_ATTEMPTS - 1 || !isSlugTaken(err)) throw err;
-        }
+      // The address is sent as a preference. Two bakeries can share a name and
+      // `app_slug` is unique, so the server allocates the free one — from one
+      // request, inside the transaction that inserts the row, which is the only
+      // place a check-then-write can't be raced. (This page used to guess "-2",
+      // "-3" from out here, which cost a round trip per guess and still raced.)
+      const created = await register({
+        name: name.trim(),
+        appSlug,
+        ownerName: ownerName.trim(),
+        ownerEmail: normalizedEmail,
+        ownerPhone: ownerPhone.trim(),
+        password,
+      }).unwrap();
+
+      // Tell them what they actually got, when it isn't what they asked for.
+      if (created.appSlug !== appSlug) {
+        toast.info(`Your storefront address is /${created.appSlug}`, {
+          description: `"${name.trim()}" was already taken, so we made yours unique.`,
+        });
       }
 
       // Sign them straight in regardless of verification. The account is real
       // and the password works, so there is no reason to make them log in
       // again — verification gates onboarding, not the session.
       const session = await login({
-        email: ownerEmail.trim().toLowerCase(),
+        email: normalizedEmail,
         password,
       }).unwrap();
 
@@ -123,13 +173,13 @@ export function RegisterPage() {
         // there. Anyone somehow already verified skips straight to setup.
         if (session.user.emailVerified === false) {
           toast.success(
-            `Welcome, ${ownerName.trim().split(" ")[0]} — check your email for a code.`,
+            `Welcome, ${ownerName.trim().split(" ")[0]}. Check your email for a code.`,
           );
           navigate("/verify-email", { replace: true });
           return;
         }
         toast.success(
-          `Welcome, ${ownerName.trim().split(" ")[0]} — let's set up your shop.`,
+          `Welcome, ${ownerName.trim().split(" ")[0]}. Let's set up your shop.`,
         );
         navigate("/onboarding", { replace: true });
         return;
@@ -138,8 +188,11 @@ export function RegisterPage() {
       // Registered but the auto-login didn't return a session — send them to
       // sign in rather than leaving them on a dead form.
       toast.success("Account created. Sign in to continue.");
-      navigate("/login", { state: { email: ownerEmail.trim().toLowerCase() } });
+      navigate("/login", { state: { email: normalizedEmail } });
     } catch (err) {
+      // Mark the field, not just the toast: a duplicate email is the one failure
+      // the owner has to act on, and a toast is gone before they've read it.
+      if (isEmailTakenError(err)) setRejectedEmail(normalizedEmail);
       toast.error(extractError(err));
     }
   }
@@ -182,9 +235,35 @@ export function RegisterPage() {
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Enter shop name"
                   autoComplete="organization"
+                  aria-describedby="shop-address"
                   autoFocus
                   required
                 />
+                {/* The name is the storefront address, so show the address. A
+                    taken name is not an error here — it just comes back with a
+                    suffix, and seeing that now beats discovering it later. */}
+                {appSlug && (
+                  <p id="shop-address" className="text-xs text-muted-foreground">
+                    {slugTaken ? (
+                      <>
+                        <span className="text-amber-600 dark:text-amber-400">
+                          “{name.trim()}” is already taken
+                        </span>
+                        , so your storefront will be{" "}
+                        <span className="font-medium text-foreground">
+                          /{assignedSlug}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        Your storefront:{" "}
+                        <span className="font-medium text-foreground">
+                          /{appSlug}
+                        </span>
+                      </>
+                    )}
+                  </p>
+                )}
               </div>
 
               <div className="grid gap-2">
@@ -201,58 +280,82 @@ export function RegisterPage() {
 
               <div className="grid gap-2">
                 <Label htmlFor="owner-email">Email</Label>
-                <Input
-                  id="owner-email"
-                  type="email"
-                  value={ownerEmail}
-                  onChange={(e) => setOwnerEmail(e.target.value)}
-                  placeholder="Enter email address"
-                  autoComplete="email"
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    id="owner-email"
+                    type="email"
+                    value={ownerEmail}
+                    onChange={(e) => setOwnerEmail(e.target.value)}
+                    placeholder="Enter email address"
+                    autoComplete="email"
+                    aria-invalid={emailTaken || undefined}
+                    aria-describedby={emailTaken ? "email-taken" : undefined}
+                    className={
+                      emailTaken
+                        ? "border-destructive pr-9 focus-visible:ring-destructive"
+                        : "pr-9"
+                    }
+                    required
+                  />
+                  {checkingEmail && (
+                    <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                  )}
+                </div>
+                {/* A taken email is the one dead end on this form, so it says so
+                    where the answer is — and offers the way out, carrying the
+                    address so signing in doesn't ask for it again. */}
+                {emailTaken && (
+                  <p
+                    id="email-taken"
+                    role="alert"
+                    className="text-xs text-destructive"
+                  >
+                    This email already has an account.{" "}
+                    <Link
+                      to="/login"
+                      state={{ email: normalizedEmail }}
+                      className="font-medium underline underline-offset-4"
+                    >
+                      Sign in instead
+                    </Link>
+                    {" or "}
+                    <Link
+                      to="/forgot-password"
+                      state={{ email: normalizedEmail }}
+                      className="font-medium underline underline-offset-4"
+                    >
+                      reset the password
+                    </Link>
+                    .
+                  </p>
+                )}
               </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="owner-phone">Phone</Label>
-                <Input
+                {/* Country picker + national formatting, so the number leaves
+                    here in E.164 — the shape the API stores and every notice
+                    (OTP, order alerts) is later sent from. */}
+                <PhoneInput
                   id="owner-phone"
-                  type="tel"
+                  defaultCountry="IN"
                   value={ownerPhone}
-                  onChange={(e) => setOwnerPhone(e.target.value)}
+                  onChange={(v) => setOwnerPhone(v ?? "")}
                   placeholder="Enter phone number"
                   autoComplete="tel"
-                  required
                 />
               </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter password"
-                    autoComplete="new-password"
-                    className="pr-10"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={
-                      showPassword ? "Hide password" : "Show password"
-                    }
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="size-4" />
-                    ) : (
-                      <Eye className="size-4" />
-                    )}
-                  </button>
-                </div>
+                <PasswordInput
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter password"
+                  autoComplete="new-password"
+                  required
+                />
                 <PasswordStrengthMeter password={password} className="mt-0.5" />
               </div>
 
@@ -295,7 +398,7 @@ export function RegisterPage() {
 
           <ul className="mt-7 space-y-3">
             {[
-              "Free forever to start — 1 branch, 4 products, no card",
+              "Free forever to start: 1 branch, 4 products, no card",
               "Your own storefront address customers can bookmark",
               "Take real orders from day one",
               "Upgrade only when you outgrow it",

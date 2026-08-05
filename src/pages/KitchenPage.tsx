@@ -15,7 +15,7 @@ export function KitchenPage() {
     <>
       <PageHeader
         title="Kitchen"
-        description="Drag a card to the next lane, or use the button — oldest deadline first"
+        description="Drag a card to the next lane, or use the button. Oldest deadline first"
         actions={<FloorBranchFilter />}
       />
       <FloorBoard

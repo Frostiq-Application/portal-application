@@ -221,7 +221,7 @@ export function FeatureEditorDialog({
                   <h3 className="text-sm font-semibold">Add-on & trial</h3>
                   <p className="text-xs text-muted-foreground">
                     Leaving the price empty disables add-on sales for this
-                    feature — accounts will only get what their plan includes.
+                    feature. Accounts will only get what their plan includes.
                   </p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-3">
@@ -276,7 +276,7 @@ export function FeatureEditorDialog({
           ) : (
             <p className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
               Boolean features are obtained only by upgrading a plan. They can
-              never be sold as add-ons — that's what protects tier value.
+              never be sold as add-ons. That's what protects tier value.
             </p>
           )}
 

@@ -1,4 +1,4 @@
-import { Clock, Copy, Mail, MapPin, MessageCircle, Navigation, Phone, ShoppingBag, Store, Wallet } from "@/components/ui/icons";
+import { Clock, Copy, MapPin, MessageCircle, Navigation, Phone, ShoppingBag, Store, User, Wallet } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { cn, formatDate } from "@/lib/utils";
 import { ORDER_STATUS_LABEL, ORDER_STATUS_TONE } from "@/lib/orders";
@@ -133,8 +133,14 @@ export function OrderCustomerPanel({ order }: { order: Order }) {
         </p>
       </div>
 
-      {/* Contact */}
+      {/* Contact — name and phone, which is what the floor actually acts on:
+          who to ask for at the door and what number to ring. Email used to hold
+          the second slot and sat empty on most orders (the storefront signs
+          customers in by phone), so it read as a broken field rather than an
+          absent one. The name repeats the heading on purpose — here it is a
+          copyable value, for pasting into a delivery app or a call log. */}
       <div className="space-y-2">
+        <ContactRow icon={User} label="Name" value={customer?.name ?? null} />
         <ContactRow
           icon={Phone}
           label="Phone"
@@ -159,12 +165,6 @@ export function OrderCustomerPanel({ order }: { order: Order }) {
               </Button>
             ) : null
           }
-        />
-        <ContactRow
-          icon={Mail}
-          label="Email"
-          value={customer?.email ?? null}
-          href={customer?.email ? `mailto:${customer.email}` : undefined}
         />
       </div>
 
@@ -232,7 +232,7 @@ export function OrderCustomerPanel({ order }: { order: Order }) {
           </div>
         ) : (
           <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
-            No address on this order — confirm it with the customer before
+            No address on this order. Confirm it with the customer before
             dispatch.
           </p>
         )}

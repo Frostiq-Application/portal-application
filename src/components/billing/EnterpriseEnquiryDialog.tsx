@@ -46,7 +46,7 @@ type StepId = (typeof STEPS)[number];
 const QUESTION: Record<StepId, { title: string; hint: string }> = {
   branches: {
     title: "How many branches do you run?",
-    hint: "A rough band is fine — it tells us what scale we're pricing for.",
+    hint: "A rough band is fine. It tells us what scale we're pricing for.",
   },
   volume: {
     title: "Roughly how many orders a month?",
@@ -58,10 +58,10 @@ const QUESTION: Record<StepId, { title: string; hint: string }> = {
   },
   needs: {
     title: "Anything we don't build yet?",
-    hint: "Be specific — this is the part that decides whether we can build it for you, and how quickly.",
+    hint: "Be specific. This is the part that decides whether we can build it for you, and how quickly.",
   },
   contact: {
-    title: "Last one — who do we call?",
+    title: "Last one: who do we call?",
     hint: "One call, usually within a working day. We won't add you to a list.",
   },
 };
@@ -262,7 +262,7 @@ export function EnterpriseEnquiryDialog({
                 <h2 className="mt-4 text-xl font-semibold">Brief received</h2>
                 <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
                   We've got everything for {shopName}. Someone will call you on{" "}
-                  {phone} — usually within a working day — with a plan and a
+                  {phone}, usually within a working day, with a plan and a
                   price.
                 </p>
                 <Button
@@ -347,7 +347,7 @@ export function EnterpriseEnquiryDialog({
                         rows={5}
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
-                        placeholder="Franchise billing, a Tally export, an ERP we already use — whatever's on your list."
+                        placeholder="Franchise billing, a Tally export, an ERP we already use, whatever's on your list."
                       />
                     )}
 
@@ -385,7 +385,7 @@ export function EnterpriseEnquiryDialog({
 
                         <Field
                           label="Email"
-                          hint="optional — the written quote lands here"
+                          hint="optional, the written quote lands here"
                           className="sm:col-span-2"
                         >
                           <Input
@@ -478,7 +478,7 @@ function Field({
           <span className="ml-0.5 text-primary">*</span>
         ) : hint ? (
           <span className="ml-1 font-normal text-muted-foreground">
-            — {hint}
+            ({hint})
           </span>
         ) : null}
       </Label>

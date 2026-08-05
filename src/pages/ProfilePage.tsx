@@ -35,7 +35,7 @@ function Field({
       </span>
       <span className="flex items-center gap-2 text-sm">
         {Icon && <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />}
-        {value ?? <span className="text-muted-foreground">—</span>}
+        {value ?? <span className="text-muted-foreground">-</span>}
       </span>
     </div>
   );
@@ -174,7 +174,7 @@ export function ProfilePage() {
                     <Field label="Owner" value={account.ownerName} icon={UserIcon} />
                     <Field label="Owner email" value={account.ownerEmail} icon={Mail} />
                     <Field label="Owner phone" value={account.ownerPhone} icon={Phone} />
-                    <Field label="Plan" value={planName || "—"} />
+                    <Field label="Plan" value={planName || "-"} />
                     <Field
                       label="Onboarded via"
                       value={ONBOARDING_SOURCE_LABEL[account.onboardingSource]}

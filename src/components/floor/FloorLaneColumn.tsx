@@ -162,7 +162,7 @@ export function FloorLaneColumn({
             )}
             style={{ background: accent }}
           >
-            {isTarget ? `Release — ${action?.label ?? lane.label}` : "Drop here"}
+            {isTarget ? `Release: ${action?.label ?? lane.label}` : "Drop here"}
           </span>
         </div>
       )}

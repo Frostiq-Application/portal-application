@@ -84,7 +84,7 @@ export function LockedFeature({
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 {isOwner
-                  ? "It unlocks the moment you upgrade — your catalogue, orders and customers all stay exactly as they are."
+                  ? "It unlocks the moment you upgrade. Your catalogue, orders and customers all stay exactly as they are."
                   : "Ask your account owner to upgrade the plan; it unlocks immediately for everyone on the team."}
               </p>
             </div>
@@ -123,7 +123,7 @@ export function LockedFeature({
           <p className="text-center text-sm text-muted-foreground">
             {unlocking.length - 1} other plan
             {unlocking.length - 1 === 1 ? " also includes" : "s also include"} it
-            —{" "}
+            :{" "}
             <button
               type="button"
               className="font-medium text-primary underline-offset-4 hover:underline"

@@ -130,7 +130,7 @@ function KeepPicker({
         })}
       </div>
       <p className="text-xs text-muted-foreground">
-        Unselected items are archived, never deleted — they come back the moment
+        Unselected items are archived, never deleted. They come back the moment
         you have capacity again.
       </p>
     </div>
@@ -165,7 +165,7 @@ function ProrationWorking({
   daysInCycle: number;
   prorationAmount: string;
 }) {
-  const current = `${basis.currentPlanName} · ${basis.currentCycleName} — you already pay`;
+  const current = `${basis.currentPlanName} · ${basis.currentCycleName} (you already pay)`;
   const full = daysRemaining >= daysInCycle;
 
   return (
@@ -228,7 +228,7 @@ function ProrationWorking({
       )}
 
       <p className="pt-1 text-xs text-muted-foreground">
-        Your renewal date doesn't move — this covers only the days left in the
+        Your renewal date doesn't move. This covers only the days left in the
         period you've already paid for. After that you're billed{" "}
         {inr(basis.newCyclePrice)} each {newCycleName.toLowerCase()} cycle.
       </p>
@@ -519,11 +519,11 @@ export function ChangePlanSheet({
                             trialDaysLeft === 0
                               ? "Your trial ends today"
                               : `You have ${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} of trial left`
-                          } — there's nothing paid to prorate against, so this is the full ${cycle?.name.toLowerCase() ?? "cycle"} price and a fresh period starts the moment it's paid. Everything you've set up stays exactly as it is.`
-                        : `You're on a free plan, so there's nothing to prorate — this is the full ${cycle?.name.toLowerCase() ?? "cycle"} price, and a new period starts the moment it's paid.`
+                          }. There's nothing paid to prorate against, so this is the full ${cycle?.name.toLowerCase() ?? "cycle"} price and a fresh period starts the moment it's paid. Everything you've set up stays exactly as it is.`
+                        : `You're on a free plan, so there's nothing to prorate, so this is the full ${cycle?.name.toLowerCase() ?? "cycle"} price, and a new period starts the moment it's paid.`
                       : immediate
                         ? `You'll be charged the difference for the ${view.daysRemaining} day${view.daysRemaining === 1 ? "" : "s"} left in your current period, and the new features unlock immediately.`
-                        : "Nothing is charged or refunded now — you keep your current plan and everything in it until then. You can undo this any time before it lands."}
+                        : "Nothing is charged or refunded now. You keep your current plan and everything in it until then. You can undo this any time before it lands."}
                   </p>
                 </div>
               </div>
@@ -557,7 +557,7 @@ export function ChangePlanSheet({
                   <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
                   <div className="text-sm text-amber-800 dark:text-amber-300">
                     <p>
-                      You're using more than {plan?.name} includes —{" "}
+                      You're using more than {plan?.name} includes:{" "}
                       {view.overLimit
                         .map((r) => `${r.used} ${r.label.toLowerCase()} of ${r.allowed}`)
                         .join(", ")}
@@ -578,7 +578,7 @@ export function ChangePlanSheet({
                     <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
                     <p className="text-sm text-amber-800 dark:text-amber-300">
                       You're using more than {plan?.name} allows. Choose what
-                      stays active — or add capacity to keep everything.
+                      stays active, or add capacity to keep everything.
                     </p>
                   </div>
 
@@ -606,7 +606,7 @@ export function ChangePlanSheet({
                     <p className="flex items-start gap-2 rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
                       <PackagePlus className="mt-0.5 size-3.5 shrink-0" />
                       Want to keep everything? Buy add-on capacity from the
-                      Add-ons panel instead — it raises your limit on any plan.
+                      Add-ons panel instead. It raises your limit on any plan.
                     </p>
                   )}
                 </section>
@@ -615,7 +615,7 @@ export function ChangePlanSheet({
               {view.overLimit.length === 0 && !immediate && !firstPurchase && (
                 <p className="flex items-center gap-2 rounded-lg bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-400">
                   <Check className="size-4 shrink-0" />
-                  Everything you're using fits in the new plan — nothing will be
+                  Everything you're using fits in the new plan, so nothing will be
                   archived.
                 </p>
               )}

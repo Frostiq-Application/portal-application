@@ -154,7 +154,7 @@ export function SubscriptionDetailSheet({
                       ? sub.hasMandate
                         ? "On, mandate active"
                         : "On, mandate missing"
-                      : "Off — manual payer"}
+                      : "Off (manual payer)"}
                   </dd>
                 </div>
                 {sub.dunningAttempt > 0 && (
@@ -183,7 +183,7 @@ export function SubscriptionDetailSheet({
                       Data retention
                     </dt>
                     <dd>
-                      Delete-ready {formatDate(sub.deleteReadyAt)} — nothing is
+                      Delete-ready {formatDate(sub.deleteReadyAt)}. Nothing is
                       removed automatically.
                     </dd>
                   </div>

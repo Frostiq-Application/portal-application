@@ -118,7 +118,7 @@ export function GrantOverrideDialog({
             {isCount
               ? "Extra capacity on top of the plan and anything already bought. It rides along through plan changes, so an upgrade adds to it rather than replacing it."
               : revoking
-                ? "This account keeps its plan, but loses this capability. It won't be told why — to them it reads like anything else their plan doesn't include."
+                ? "This account keeps its plan, but loses this capability. It won't be told why. To them it reads like anything else their plan doesn't include."
                 : "This account gets the capability without moving to the plan that sells it. Its price and limits don't change."}
           </DialogDescription>
         </DialogHeader>

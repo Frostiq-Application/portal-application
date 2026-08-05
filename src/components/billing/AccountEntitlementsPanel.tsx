@@ -109,7 +109,7 @@ export function AccountEntitlementsPanel({ accountId }: { accountId: string }) {
       {data.subscription &&
         !["trial", "active", "grace"].includes(data.subscription.status) && (
           <p className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-            This subscription is {data.subscription.status} — everything below is
+            This subscription is {data.subscription.status}. Everything below is
             switched off for the account until it's paid, grants included.
           </p>
         )}

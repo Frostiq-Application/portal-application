@@ -579,7 +579,7 @@ function AddonsTab({ shopId }: { shopId: string }) {
                     <span className="text-muted-foreground"> / {a.unitType}</span>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {a.trackInventory ? (a.stockQuantity ?? 0) : "—"}
+                    {a.trackInventory ? (a.stockQuantity ?? 0) : "-"}
                   </TableCell>
                   <TableCell>
                     <span

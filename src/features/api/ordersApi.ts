@@ -1,3 +1,4 @@
+import { defaultSerializeQueryArgs } from "@reduxjs/toolkit/query";
 import { baseApi } from "./baseApi";
 import type { AppDispatch } from "@/app/store";
 import type { OrderDateBucket, OrderSortBy, SortDir } from "@/lib/orders";
@@ -224,6 +225,43 @@ export const ordersApi = baseApi.injectEndpoints({
           ...(params?.sortDir ? { sortDir: params.sortDir } : {}),
         },
       }),
+      // The queue scrolls rather than pages, so every loaded page lives in ONE
+      // cache entry keyed by the filters alone. That keeps the optimistic
+      // patches above honest: advancing an order the user scrolled to on page 3
+      // still rewrites the row they are looking at, which a per-page cache
+      // (each page a separate entry, only the newest one subscribed) could not do.
+      serializeQueryArgs: ({ queryArgs, endpointDefinition, endpointName }) => {
+        const filters: Partial<OrdersQuery> = { ...queryArgs };
+        delete filters.page;
+        return defaultSerializeQueryArgs({
+          queryArgs: filters,
+          endpointDefinition,
+          endpointName,
+        });
+      },
+      merge: (cache, incoming, { arg }) => {
+        // Page 1 only comes back around as a refresh (a filter change makes a
+        // new cache entry), and the user is by definition still at the top —
+        // so take the server's list wholesale and pick up anything just placed.
+        if ((arg?.page ?? 1) <= 1) {
+          cache.data = incoming.data;
+          cache.meta = incoming.meta;
+          return;
+        }
+        // Upsert, don't append: a realtime invalidation refetches the page the
+        // user is on, and rows shift across the page boundary as orders leave
+        // the queue — appending blindly would duplicate both.
+        const at = new Map(cache.data.map((o, i) => [o.id, i]));
+        for (const order of incoming.data) {
+          const i = at.get(order.id);
+          if (i === undefined) cache.data.push(order);
+          else cache.data[i] = order;
+        }
+        cache.meta = incoming.meta;
+      },
+      // Same cache entry, so only a page turn is a new request.
+      forceRefetch: ({ currentArg, previousArg }) =>
+        (currentArg?.page ?? 1) !== (previousArg?.page ?? 1),
       providesTags: (result) =>
         result
           ? [

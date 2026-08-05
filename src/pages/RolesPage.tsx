@@ -47,12 +47,12 @@ const BRAND_ROLES: Role[] = [
 ];
 
 const ROLE_BLURB: Record<Role, string> = {
-  platform_super_admin: "Runs the platform — brands, plans & subscriptions.",
-  account_super_admin: "Owns a brand — full control across all its branches.",
-  shop_admin: "Runs a single branch — scoped to their assigned outlet.",
-  staff: "Branch team member — day-to-day order operations only.",
-  chef: "Works the kitchen — the bake queue and nothing else.",
-  delivery_manager: "Runs dispatch — what's ready, where it goes, who to call.",
+  platform_super_admin: "Runs the platform: brands, plans & subscriptions.",
+  account_super_admin: "Owns a brand: full control across all its branches.",
+  shop_admin: "Runs a single branch, scoped to their assigned outlet.",
+  staff: "Branch team member: day-to-day order operations only.",
+  chef: "Works the kitchen: the bake queue and nothing else.",
+  delivery_manager: "Runs dispatch: what's ready, where it goes, who to call.",
 };
 
 export function RolesPage() {
@@ -68,7 +68,7 @@ export function RolesPage() {
         description={
           isPlatformAdmin(role)
             ? "What each role can access across the portal"
-            : "What each role on your team can reach — and the custom roles you've defined"
+            : "What each role on your team can reach, and the custom roles you've defined"
         }
       />
 

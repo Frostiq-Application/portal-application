@@ -24,6 +24,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { apiError } from "@/lib/apiError";
 import { LiveIndicator } from "@/components/LiveIndicator";
+import { InfiniteScroll } from "@/components/common/InfiniteScroll";
+import { useCan } from "@/hooks/useCan";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import {
@@ -103,6 +105,9 @@ import {
 
 const DELIVERY_TYPES: DeliveryType[] = ["delivery", "pickup"];
 const PAYMENT_STATUSES: OrderPaymentStatus[] = ["pending", "paid"];
+
+/** Rows fetched per scroll step. */
+const PAGE_SIZE = 20;
 
 /** Status tabs, in pipeline order. */
 const STATUS_TABS: OrderStatus[] = [
@@ -311,7 +316,7 @@ function OrderRowActions({
   const canDecline = CANCELLABLE.includes(order.status);
 
   if (next.length === 0 && !canPay && !canDecline) {
-    return <span className="text-xs text-muted-foreground">—</span>;
+    return <span className="text-xs text-muted-foreground">-</span>;
   }
 
   return (
@@ -448,11 +453,14 @@ export function OrdersPage() {
   };
   const day = dateBucket === "all" ? undefined : dateBucket;
 
-  const { data, isLoading, isFetching } = useListOrdersQuery({
+  // `currentData`, not `data`: while a new filter is in flight RTK keeps the
+  // PREVIOUS filter's response in `data`, which would paint the old queue's
+  // rows under the new tab.
+  const { currentData, isLoading, isFetching } = useListOrdersQuery({
     ...filters,
     dateBucket: day,
     page,
-    limit: 20,
+    limit: PAGE_SIZE,
     status,
     sortBy,
     sortDir,
@@ -466,6 +474,7 @@ export function OrdersPage() {
   // orders — just no live updates and no Live indicator.
   const { hasFeature } = useEntitlements();
   const realtimeEnabled = hasFeature("can_use_realtime");
+  const { can } = useCan();
   const streamStatus = useAppSelector(selectStreamStatus);
 
   const flash = useCallback((id: string) => {
@@ -479,15 +488,27 @@ export function OrdersPage() {
     }, 1000);
   }, []);
 
-  // paymentStatus isn't a server filter — narrow the current page client-side.
+  // paymentStatus isn't a server filter — narrow what's loaded client-side.
   const rows = useMemo(() => {
-    const all = data?.data ?? [];
+    const all = currentData?.data ?? [];
     return payment === "all"
       ? all
       : all.filter((o) => o.paymentStatus === payment);
-  }, [data, payment]);
+  }, [currentData, payment]);
 
-  const totalPages = data?.meta.totalPages ?? 1;
+  // Read the page depth back off the response rather than trusting local state:
+  // returning to a tab replays its accumulated cache entry, and `meta.page` is
+  // how deep that entry already goes.
+  const loadedPage = currentData?.meta.page ?? 1;
+  const hasMore = loadedPage < (currentData?.meta.totalPages ?? 1);
+  const total = currentData?.meta.total ?? 0;
+
+  // Memoized: InfiniteScroll rebuilds its IntersectionObserver whenever this
+  // identity changes, and a fresh observer re-fires on a sentinel already in
+  // view — which would skip a page.
+  const loadMore = useCallback(() => {
+    if (!isFetching) setPage(loadedPage + 1);
+  }, [isFetching, loadedPage]);
 
   const resetPage = () => setPage(1);
   // Branch selection is a shared, persisted app-wide choice — not a per-page
@@ -575,10 +596,14 @@ export function OrdersPage() {
           <div className="flex items-center gap-3">
             {realtimeEnabled && <LiveIndicator status={streamStatus} />}
             <ShopSelect onChange={resetPage} />
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus className="mr-1 h-4 w-4" />
-              Create order
-            </Button>
+            {/* Ungated, this button was visible to every role that can see the
+                queue and 403'd on submit for the ones that cannot raise one. */}
+            {can("orders.create") && (
+              <Button onClick={() => setCreateOpen(true)}>
+                <Plus className="mr-1 h-4 w-4" />
+                Create order
+              </Button>
+            )}
           </div>
         }
       />
@@ -660,10 +685,9 @@ export function OrdersPage() {
 
           <Select
             value={payment}
-            onValueChange={(v) => {
-              setPayment(v as OrderPaymentStatus | "all");
-              resetPage();
-            }}
+            // Client-side only, so it narrows what's already scrolled in rather
+            // than throwing those rows away and starting again at the top.
+            onValueChange={(v) => setPayment(v as OrderPaymentStatus | "all")}
           >
             <SelectTrigger className="w-40">
               <SelectValue placeholder="Payment" />
@@ -695,153 +719,157 @@ export function OrdersPage() {
         </div>
       </div>
 
-      {/* The row actions no longer wrap, so on a narrow screen the table
-          scrolls inside its own frame rather than the whole page shifting. */}
-      <div className="overflow-x-auto rounded-lg border bg-background">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Order</TableHead>
-              <SortHead
-                label="Delivery date"
-                sortKey="schedule"
-                sortBy={sortBy}
-                sortDir={sortDir}
-                onSort={applySort}
-              />
-              <SortHead
-                label="Delivery time"
-                sortKey="slot"
-                sortBy={sortBy}
-                sortDir={sortDir}
-                onSort={applySort}
-              />
-              <TableHead>Type</TableHead>
-              <SortHead
-                label="Total"
-                sortKey="total"
-                sortBy={sortBy}
-                sortDir={sortDir}
-                onSort={applySort}
-              />
-              <TableHead>Payment</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              [0, 1, 2, 3].map((i) => (
-                <TableRow key={i}>
-                  <TableCell colSpan={8}>
-                    <Skeleton className="h-6 w-full" />
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : rows.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={8}
-                  className="py-10 text-center text-sm text-muted-foreground"
-                >
-                  {emptyMessage}
-                </TableCell>
-              </TableRow>
-            ) : (
-              rows.map((o) => (
-                <TableRow
-                  key={o.id}
-                  className={cn(
-                    "cursor-pointer animate-row-enter",
-                    flashIds.has(o.id) && "animate-row-flash",
-                  )}
-                  onClick={() => setOpenId(o.id)}
-                >
-                  {/* Nowrap: with eight columns the number otherwise breaks
-                      into three lines and doubles the row height. */}
-                  <TableCell className="whitespace-nowrap font-mono font-medium">
-                    {o.orderNumber}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    <DeliveryDay order={o} today={today} />
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    <DeliveryTime order={o} />
-                  </TableCell>
-                  <TableCell className="capitalize text-sm">
-                    {o.deliveryType}
-                  </TableCell>
-                  <TableCell>₹{Number(o.totalAmount)}</TableCell>
-                  <TableCell>
-                    <span
-                      className={
-                        o.paymentStatus === "paid"
-                          ? "text-xs text-emerald-600"
-                          : "text-xs text-amber-600"
-                      }
-                    >
-                      {o.paymentStatus}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={cn(
-                        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-                        ORDER_STATUS_TONE[o.status],
-                      )}
-                    >
-                      {ORDER_STATUS_LABEL[o.status]}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex flex-nowrap items-center justify-end gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenId(o.id);
-                        }}
-                      >
-                        <Eye className="mr-1 h-3.5 w-3.5" />
-                        Details
-                      </Button>
-                      <OrderRowActions order={o} onFail={flash} />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      <div className="mb-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>
+          {isLoading
+            ? "Loading orders…"
+            : `Showing ${rows.length} of ${total} ${total === 1 ? "order" : "orders"}`}
+        </span>
+        {isFetching && !isLoading && <span>Refreshing…</span>}
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-2">
-        <span className="text-xs text-muted-foreground">
-          {isFetching && !isLoading ? "Refreshing…" : `${rows.length} shown`}
-        </span>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
-            Previous
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            Page {page} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Next
-          </Button>
+      {/* The queue scrolls instead of paging: the next batch loads as the
+          sentinel below the table comes into view, so staff working down the
+          list never stop to press Next. */}
+      <InfiniteScroll
+        hasMore={hasMore}
+        loading={isFetching}
+        onLoadMore={loadMore}
+        loader={
+          <div className="flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Loading more orders…
+          </div>
+        }
+        endMessage={
+          rows.length > 0 ? (
+            <p className="py-6 text-center text-xs text-muted-foreground">
+              That's every order in this queue.
+            </p>
+          ) : null
+        }
+      >
+        {/* The row actions no longer wrap, so on a narrow screen the table
+            scrolls inside its own frame rather than the whole page shifting. */}
+        <div className="overflow-x-auto rounded-lg border bg-background">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Order</TableHead>
+                <SortHead
+                  label="Delivery date"
+                  sortKey="schedule"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={applySort}
+                />
+                <SortHead
+                  label="Delivery time"
+                  sortKey="slot"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={applySort}
+                />
+                <TableHead>Type</TableHead>
+                <SortHead
+                  label="Total"
+                  sortKey="total"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={applySort}
+                />
+                <TableHead>Payment</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                [0, 1, 2, 3].map((i) => (
+                  <TableRow key={i}>
+                    <TableCell colSpan={8}>
+                      <Skeleton className="h-6 w-full" />
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : rows.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={8}
+                    className="py-10 text-center text-sm text-muted-foreground"
+                  >
+                    {emptyMessage}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                rows.map((o) => (
+                  <TableRow
+                    key={o.id}
+                    className={cn(
+                      "cursor-pointer animate-row-enter",
+                      flashIds.has(o.id) && "animate-row-flash",
+                    )}
+                    onClick={() => setOpenId(o.id)}
+                  >
+                    {/* Nowrap: with eight columns the number otherwise breaks
+                        into three lines and doubles the row height. */}
+                    <TableCell className="whitespace-nowrap font-mono font-medium">
+                      {o.orderNumber}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <DeliveryDay order={o} today={today} />
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <DeliveryTime order={o} />
+                    </TableCell>
+                    <TableCell className="capitalize text-sm">
+                      {o.deliveryType}
+                    </TableCell>
+                    <TableCell>₹{Number(o.totalAmount)}</TableCell>
+                    <TableCell>
+                      <span
+                        className={
+                          o.paymentStatus === "paid"
+                            ? "text-xs text-emerald-600"
+                            : "text-xs text-amber-600"
+                        }
+                      >
+                        {o.paymentStatus}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+                          ORDER_STATUS_TONE[o.status],
+                        )}
+                      >
+                        {ORDER_STATUS_LABEL[o.status]}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex flex-nowrap items-center justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenId(o.id);
+                          }}
+                        >
+                          <Eye className="mr-1 h-3.5 w-3.5" />
+                          Details
+                        </Button>
+                        <OrderRowActions order={o} onFail={flash} />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </div>
-      </div>
+      </InfiniteScroll>
 
       <OrderDetailDrawer orderId={openId} onOpenChange={(o) => !o && setOpenId(null)} />
       <CreateOrderDialog

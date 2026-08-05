@@ -48,6 +48,23 @@ export interface RegisterAccountBody {
   password: string;
 }
 
+export interface RegistrationAvailabilityQuery {
+  email?: string;
+  appSlug?: string;
+}
+
+export interface RegistrationAvailability {
+  /** null when the request didn't ask about an email. */
+  emailAvailable: boolean | null;
+  /** null when the request didn't ask about an address. */
+  slugAvailable: boolean | null;
+  /**
+   * The address registration would assign: the requested one when free, else the
+   * same name with a random suffix. Indicative — the account carries the real one.
+   */
+  suggestedSlug: string | null;
+}
+
 export const accountsApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
     /**
@@ -58,6 +75,24 @@ export const accountsApi = baseApi.injectEndpoints({
      */
     registerAccount: build.mutation<Account, RegisterAccountBody>({
       query: (body) => ({ url: "/accounts/register", method: "POST", body }),
+    }),
+
+    /**
+     * Signup pre-flight: is this email free, and is the address the shop name
+     * derives from taken? Also public, and also tag-free — the answer is about
+     * rows this session can't see and shouldn't hold on to.
+     */
+    registrationAvailability: build.query<
+      RegistrationAvailability,
+      RegistrationAvailabilityQuery
+    >({
+      query: ({ email, appSlug }) => ({
+        url: "/accounts/register/availability",
+        params: {
+          ...(email ? { email } : {}),
+          ...(appSlug ? { appSlug } : {}),
+        },
+      }),
     }),
 
     listAccounts: build.query<Paginated<Account>, AccountsQuery | void>({
@@ -162,6 +197,7 @@ export const accountsApi = baseApi.injectEndpoints({
 
 export const {
   useRegisterAccountMutation,
+  useRegistrationAvailabilityQuery,
   useListAccountsQuery,
   useGetAccountQuery,
   useMyAccountQuery,

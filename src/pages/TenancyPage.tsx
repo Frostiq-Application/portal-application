@@ -211,7 +211,7 @@ export function TenancyPage() {
                         <TableCell className="text-sm">
                           {t.accountName ?? (
                             <span className="text-muted-foreground">
-                              {t.orphaned ? "No account" : "—"}
+                              {t.orphaned ? "No account" : "-"}
                             </span>
                           )}
                         </TableCell>
@@ -240,7 +240,7 @@ export function TenancyPage() {
           {stats.orphaned > 0 && (
             <p className="mt-3 flex items-start gap-2 text-xs text-muted-foreground">
               <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-500" />
-              {stats.orphaned} schema{stats.orphaned > 1 ? "s have" : " has"} no owning account —
+              {stats.orphaned} schema{stats.orphaned > 1 ? "s have" : " has"} no owning account,
               left behind when a brand was deleted. They are still migrated so they stay restorable,
               but they are safe to drop once you are sure.
             </p>

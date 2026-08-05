@@ -72,7 +72,7 @@ export function SubscriptionCouponsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Subscription coupons"
-        description="Promotional discounts on what bakeries pay you. Applied to the plan price only — never to add-ons."
+        description="Promotional discounts on what bakeries pay you. Applied to the plan price only, never to add-ons."
         actions={
           <Button
             onClick={() => {
@@ -200,8 +200,8 @@ export function SubscriptionCouponsPage() {
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                         {c.validFrom || c.validUntil ? (
                           <>
-                            {c.validFrom ? formatDate(c.validFrom) : "—"} →{" "}
-                            {c.validUntil ? formatDate(c.validUntil) : "—"}
+                            {c.validFrom ? formatDate(c.validFrom) : "-"} →{" "}
+                            {c.validUntil ? formatDate(c.validUntil) : "-"}
                           </>
                         ) : (
                           "Always"
@@ -350,7 +350,7 @@ function CouponEditor({
             {coupon ? `Edit ${coupon.code}` : "New subscription coupon"}
           </DialogTitle>
           <DialogDescription>
-            Discounts the plan portion of a bakery's bill — never add-ons, and
+            Discounts the plan portion of a bakery's bill, never add-ons, and
             never stacked with another coupon.
           </DialogDescription>
         </DialogHeader>
@@ -390,7 +390,7 @@ function CouponEditor({
               rows={2}
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Diwali campaign 2026 — admin only, never shown to bakeries."
+              placeholder="Diwali campaign 2026, admin only, never shown to bakeries."
             />
           </div>
 

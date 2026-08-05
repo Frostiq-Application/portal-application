@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CreateOrderDialog } from "./CreateOrderDialog";
 
@@ -20,10 +20,31 @@ const page = <T,>(rows: T[]) => ({
 vi.mock("@/features/api/ordersApi", () => ({
   useCreateOrderMutation: () => [vi.fn(), { isLoading: false }],
 }));
-vi.mock("@/features/api/customersApi", () => ({
-  useListCustomersQuery: () => ({ data: page([]), isFetching: false }),
-  useGetCustomerQuery: () => ({ data: undefined }),
-}));
+/** Every arg object the picker has asked the customer list for, in order. */
+const customerQueries: { page?: number; limit?: number; search?: string }[] = [];
+
+vi.mock("@/features/api/customersApi", () => {
+  // One stable page object across renders, the way RTK Query hands back a
+  // cached response — a fresh identity each render would look like a new page
+  // to the accumulator and loop.
+  const rows = Array.from({ length: 10 }, (_, i) => ({
+    id: `c${i + 1}`,
+    name: `Customer ${i + 1}`,
+    phone: `+9198123456${i}`,
+    email: null,
+  }));
+  const result = {
+    data: rows,
+    meta: { total: 25, page: 1, limit: 10, totalPages: 3 },
+  };
+  return {
+    useListCustomersQuery: (args: { page?: number; limit?: number; search?: string }) => {
+      customerQueries.push(args);
+      return { data: result, currentData: result, isFetching: false };
+    },
+    useGetCustomerQuery: () => ({ data: undefined }),
+  };
+});
 vi.mock("@/features/api/catalogApi", () => ({
   useListProductsQuery: () => ({
     data: page([
@@ -53,6 +74,39 @@ const renderDialog = () =>
   );
 
 const removeButtons = () => screen.queryAllByRole("button", { name: /remove item/i });
+
+const lastCustomerQuery = () => customerQueries[customerQueries.length - 1];
+
+describe("CreateOrderDialog customer picker", () => {
+  beforeEach(() => {
+    customerQueries.length = 0;
+  });
+
+  it("asks for one small page at a time, not the whole directory", () => {
+    renderDialog();
+
+    expect(lastCustomerQuery()).toMatchObject({ page: 1, limit: 10 });
+    expect(
+      screen.getAllByRole("button", { name: /^Customer \d+/ }),
+    ).toHaveLength(10);
+  });
+
+  it("waits for typing to settle before searching", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.type(
+      screen.getByPlaceholderText(/search by name, phone or email/i),
+      "vik",
+    );
+    // Mid-keystroke: still the unfiltered list, no request per character.
+    expect(lastCustomerQuery().search).toBeUndefined();
+
+    await waitFor(() =>
+      expect(lastCustomerQuery()).toMatchObject({ search: "vik", page: 1 }),
+    );
+  });
+});
 
 describe("CreateOrderDialog items", () => {
   it("removes the row that was clicked", async () => {

@@ -84,8 +84,51 @@ export interface CustomCakeQuery {
   limit?: number;
 }
 
+/**
+ * A request typed up by the shop for someone who phoned in or walked up. The
+ * brief is the storefront form's, plus the branch it belongs to and (optionally)
+ * the customer record to attach — the link conversion to an order later needs.
+ */
+export interface CreateCustomCakeInput {
+  shopId: string;
+  customerId?: string;
+  contactName: string;
+  contactPhone: string;
+  contactEmail?: string;
+  cakeType?: string;
+  weight?: string;
+  shape?: string;
+  theme?: string;
+  occasion?: string;
+  sponge?: string;
+  cream?: string;
+  filling?: string;
+  flavour?: string;
+  colour?: string;
+  decorations?: string[];
+  topper?: string;
+  cakeMessage?: string;
+  referenceImageUrls?: string[];
+  deliveryType: DeliveryType;
+  neededDate?: string;
+  neededTime?: string;
+  deliveryAddress?: string;
+  notes?: string;
+  specialInstructions?: string;
+  allergyInfo?: string;
+}
+
 export const customCakeApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
+    createCustomCake: build.mutation<CustomCakeRequest, CreateCustomCakeInput>({
+      query: (body) => ({
+        url: "/custom-cake/requests",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [{ type: "CustomCake", id: "LIST" }],
+    }),
+
     listCustomCakes: build.query<CustomCakeListResponse, CustomCakeQuery | void>({
       query: (params) => ({
         url: "/custom-cake/requests",
@@ -209,6 +252,7 @@ export const customCakeApi = baseApi.injectEndpoints({
 });
 
 export const {
+  useCreateCustomCakeMutation,
   useListCustomCakesQuery,
   useGetCustomCakeQuery,
   useGetCustomCakeEventsQuery,

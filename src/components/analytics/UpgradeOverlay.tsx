@@ -91,7 +91,7 @@ export function UpgradeOverlay({
             )
           ) : (
             <p className="mt-4 text-xs text-muted-foreground">
-              Ask your account owner to upgrade — it unlocks for the whole team
+              Ask your account owner to upgrade. It unlocks for the whole team
               at once.
             </p>
           )}

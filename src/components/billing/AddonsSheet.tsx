@@ -116,7 +116,7 @@ export function AddonsSheet({
       setPayStage("done");
       await new Promise((r) => setTimeout(r, 1000));
 
-      toast.success(`${label} capacity added — it's available right away.`);
+      toast.success(`${label} capacity added. It's available right away.`);
       setPayStage(null);
       setDraft((d) => ({ ...d, [featureKey]: 0 }));
       onDone?.();
@@ -146,7 +146,7 @@ export function AddonsSheet({
       toast.success(
         remove
           ? `Removal scheduled for ${renewalDate ? formatDate(renewalDate) : "your renewal date"}. You can undo it until then.`
-          : "Removal cancelled — you're keeping this add-on.",
+          : "Removal cancelled. You're keeping this add-on.",
       );
       onDone?.();
     } catch {
@@ -185,8 +185,8 @@ export function AddonsSheet({
           <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
             {isTrial && (
               <p className="rounded-lg bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
-                Add-ons aren't available during the trial. Activate a plan first
-                — trial limits are fixed.
+                Add-ons aren't available during the trial. Activate a plan first,
+                since trial limits are fixed.
               </p>
             )}
 

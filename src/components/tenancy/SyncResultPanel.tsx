@@ -31,7 +31,7 @@ export function SyncResultPanel({ result }: { result: SyncResult }) {
         }`}
       >
         <span className="font-medium">
-          {result.dryRun ? "Rehearsal — rolled back, nothing changed" : "Applied"}
+          {result.dryRun ? "Rehearsal: rolled back, nothing changed" : "Applied"}
         </span>
         <span className="text-muted-foreground">
           {result.appliedCount}/{result.totalTasks} ok
@@ -42,7 +42,7 @@ export function SyncResultPanel({ result }: { result: SyncResult }) {
 
       {interesting.length === 0 ? (
         <p className="px-3 py-3 text-sm text-muted-foreground">
-          Nothing to do — every targeted tenant already matches the registry.
+          Nothing to do. Every targeted tenant already matches the registry.
         </p>
       ) : (
         <ul className="divide-y">

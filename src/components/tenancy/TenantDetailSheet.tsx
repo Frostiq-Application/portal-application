@@ -100,7 +100,7 @@ export function TenantDetailSheet({
         </div>
         {!pending.length && !isFetching && (
           <p className="mt-2 text-xs text-muted-foreground">
-            Nothing pending — this tenant matches the registry.
+            Nothing pending. This tenant matches the registry.
           </p>
         )}
 

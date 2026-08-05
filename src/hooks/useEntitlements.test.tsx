@@ -112,7 +112,7 @@ describe("subscription state", () => {
     expect(withAccount("active", "cancelled").isSubscriptionExpired).toBe(true);
   });
 
-  it("does not hard-stop during grace — the storefront is still live", () => {
+  it("does not hard-stop during grace, the storefront is still live", () => {
     const r = withAccount("active", "grace");
     expect(r.isSubscriptionExpired).toBe(false);
     expect(r.isInGracePeriod).toBe(true);

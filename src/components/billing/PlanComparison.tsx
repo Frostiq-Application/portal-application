@@ -211,7 +211,7 @@ export function PlanComparison({
           </table>
 
           <p className="border-t px-5 py-3 text-xs text-muted-foreground">
-            Limits can be raised on any plan with add-on capacity — you don't
+            Limits can be raised on any plan with add-on capacity, so you don't
             have to change tier for one more branch. Features are plan-only.
           </p>
         </div>

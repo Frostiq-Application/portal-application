@@ -74,7 +74,7 @@ export function TrialStatusStrip() {
         body={
           full
             ? "Move up a plan or add capacity to keep adding."
-            : "You're close to your plan's limit — worth a look before you hit it."
+            : "You're close to your plan's limit. Worth a look before you hit it."
         }
         cta={full ? "Upgrade" : "See options"}
         onClick={() => navigate("/my-subscription")}

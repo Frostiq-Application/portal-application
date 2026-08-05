@@ -195,7 +195,7 @@ export function AnalyticsPage() {
           <SectionHeading
             icon={Heart}
             title="Wishlist insights"
-            description="What shoppers are saving for later — and how often it turns into an order."
+            description="What shoppers are saving for later, and how often it turns into an order."
           />
           {canWishlist ? (
             shopId ? (
@@ -222,7 +222,7 @@ export function AnalyticsPage() {
             <SectionHeading
               icon={Building2}
               title="Brand overview"
-              description="Every branch together — revenue comparison, customers and repeat rate."
+              description="Every branch together: revenue comparison, customers and repeat rate."
             />
             {canBrand ? (
               <LiveBrandAnalytics range={range} />
@@ -283,8 +283,8 @@ function BranchAnalyticsView({
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Kpi label="Total orders" value={data?.totalOrders ?? 0} icon={ShoppingBag} accent="#3b82f6" loading={loading} />
-        <Kpi label="Revenue" value={data ? inr(data.revenue) : "—"} icon={TrendingUp} accent="#10b981" loading={loading} />
-        <Kpi label="Avg order value" value={data ? inr(data.averageOrderValue) : "—"} icon={IndianRupee} loading={loading} />
+        <Kpi label="Revenue" value={data ? inr(data.revenue) : "-"} icon={TrendingUp} accent="#10b981" loading={loading} />
+        <Kpi label="Avg order value" value={data ? inr(data.averageOrderValue) : "-"} icon={IndianRupee} loading={loading} />
         <Kpi label="Cancelled" value={data?.cancelledOrders ?? 0} icon={Ban} accent="#ef4444" loading={loading} />
       </div>
 
@@ -309,11 +309,11 @@ function BrandAnalyticsView({
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Kpi label="Total orders" value={data?.totalOrders ?? 0} icon={ShoppingBag} accent="#3b82f6" loading={loading} />
-        <Kpi label="Revenue" value={data ? inr(data.revenue) : "—"} icon={TrendingUp} accent="#10b981" loading={loading} />
-        <Kpi label="Avg order value" value={data ? inr(data.averageOrderValue) : "—"} icon={IndianRupee} loading={loading} />
+        <Kpi label="Revenue" value={data ? inr(data.revenue) : "-"} icon={TrendingUp} accent="#10b981" loading={loading} />
+        <Kpi label="Avg order value" value={data ? inr(data.averageOrderValue) : "-"} icon={IndianRupee} loading={loading} />
         <Kpi
           label="Repeat rate"
-          value={data ? `${Number(data.repeatRatePct).toFixed(1)}%` : "—"}
+          value={data ? `${Number(data.repeatRatePct).toFixed(1)}%` : "-"}
           icon={Users}
           accent="#8b5cf6"
           loading={loading}

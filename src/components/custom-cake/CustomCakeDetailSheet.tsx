@@ -252,7 +252,7 @@ function SheetBody({ request }: { request: CustomCakeRequest }) {
         )}
         {request.status === "accepted" && request.quotedPrice && (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-            Customer accepted ₹{request.quotedPrice} — convert it to an order
+            Customer accepted ₹{request.quotedPrice}. Convert it to an order
             below.
           </div>
         )}
@@ -284,7 +284,7 @@ function SheetBody({ request }: { request: CustomCakeRequest }) {
         <Textarea
           value={quoteNote}
           onChange={(e) => setQuoteNote(e.target.value)}
-          placeholder="Message to the customer (optional) — shown with the quote"
+          placeholder="Message to the customer (optional), shown with the quote"
           rows={2}
         />
       </section>
@@ -344,7 +344,7 @@ function SheetBody({ request }: { request: CustomCakeRequest }) {
         )}
         {!request.customerId && !request.convertedOrderId && (
           <p className="mt-1 text-xs text-muted-foreground">
-            Guest request — a registered customer is required to convert.
+            Guest request. A registered customer is required to convert.
           </p>
         )}
       </section>
@@ -457,6 +457,6 @@ function DetailGrid({ request }: { request: CustomCakeRequest }) {
 /** Pre-filled WhatsApp message the shop sends the customer about this request. */
 function waMessage(r: CustomCakeRequest): string {
   return `Hi ${r.contactName}, regarding your custom cake request ${r.requestNumber}${
-    r.quotedPrice ? ` — quoted price ₹${r.quotedPrice}` : ""
+    r.quotedPrice ? `, quoted price ₹${r.quotedPrice}` : ""
   }.`;
 }

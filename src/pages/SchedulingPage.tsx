@@ -84,7 +84,7 @@ export function SchedulingPage() {
     <>
       <PageHeader
         title="Scheduling"
-        description="Pickup & delivery slots, hours, cutoffs, and closed days — per branch"
+        description="Pickup & delivery slots, hours, cutoffs, and closed days, per branch"
         actions={<ShopSelect />}
       />
       {!shopId ? (
@@ -184,7 +184,7 @@ function SettingsCard({
           {scope === "all"
             ? "Branch defaults for how time slots are generated."
             : inherited
-              ? "Currently inheriting the branch defaults — saving creates separate rules for this fulfilment type."
+              ? "Currently inheriting the branch defaults. Saving creates separate rules for this fulfilment type."
               : "Separate rules for this fulfilment type (override the branch defaults)."}
         </CardDescription>
       </CardHeader>
@@ -590,7 +590,7 @@ function SlotPreviewCard({
         ) : !data ? null : !data.open ? (
           <div className="rounded-lg border border-dashed bg-muted/30 py-8 text-center text-sm text-muted-foreground">
             Closed on this date
-            {data.closedReason ? ` — ${data.closedReason}` : ""}.
+            {data.closedReason ? `: ${data.closedReason}` : ""}.
           </div>
         ) : data.slots.length === 0 ? (
           <p className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">

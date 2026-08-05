@@ -320,7 +320,7 @@ export function ShopDialog({
             // but now that each one sends mail it would land the new owner two
             // different invites for the same account.
             setResetToken(owner.inviteToken);
-            toast.success(`Branch owner invited — email sent to ${ownerEmail.trim()}`);
+            toast.success(`Branch owner invited. Email sent to ${ownerEmail.trim()}`);
             return; // Stay open to show the invite confirmation.
           } catch (err) {
             toast.error(apiError(err, "Branch saved, but the owner invite failed"));
@@ -448,7 +448,7 @@ export function ShopDialog({
             {latitude && longitude && !coordsInvalid ? (
               <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                 <Check className="h-3.5 w-3.5" />
-                Location set — {formatCoordinates(latitude, longitude)}
+                Location set: {formatCoordinates(latitude, longitude)}
                 <button
                   type="button"
                   className="ml-1 font-normal text-muted-foreground underline-offset-2 hover:underline"
@@ -545,7 +545,7 @@ export function ShopDialog({
                     type="button"
                     onClick={() => toggleDay(d)}
                     aria-pressed={closed}
-                    aria-label={`${d} — ${closed ? "closed" : "open"}`}
+                    aria-label={`${d}: ${closed ? "closed" : "open"}`}
                     className={cn(
                       "rounded-md border py-2 text-xs font-medium capitalize transition-colors",
                       "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",

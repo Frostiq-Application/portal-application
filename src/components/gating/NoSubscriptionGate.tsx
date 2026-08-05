@@ -80,8 +80,8 @@ export function NoSubscriptionGate({
               {sub.deleteReadyAt && (
                 <>
                   {" "}
-                  Your data is kept until {formatDate(sub.deleteReadyAt)} —
-                  subscribe again before then and everything comes straight
+                  Your data is kept until {formatDate(sub.deleteReadyAt)}.
+                  Subscribe again before then and everything comes straight
                   back.
                 </>
               )}
@@ -90,7 +90,7 @@ export function NoSubscriptionGate({
             trial ? (
               <>
                 No card, nothing charged automatically. Your storefront goes
-                live immediately and takes real orders from day one — after{" "}
+                live immediately and takes real orders from day one, after{" "}
                 {trial.days} days you choose a plan to carry on.
               </>
             ) : data?.freePlanAvailable ? (

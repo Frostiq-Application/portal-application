@@ -178,7 +178,7 @@ export function CycleEditorDialog({
               <>
                 <p className="mt-2 text-sm">
                   Customers get <strong>{m} months</strong> and pay for{" "}
-                  <strong>{payable}</strong> —{" "}
+                  <strong>{payable}</strong>:{" "}
                   <strong className="tabular-nums">{payable}×</strong> the
                   monthly price.
                 </p>
@@ -201,7 +201,7 @@ export function CycleEditorDialog({
             <p className="rounded-lg bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-800 dark:text-amber-300">
               Changing the length or free months affects{" "}
               <strong>future</strong> checkouts and renewals only. Anyone
-              mid-period keeps the term and price they bought — the engine
+              mid-period keeps the term and price they bought. The engine
               re-reads this at each renewal, never inside a paid period.
             </p>
           )}

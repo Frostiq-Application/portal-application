@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   CalendarClock,
   CreditCard,
@@ -17,6 +17,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { apiError } from "@/lib/apiError";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useInfiniteList } from "@/hooks/useInfiniteList";
+import { InfiniteScroll } from "@/components/common/InfiniteScroll";
 import {
   useCreateOrderMutation,
   type ManualOrderItemInput,
@@ -52,6 +54,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+/** Customers loaded per request in the picker — the rest page in on scroll. */
+const CUSTOMER_PAGE_SIZE = 10;
 
 const PAYMENT_LABEL: Record<OrderPaymentMethod, string> = {
   cod: "Cash",
@@ -145,11 +150,56 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
 
   const { data: shops } = useListShopsQuery({ page: 1, limit: 100 });
 
-  const debouncedSearch = useDebouncedValue(customerSearch, 300);
-  const { data: customerResults, isFetching: searching } = useListCustomersQuery(
-    { page: 1, limit: 8, search: debouncedSearch || undefined },
-    { skip: !open || Boolean(customer) },
+  // The directory can run to thousands of rows, so the picker never asks for
+  // all of them: one debounced request per settled search term, ten rows at a
+  // time, and the next ten as the results box is scrolled.
+  const [customerListEl, setCustomerListEl] = useState<HTMLDivElement | null>(
+    null,
   );
+  const debouncedSearch = useDebouncedValue(customerSearch, 300);
+  // An emptied box needs no debounce: snap back to the default list at once
+  // rather than showing the cleared term's matches for another beat.
+  const search = customerSearch.trim() ? debouncedSearch.trim() : "";
+  // The debounce window is dead time the user can see — count it as loading so
+  // the list never sits there showing matches for a term already typed past.
+  const isTyping = customerSearch.trim() !== search;
+
+  // Keyed on the dialog session too, so reopening starts back at page 1 instead
+  // of re-requesting however deep the last order's search had scrolled.
+  const {
+    page: customerPage,
+    items: customerOptions,
+    hasMore: hasMoreCustomers,
+    ingest: ingestCustomers,
+    loadMore: loadNextCustomers,
+  } = useInfiniteList<Customer>(`${seedKey ?? "closed"}|${search}`);
+
+  // `currentData`, not `data`: RTK keeps the PREVIOUS term's response in `data`
+  // while the new one is in flight, which reads to the accumulator as "nothing
+  // changed" and silently drops the page.
+  const { currentData: customerResults, isFetching: searching } =
+    useListCustomersQuery(
+      {
+        page: customerPage,
+        limit: CUSTOMER_PAGE_SIZE,
+        search: search || undefined,
+      },
+      { skip: !open || Boolean(customer) },
+    );
+  ingestCustomers(customerResults);
+
+  // Spinner only while there is nothing to show for what was asked: the
+  // debounce window and the first page. Paging deeper keeps the rows up and
+  // puts the loader underneath them instead.
+  const loadingCustomers =
+    isTyping || (customerPage === 1 && searching && !customerResults);
+
+  // Memoized: InfiniteScroll rebuilds its IntersectionObserver whenever this
+  // identity changes, and a fresh observer re-fires on a sentinel already in
+  // view — which would skip a page.
+  const loadMoreCustomers = useCallback(() => {
+    if (!searching) loadNextCustomers();
+  }, [searching, loadNextCustomers]);
   const { data: customerDetail } = useGetCustomerQuery(customer?.id ?? "", {
     skip: !customer,
   });
@@ -311,31 +361,50 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
                         onChange={(e) => setCustomerSearch(e.target.value)}
                       />
                     </div>
-                    <div className="max-h-44 divide-y overflow-y-auto rounded-lg border">
-                      {searching ? (
+                    <div
+                      ref={setCustomerListEl}
+                      className="max-h-44 overflow-y-auto rounded-lg border"
+                    >
+                      {loadingCustomers ? (
                         <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
                           <Loader2 className="size-4 animate-spin" /> Searching…
                         </div>
-                      ) : (customerResults?.data ?? []).length === 0 ? (
+                      ) : customerOptions.length === 0 ? (
                         <div className="p-3 text-sm text-muted-foreground">
                           No customers found.
                         </div>
                       ) : (
-                        (customerResults?.data ?? []).map((c) => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
-                            onClick={() => setCustomer(c)}
-                          >
-                            <span className="truncate font-medium">
-                              {c.name ?? "Unnamed customer"}
-                            </span>
-                            <span className="shrink-0 text-xs text-muted-foreground">
-                              {c.phone ?? c.email ?? ""}
-                            </span>
-                          </button>
-                        ))
+                        <InfiniteScroll
+                          root={customerListEl}
+                          rootMargin="80px"
+                          hasMore={hasMoreCustomers}
+                          loading={searching}
+                          onLoadMore={loadMoreCustomers}
+                          loader={
+                            <div className="flex items-center justify-center gap-2 border-t py-2 text-xs text-muted-foreground">
+                              <Loader2 className="size-3.5 animate-spin" />
+                              Loading more…
+                            </div>
+                          }
+                        >
+                          <div className="divide-y">
+                            {customerOptions.map((c) => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
+                                onClick={() => setCustomer(c)}
+                              >
+                                <span className="truncate font-medium">
+                                  {c.name ?? "Unnamed customer"}
+                                </span>
+                                <span className="shrink-0 text-xs text-muted-foreground">
+                                  {c.phone ?? c.email ?? ""}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </InfiniteScroll>
                       )}
                     </div>
                   </div>
@@ -426,7 +495,7 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
                         <SelectContent>
                           {(customerDetail?.addresses ?? []).map((a) => (
                             <SelectItem key={a.id} value={a.id}>
-                              {a.label ? `${a.label} — ` : ""}
+                              {a.label ? `${a.label}: ` : ""}
                               {a.fullAddress}
                             </SelectItem>
                           ))}
@@ -435,7 +504,7 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
                       {customer &&
                         (customerDetail?.addresses ?? []).length === 0 && (
                           <p className="text-xs text-muted-foreground">
-                            This customer has no saved addresses — choose
+                            This customer has no saved addresses. Choose
                             Pickup, or ask them to add one.
                           </p>
                         )}
@@ -455,7 +524,7 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
                       <p className="text-xs text-amber-600 dark:text-amber-400">
                         {slotsData.closedReason ??
                           "The branch is closed on this date"}
-                        {" — you can still create the order."}
+                        {". You can still create the order."}
                       </p>
                     )}
                   </Field>
@@ -532,7 +601,7 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
               <Section icon={StickyNote} title="Note" hint="Optional">
                 <Textarea
                   rows={3}
-                  placeholder="e.g. Phone order — write “Happy Birthday Riya” on the cake."
+                  placeholder="e.g. Phone order, write “Happy Birthday Riya” on the cake."
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                 />

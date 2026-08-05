@@ -33,7 +33,7 @@ export function homePathForRole(role?: Role): string {
 }
 
 export function roleLabel(role?: Role): string {
-  return role ? ROLE_LABELS[role] : "—";
+  return role ? ROLE_LABELS[role] : "-";
 }
 
 export function isPlatformAdmin(role?: Role): boolean {

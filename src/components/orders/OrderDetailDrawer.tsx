@@ -268,7 +268,7 @@ export function OrderDetailDrawer({ orderId, onOpenChange }: Props) {
                           </span>
                           {h.note && (
                             <span className="text-muted-foreground">
-                              — {h.note}
+                              · {h.note}
                             </span>
                           )}
                         </li>

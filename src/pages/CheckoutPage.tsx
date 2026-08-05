@@ -186,7 +186,7 @@ export function CheckoutPage() {
   const warnWhilePaying = useCallback(() => {
     toast.warning("Payment in progress", {
       description:
-        "Please don't refresh or close this tab until it finishes — you may be charged without us recording it.",
+        "Please don't refresh or close this tab until it finishes. You may be charged without us recording it.",
     });
   }, []);
   usePaymentExitGuard(paying && payStage === null, {
@@ -371,7 +371,7 @@ export function CheckoutPage() {
       }).unwrap();
 
       if (session.settledWithoutPayment) {
-        toast.success("You're all set — your plan is active.");
+        toast.success("You're all set. Your plan is active.");
         navigate("/my-subscription", { replace: true });
         return;
       }
@@ -389,7 +389,7 @@ export function CheckoutPage() {
         accountName: session.accountName,
         ownerEmail: session.ownerEmail,
         ownerPhone: session.ownerPhone,
-        description: `${plan.name} — ${cycle.name}`,
+        description: `${plan.name} · ${cycle.name}`,
       });
       if (!result) return; // dismissed — not an error
 
@@ -421,7 +421,7 @@ export function CheckoutPage() {
 
       toast.success(
         verified.invoiceNumber
-          ? `Payment received — invoice ${verified.invoiceNumber}`
+          ? `Payment received: invoice ${verified.invoiceNumber}`
           : "Payment received. Your plan is active.",
       );
       // Replace, never push: it consumes the sentinel history entry the lock
@@ -630,7 +630,7 @@ export function CheckoutPage() {
                 </h2>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Add capacity now and it's on the same invoice. You can always
-                  add it later instead — it's just prorated then.
+                  add it later instead. It's just prorated then.
                 </p>
               </div>
 
@@ -853,8 +853,7 @@ export function CheckoutPage() {
                         {appliedCoupon} applied
                         {Number(quote?.discountAmount ?? 0) > 0 && (
                           <span className="font-normal">
-                            {" "}
-                            — saving {inr(quote!.discountAmount)}
+                            , saving {inr(quote!.discountAmount)}
                           </span>
                         )}
                       </>
@@ -931,7 +930,7 @@ export function CheckoutPage() {
               </>
             )}
             <p className="text-xs text-muted-foreground">
-              Applies to the plan price only — never to add-ons.
+              Applies to the plan price only, never to add-ons.
             </p>
           </section>
 
@@ -990,7 +989,7 @@ export function CheckoutPage() {
               >
                 {chosenAddons.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    None — you're on the plan's included limits. You can add
+                    None. You're on the plan's included limits. You can add
                     capacity later whenever you outgrow them.
                   </p>
                 ) : (
@@ -1038,8 +1037,8 @@ export function CheckoutPage() {
                   label="Autopay"
                   value={
                     autopay
-                      ? "On — renewals charge automatically"
-                      : "Off — you'll pay each cycle yourself"
+                      ? "On (renewals charge automatically)"
+                      : "Off (you'll pay each cycle yourself)"
                   }
                 />
               </ReviewCard>
@@ -1185,7 +1184,7 @@ export function CheckoutPage() {
                                   </TooltipTrigger>
                                   <TooltipContent className="max-w-64">
                                     What our payment provider charges to process
-                                    the transaction, passed on at cost —{" "}
+                                    the transaction, passed on at cost:{" "}
                                     {quote.gatewayFeePercent}% of{" "}
                                     {inr(quote.subtotal)}. It applies to every
                                     charge, including renewals.
@@ -1293,7 +1292,7 @@ export function CheckoutPage() {
                       {paying && (
                         <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-amber-500/10 px-2 py-1.5 text-left text-xs font-medium text-amber-700 dark:text-amber-400">
                           <TriangleAlert className="mt-px size-3.5 shrink-0" />
-                          Payment in progress — don't refresh or close this tab.
+                          Payment in progress. Don't refresh or close this tab.
                         </p>
                       )}
 
@@ -1311,7 +1310,7 @@ export function CheckoutPage() {
                     <p className="mt-3 flex items-start gap-1.5 rounded-lg bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400">
                       <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
                       Above ₹15,000, RBI requires your approval for each
-                      recurring debit — we'll email you before every renewal.
+                      recurring debit. We'll email you before every renewal.
                     </p>
                   )}
                 </>
@@ -1322,7 +1321,7 @@ export function CheckoutPage() {
                 with. All three statements are literally true here. */}
             <div className="space-y-2 border-t bg-muted/30 px-5 py-4">
               {[
-                { Icon: ShieldCheck, text: "Secured by Razorpay — we never see your card or UPI details" },
+                { Icon: ShieldCheck, text: "Secured by Razorpay. We never see your card or UPI details" },
                 { Icon: BadgeCheck, text: "GST-ready invoice emailed immediately" },
                 { Icon: Check, text: "Cancel any time; access runs to the end of your period" },
               ].map(({ Icon, text }) => (

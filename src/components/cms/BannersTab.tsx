@@ -282,7 +282,7 @@ export function BannersTab() {
             </EmptyMedia>
             <EmptyTitle>No banners yet</EmptyTitle>
             <EmptyDescription>
-              Add your first hero banner above — it shows at the top of the storefront.
+              Add your first hero banner above. It shows at the top of the storefront.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>

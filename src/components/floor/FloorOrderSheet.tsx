@@ -258,7 +258,7 @@ export function FloorOrderSheet({
                         <p className="mt-1.5 pl-[3.25rem] text-base text-muted-foreground">
                           {[it.variantLabel, it.flavorName]
                             .filter(Boolean)
-                            .join(" · ") || "—"}
+                            .join(" · ") || "-"}
                         </p>
                         {it.addons.length > 0 && (
                           <div className="mt-3 flex flex-wrap gap-2">
@@ -311,7 +311,7 @@ export function FloorOrderSheet({
                       <div className="flex items-center gap-4 rounded-xl bg-muted p-4">
                         <Store className="size-6 shrink-0 text-muted-foreground" />
                         <p className="text-lg font-semibold">
-                          Pickup — collects from the branch
+                          Pickup, collects from the branch
                         </p>
                       </div>
                     ) : (
@@ -373,7 +373,7 @@ export function FloorOrderSheet({
                 <div className="flex items-center gap-4 rounded-2xl border bg-muted/50 p-5">
                   <Store className="size-6 shrink-0 text-muted-foreground" />
                   <p className="text-lg font-semibold">
-                    Pickup — the customer collects from the branch
+                    Pickup, the customer collects from the branch
                   </p>
                 </div>
               )}

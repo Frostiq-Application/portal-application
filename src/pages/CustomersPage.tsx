@@ -137,7 +137,7 @@ function CustomerRow({
         )}
       </TableCell>
       <TableCell className="text-sm text-muted-foreground">
-        <div>{customer.phone ?? "—"}</div>
+        <div>{customer.phone ?? "-"}</div>
         {customer.email && <div className="truncate">{customer.email}</div>}
       </TableCell>
       <TableCell className="text-right text-sm">{customer.orderCount}</TableCell>
@@ -145,7 +145,7 @@ function CustomerRow({
         {inr(customer.totalSpent)}
       </TableCell>
       <TableCell className="text-sm text-muted-foreground">
-        {customer.lastOrderAt ? formatDate(customer.lastOrderAt) : "—"}
+        {customer.lastOrderAt ? formatDate(customer.lastOrderAt) : "-"}
       </TableCell>
     </TableRow>
   );

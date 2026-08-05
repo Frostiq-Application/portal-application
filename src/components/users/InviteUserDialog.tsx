@@ -140,7 +140,7 @@ export function InviteUserDialog() {
               <DialogTitle>{invitesStaff ? "Invite staff" : "Invite User"}</DialogTitle>
               <DialogDescription>
                 {invitesStaff
-                  ? "Your branch team — staff, chefs and delivery managers. They’ll receive a link to set their password."
+                  ? "Your branch team: staff, chefs and delivery managers. They’ll receive a link to set their password."
                   : "They’ll receive a link to set their password."}
               </DialogDescription>
             </DialogHeader>

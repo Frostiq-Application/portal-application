@@ -6,9 +6,9 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatDate(value?: string | Date | null): string {
-  if (!value) return '—'
+  if (!value) return '-'
   const d = typeof value === 'string' ? new Date(value) : value
-  if (Number.isNaN(d.getTime())) return '—'
+  if (Number.isNaN(d.getTime())) return '-'
   return d.toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'short',
@@ -17,7 +17,7 @@ export function formatDate(value?: string | Date | null): string {
 }
 
 export function truncate(text?: string | null, max = 60): string {
-  if (!text) return '—'
+  if (!text) return '-'
   return text.length > max ? text.slice(0, max) + '…' : text
 }
 

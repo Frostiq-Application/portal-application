@@ -50,7 +50,7 @@ export function passwordStrength(password: string): PasswordStrength {
     : !hasNumber
       ? "Add a number."
       : password.length < 8
-        ? "A little longer — 8 characters minimum."
+        ? "A little longer, 8 characters minimum."
         : score < 4
           ? "Longer, or add a capital or symbol, to make it stronger."
           : null;
