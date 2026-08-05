@@ -42,6 +42,8 @@ export interface AccountContent {
   instagramUrl: string | null;
   facebookUrl: string | null;
   whatsappUrl: string | null;
+  /** Dialling code the storefront pre-fills its phone field with, e.g. "+91". */
+  phoneCountryCode: string | null;
 }
 
 export interface CreateBannerBody {
