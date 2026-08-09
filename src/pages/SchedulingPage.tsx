@@ -13,7 +13,6 @@ import {
   useUpsertSchedulingSettingsMutation,
   useUpsertWeeklyHoursMutation,
 } from "@/features/api/schedulingApi";
-import type { SchedulingScope } from "@/types";
 import { useAppSelector } from "@/app/hooks";
 import {
   ALL_BRANCHES,
@@ -26,7 +25,6 @@ import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
   CardContent,
@@ -44,11 +42,13 @@ import {
 
 const SLOT_DURATIONS = [15, 30, 45, 60, 90, 120];
 
-const SCOPES: { value: SchedulingScope; label: string }[] = [
-  { value: "all", label: "All orders" },
-  { value: "delivery", label: "Delivery" },
-  { value: "pickup", label: "Pickup" },
-];
+/**
+ * One schedule per branch, applied to delivery and pickup alike. The API still
+ * models per-fulfilment-type overrides, but the portal only ever writes the
+ * 'all' rule set — and saving clears any stale delivery/pickup overrides so
+ * what's on this screen is what both fulfilment types actually use.
+ */
+const SCOPE = "all" as const;
 
 const WEEKDAY_LABELS = [
   "Sunday",
@@ -78,13 +78,12 @@ export function SchedulingPage() {
   const branchId = useAppSelector(selectSelectedBranchId);
   // Scheduling is always scoped to one concrete branch.
   const shopId = branchId === ALL_BRANCHES ? "" : branchId;
-  const [scope, setScope] = useState<SchedulingScope>("all");
 
   return (
     <>
       <PageHeader
         title="Scheduling"
-        description="Pickup & delivery slots, hours, cutoffs, and closed days — per branch"
+        description="Slots, hours, cutoffs, and closed days — per branch, for delivery & pickup alike"
         actions={<ShopSelect />}
       />
       {!shopId ? (
@@ -94,38 +93,21 @@ export function SchedulingPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-6">
-          <Tabs value={scope} onValueChange={(v) => setScope(v as SchedulingScope)}>
-            <TabsList>
-              {SCOPES.map((s) => (
-                <TabsTrigger key={s.value} value={s.value}>
-                  {s.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-          <div className="grid gap-6 lg:grid-cols-2">
-            <SettingsCard shopId={shopId} scope={scope} />
-            <SlotPreviewCard shopId={shopId} scope={scope} />
-            <WeeklyHoursCard shopId={shopId} scope={scope} />
-            <BlackoutCard shopId={shopId} />
-          </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <SettingsCard shopId={shopId} />
+          <SlotPreviewCard shopId={shopId} />
+          <WeeklyHoursCard shopId={shopId} />
+          <BlackoutCard shopId={shopId} />
         </div>
       )}
     </>
   );
 }
 
-function SettingsCard({
-  shopId,
-  scope,
-}: {
-  shopId: string;
-  scope: SchedulingScope;
-}) {
+function SettingsCard({ shopId }: { shopId: string }) {
   const { data, isLoading } = useGetSchedulingSettingsQuery({
     shopId,
-    fulfilmentType: scope,
+    fulfilmentType: SCOPE,
   });
   const [save, { isLoading: saving }] = useUpsertSchedulingSettingsMutation();
 
@@ -145,24 +127,17 @@ function SettingsCard({
     setCapacity(data.slotCapacity != null ? String(data.slotCapacity) : "");
   }
 
-  // The backend falls back to the 'all' row when this scope has none saved.
-  const inherited = scope !== "all" && data != null && data.fulfilmentType !== scope;
-
   const onSave = async () => {
     try {
       await save({
         shopId,
-        fulfilmentType: scope,
+        fulfilmentType: SCOPE,
         slotDurationMinutes: slotDuration,
         dailyCutoffTime: cutoff || undefined,
         maxAdvanceDays: maxDays,
         slotCapacity: capacity === "" ? null : Number(capacity),
       }).unwrap();
-      toast.success(
-        scope === "all"
-          ? "Scheduling settings saved"
-          : `${scope === "delivery" ? "Delivery" : "Pickup"} settings saved`,
-      );
+      toast.success("Scheduling settings saved");
     } catch (err) {
       toast.error(apiError(err));
     }
@@ -174,18 +149,10 @@ function SettingsCard({
         <CardTitle className="flex items-center gap-2 text-base">
           <Clock className="h-4 w-4 text-muted-foreground" />
           Slot settings
-          {scope !== "all" && (
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium capitalize text-muted-foreground">
-              {scope}
-            </span>
-          )}
         </CardTitle>
         <CardDescription>
-          {scope === "all"
-            ? "Branch defaults for how time slots are generated."
-            : inherited
-              ? "Currently inheriting the branch defaults — saving creates separate rules for this fulfilment type."
-              : "Separate rules for this fulfilment type (override the branch defaults)."}
+          How time slots are generated for this branch — used for both delivery
+          and pickup orders.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -283,29 +250,23 @@ interface DayDraft {
   closeTime: string;
 }
 
-function WeeklyHoursCard({
-  shopId,
-  scope,
-}: {
-  shopId: string;
-  scope: SchedulingScope;
-}) {
+function WeeklyHoursCard({ shopId }: { shopId: string }) {
   const { data: rows, isLoading } = useListWeeklyHoursQuery(shopId);
   const [save, { isLoading: saving }] = useUpsertWeeklyHoursMutation();
 
   const [draft, setDraft] = useState<DayDraft[]>([]);
 
-  // Rebuild the 7-day draft whenever the branch, scope, or saved rows change.
-  // Done during render so switching branch or scope never paints the previous
-  // one's hours for a frame — these are per-branch settings, and showing the
-  // wrong branch's opening times even briefly is worth avoiding.
-  const draftKey = `${shopId}:${scope}:${rows?.length ?? -1}`;
+  // Rebuild the 7-day draft whenever the branch or its saved rows change. Done
+  // during render so switching branch never paints the previous one's hours for
+  // a frame — these are per-branch settings, and showing the wrong branch's
+  // opening times even briefly is worth avoiding.
+  const draftKey = `${shopId}:${rows?.length ?? -1}`;
   const [draftSeeded, setDraftSeeded] = useState<string | null>(null);
   if (draftKey !== draftSeeded) {
     setDraftSeeded(draftKey);
     const next: DayDraft[] = WEEKDAY_LABELS.map((_, weekday) => {
       const row = (rows ?? []).find(
-        (r) => r.fulfilmentType === scope && r.weekday === weekday,
+        (r) => r.fulfilmentType === SCOPE && r.weekday === weekday,
       );
       if (!row) return { mode: "default", openTime: "09:00", closeTime: "21:00" };
       if (row.closed) return { mode: "closed", openTime: "09:00", closeTime: "21:00" };
@@ -324,28 +285,21 @@ function WeeklyHoursCard({
     );
 
   const onSave = async () => {
-    // The PUT replaces every row for the branch, so keep other scopes' rows.
-    const otherRows = (rows ?? [])
-      .filter((r) => r.fulfilmentType !== scope)
-      .map((r) => ({
-        fulfilmentType: r.fulfilmentType,
-        weekday: r.weekday,
-        closed: r.closed,
-        openTime: r.openTime?.slice(0, 5) ?? null,
-        closeTime: r.closeTime?.slice(0, 5) ?? null,
-      }));
-    const scopeRows = draft
+    // The PUT replaces every row for the branch. Sending only the 'all' rows
+    // therefore drops any legacy delivery/pickup rows — which is the point:
+    // both fulfilment types run on these hours.
+    const nextRows = draft
       .map((d, weekday) => ({ d, weekday }))
       .filter(({ d }) => d.mode !== "default")
       .map(({ d, weekday }) => ({
-        fulfilmentType: scope,
+        fulfilmentType: SCOPE,
         weekday,
         closed: d.mode === "closed",
         openTime: d.mode === "open" ? d.openTime : null,
         closeTime: d.mode === "open" ? d.closeTime : null,
       }));
     try {
-      await save({ shopId, rows: [...otherRows, ...scopeRows] }).unwrap();
+      await save({ shopId, rows: nextRows }).unwrap();
       toast.success("Weekly hours saved");
     } catch (err) {
       toast.error(apiError(err));
@@ -358,17 +312,11 @@ function WeeklyHoursCard({
         <CardTitle className="flex items-center gap-2 text-base">
           <Sun className="h-4 w-4 text-muted-foreground" />
           Weekly hours
-          {scope !== "all" && (
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium capitalize text-muted-foreground">
-              {scope}
-            </span>
-          )}
         </CardTitle>
         <CardDescription>
-          Per-weekday opening hours for this branch.{" "}
-          {scope === "all"
-            ? "Days set to “Branch hours” use the branch's base opening/closing time."
-            : "Days set to “Branch hours” fall back to the “All orders” hours, then the branch's base hours."}
+          Per-weekday opening hours for this branch, for delivery and pickup
+          alike. Days set to “Branch hours” use the branch's base
+          opening/closing time.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -475,6 +423,8 @@ function BlackoutCard({ shopId }: { shopId: string }) {
         </CardTitle>
         <CardDescription>
           Specific dates the branch takes no orders (holidays, maintenance).
+          These dates still appear in the customer&apos;s date picker, marked as
+          closed — the reason you type is shown to them.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -541,22 +491,9 @@ function BlackoutCard({ shopId }: { shopId: string }) {
   );
 }
 
-function SlotPreviewCard({
-  shopId,
-  scope,
-}: {
-  shopId: string;
-  scope: SchedulingScope;
-}) {
+function SlotPreviewCard({ shopId }: { shopId: string }) {
   const [date, setDate] = useState(todayIso());
-  const { data, isFetching } = useGetSlotsQuery(
-    {
-      shopId,
-      date,
-      ...(scope !== "all" ? { deliveryType: scope } : {}),
-    },
-    { skip: !date },
-  );
+  const { data, isFetching } = useGetSlotsQuery({ shopId, date }, { skip: !date });
 
   return (
     <Card>
@@ -564,11 +501,6 @@ function SlotPreviewCard({
         <CardTitle className="flex items-center gap-2 text-base">
           <CalendarClock className="h-4 w-4 text-muted-foreground" />
           Slot preview
-          {scope !== "all" && (
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium capitalize text-muted-foreground">
-              {scope}
-            </span>
-          )}
         </CardTitle>
         <CardDescription>
           Bookable slots on a date, computed from hours, settings &amp; closures.
