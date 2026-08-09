@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Boxes, Cake, CheckCircle2, Copy, EyeOff, LayoutGrid, Layers, Lock, MoreHorizontal, Search, X } from "@/components/ui/icons";
+import { Boxes, Cake, CheckCircle2, ChevronDown, CloudUpload, Copy, Download, EyeOff, LayoutGrid, Layers, Loader2, Lock, MoreHorizontal, Search, X } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { apiError } from "@/lib/apiError";
 import { useLimitState } from "@/hooks/useLimitState";
@@ -22,6 +22,10 @@ import {
 } from "@/features/branch/branchSlice";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { CloneCatalogDialog } from "@/components/catalog/CloneCatalogDialog";
+import {
+  BulkUploadDialog,
+  useSampleFileDownload,
+} from "@/components/catalog/BulkUploadDialog";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ShopSelect } from "@/components/ShopSelect";
 import { SegmentedStrip } from "@/components/SegmentedStrip";
@@ -667,8 +671,10 @@ export function CatalogPage() {
   const effectiveShopId = shopId === ALL_BRANCHES ? "" : shopId;
   const [tab, setTab] = useState<CatalogTab>("products");
   const [cloneOpen, setCloneOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const { hasFeature, entitlements } = useEntitlements();
   const canClone = hasFeature("can_clone_catalog");
+  const { downloadSample, downloading } = useSampleFileDownload();
 
   // Lightweight count queries (limit 1 → only meta.total is used) so the strip
   // shows how many items live under each tab. Shared cache with the tab bodies.
@@ -719,6 +725,37 @@ export function CatalogPage() {
         description="Products, categories & add-ons"
         actions={
           <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  disabled={!effectiveShopId}
+                  title={
+                    effectiveShopId
+                      ? undefined
+                      : "Select a branch to bulk upload into"
+                  }
+                >
+                  <CloudUpload className="mr-2 h-4 w-4" />
+                  Bulk upload
+                  <ChevronDown className="ml-2 h-3.5 w-3.5 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setBulkOpen(true)}>
+                  <CloudUpload className="mr-2 h-4 w-4" />
+                  Upload file
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={downloadSample} disabled={downloading}>
+                  {downloading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 h-4 w-4" />
+                  )}
+                  Download sample file
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               variant="outline"
               onClick={() => setCloneOpen(true)}
@@ -763,6 +800,13 @@ export function CatalogPage() {
           open={cloneOpen}
           onOpenChange={setCloneOpen}
           sourceShopId={effectiveShopId}
+        />
+      )}
+      {effectiveShopId && (
+        <BulkUploadDialog
+          open={bulkOpen}
+          onOpenChange={setBulkOpen}
+          shopId={effectiveShopId}
         />
       )}
     </>
