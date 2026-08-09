@@ -164,6 +164,17 @@ export default {
   			'splash-track': {
   				'0%': { transform: 'translateX(-100%)' },
   				'100%': { transform: 'translateX(300%)' }
+  			},
+  			/* Bulk-upload success burst. Each particle carries its own flight in
+  			   --dx/--dy/--rot (set inline per particle), so one keyframe serves
+  			   the whole shower — clean import days deserve a little cake crumb. */
+  			'crumb': {
+  				'0%': { opacity: '1', transform: 'translate(0, 0) scale(1) rotate(0deg)' },
+  				'100%': {
+  					opacity: '0',
+  					transform:
+  						'translate(var(--dx, 0px), var(--dy, -60px)) scale(0.4) rotate(var(--rot, 180deg))'
+  				}
   			}
   		},
   		animation: {
@@ -184,7 +195,8 @@ export default {
   			'lane-pulse': 'lane-pulse 1.2s ease-in-out infinite',
   			'splash-bob': 'splash-bob 2.6s ease-in-out infinite',
   			'splash-ring': 'splash-ring 2.6s cubic-bezier(0.24,0.6,0.3,1) infinite',
-  			'splash-track': 'splash-track 1.5s ease-in-out infinite'
+  			'splash-track': 'splash-track 1.5s ease-in-out infinite',
+  			'crumb': 'crumb 0.9s cubic-bezier(0.16,1,0.3,1) forwards'
   		}
   	}
   },
