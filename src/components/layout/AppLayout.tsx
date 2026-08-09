@@ -306,6 +306,7 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, role } = useAuth();
+  const { can } = useCan();
   const {
     isExempt,
     isLoading,
@@ -314,7 +315,6 @@ export function AppLayout() {
     isSubscriptionExpired,
     entitlements,
     brand,
-    hasFeature,
   } = useEntitlements();
   const theme = useAppSelector((s) => s.ui.theme);
 
@@ -407,11 +407,11 @@ export function AppLayout() {
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-1 h-4" />
           <div className="ml-auto flex items-center gap-2">
-            {!isExempt && hasFeature("can_use_custom_cake") && (
+            {!isExempt && can("orders.manage") && (
               <Button
                 size="sm"
                 className="gap-1.5"
-                onClick={() => navigate("/custom-cakes")}
+                onClick={() => navigate("/orders?new=1")}
               >
                 <Plus className="h-4 w-4" />
                 New Order
