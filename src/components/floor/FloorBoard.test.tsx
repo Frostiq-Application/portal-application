@@ -23,6 +23,8 @@ const mockState = vi.hoisted(() => ({
    * contract than the one that ships.
    */
   pages: new Map<string, unknown>(),
+  /** Hold every lane's first response, so the board renders mid-load. */
+  loading: false,
 }));
 
 const order = (over: Record<string, unknown>) => ({
@@ -70,6 +72,9 @@ vi.mock("@/features/api/ordersApi", () => ({
   // real one does — a lane that returns everything would hide a routing bug.
   useListBoardOrdersQuery: (args: { status?: string; limit?: number }) => {
     mockState.listArgs.push(args);
+    if (mockState.loading) {
+      return { data: undefined, isLoading: true, isFetching: true };
+    }
     const limit = args.limit ?? 10;
     const key = `${args.status ?? "all"}:${limit}`;
     let page = mockState.pages.get(key);
@@ -168,6 +173,7 @@ beforeEach(() => {
   mockState.updates = [];
   mockState.listArgs = [];
   mockState.pages.clear();
+  mockState.loading = false;
   mockState.rows = [order({})];
 });
 
@@ -179,6 +185,27 @@ describe("floor board", () => {
     );
     expect(within(toStart).getByText("KIT-0001")).toBeInTheDocument();
     expect(within(inProgress).queryByText("KIT-0001")).toBeNull();
+  });
+
+  /**
+   * A lane reads 0 before its first response, and the board used to take that
+   * as an answer — so a cold open flashed "nothing to bake" across the top
+   * while the lanes underneath were still loading. Lanes stay silent until
+   * they've actually heard from the server.
+   */
+  it("holds the empty state back until every lane has reported", () => {
+    mockState.loading = true;
+    const { container, rerender } = renderBoard();
+    expect(screen.queryByText("Nothing to bake.")).toBeNull();
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+
+    // Lanes answer, and both are genuinely empty this time.
+    mockState.loading = false;
+    mockState.rows = [];
+    rerender(
+      <FloorBoard lanes={LANES} actions={ACTIONS} emptyLabel="Nothing to bake." />,
+    );
+    expect(screen.getByText("Nothing to bake.")).toBeInTheDocument();
   });
 
   it("asks each lane for its own status, ten at a time", () => {

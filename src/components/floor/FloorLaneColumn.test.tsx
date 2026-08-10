@@ -96,4 +96,14 @@ describe("FloorLaneColumn page retention", () => {
     renderColumn();
     expect(screen.getByText("Nothing here")).toBeTruthy();
   });
+
+  // A lane that has never answered must not claim to be empty, and must not
+  // print a confident "0" in its header — both read as settled facts.
+  it("shows placeholders, not an empty lane, before the first page lands", () => {
+    const { container } = renderColumn();
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("order")).toBeNull();
+    expect(screen.queryByText("Nothing here")).toBeNull();
+    expect(screen.queryByText("0")).toBeNull();
+  });
 });

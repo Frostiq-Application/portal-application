@@ -46,6 +46,13 @@ const mockState = vi.hoisted(() => ({
   /** The signed-in user's effective permissions — what the page gates on. */
   permissions: [] as string[],
   role: "shop_admin" as string,
+  /**
+   * A request in flight for a filter that isn't cached — what RTK hands back on
+   * every filter change *after* the first: no `currentData` for the new args,
+   * `isFetching`, and `isLoading` already false because the hook has a
+   * successful `lastResult` from the filter before it.
+   */
+  inFlight: false,
 }));
 
 vi.mock("@/app/hooks", () => ({
@@ -79,6 +86,9 @@ vi.mock("@/components/orders/CreateOrderDialog", () => ({
 vi.mock("@/features/api/ordersApi", () => ({
   useListOrdersQuery: (args: Record<string, unknown>) => {
     mockState.listArgs = args;
+    if (mockState.inFlight) {
+      return { currentData: undefined, isLoading: false, isFetching: true };
+    }
     return {
       // The queue reads `currentData`, so a filter change never paints the
       // previous filter's rows.
@@ -120,6 +130,7 @@ const rowFor = (orderNumber: string) =>
 beforeEach(() => {
   mockState.listArgs = undefined;
   mockState.meta = { page: 1, totalPages: 1, total: 0 };
+  mockState.inFlight = false;
   mockState.role = "shop_admin";
   mockState.permissions = [
     "orders.view",
@@ -281,16 +292,11 @@ describe("row actions", () => {
 });
 
 describe("raising an order", () => {
-  it("offers it to a chef, who now holds orders.create", () => {
+  it("keeps it off the chef's screen — the kitchen bakes orders, it does not raise them", () => {
     mockState.role = "chef";
-    mockState.permissions = [
-      "orders.view",
-      "orders.status",
-      "orders.create",
-      "kitchen.view",
-    ];
+    mockState.permissions = ["orders.view", "orders.status", "kitchen.view"];
     renderPage();
-    expect(screen.getByRole("button", { name: /Create order/ })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Create order/ })).toBeNull();
   });
 
   it("hides the button from a role that cannot, rather than 403ing on submit", () => {
@@ -299,6 +305,18 @@ describe("raising an order", () => {
     mockState.permissions = ["orders.view", "orders.status", "delivery.view"];
     renderPage();
     expect(screen.queryByRole("button", { name: /Create order/ })).toBeNull();
+  });
+
+  it("still offers it to the counter, which is whose job it is", () => {
+    mockState.role = "staff";
+    mockState.permissions = [
+      "orders.view",
+      "orders.status",
+      "orders.create",
+      "orders.manage",
+    ];
+    renderPage();
+    expect(screen.getByRole("button", { name: /Create order/ })).toBeVisible();
   });
 });
 
@@ -338,5 +356,27 @@ describe("empty state", () => {
     mockState.rows = [];
     renderPage();
     expect(screen.getByText("No new orders due today.")).toBeVisible();
+  });
+
+  /**
+   * The queue used to gate its skeleton on RTK's `isLoading`, which only ever
+   * fires for a hook's *first* request — every later filter change reported
+   * "not loading" with no rows yet, so the table showed "no orders" over a
+   * queue that was still being fetched. The skeleton is tied to `currentData`
+   * now, the same value the rows come from.
+   */
+  it("shows placeholders, not 'no orders', while a filter change is in flight", async () => {
+    const { container } = renderPage();
+    expect(screen.getByText("DIV-0001")).toBeVisible();
+
+    mockState.inFlight = true;
+    await userEvent.click(screen.getByRole("button", { name: /^Preparing/ }));
+
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/No .* orders/)).toBeNull();
+    expect(screen.getByText("Loading orders…")).toBeVisible();
+    // The rows themselves are gone — the point is that nothing claims the
+    // queue is empty while we're still asking.
+    expect(screen.queryByText("DIV-0001")).toBeNull();
   });
 });

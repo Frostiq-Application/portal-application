@@ -456,7 +456,7 @@ export function OrdersPage() {
   // `currentData`, not `data`: while a new filter is in flight RTK keeps the
   // PREVIOUS filter's response in `data`, which would paint the old queue's
   // rows under the new tab.
-  const { currentData, isLoading, isFetching } = useListOrdersQuery({
+  const { currentData, isFetching } = useListOrdersQuery({
     ...filters,
     dateBucket: day,
     page,
@@ -487,6 +487,21 @@ export function OrdersPage() {
       });
     }, 1000);
   }, []);
+
+  // Nothing to show for the filters as they stand right now.
+  //
+  // Deliberately not RTK's `isLoading`, which is only ever true for a hook's
+  // very first request: it's computed as `!lastResult && !hasData &&
+  // isFetching`, and `lastResult` is the hook's previous result, which outlives
+  // an arg change. So the second filter the user picked — and every one after
+  // it — reported "not loading" while its request was still in flight, and the
+  // table fell through to "No placed orders due today." over an empty page.
+  //
+  // Pairing `isFetching` with `currentData` keeps the flag on the same footing
+  // as the rows below, which come from `currentData` too. A page turn doesn't
+  // trip it: infinite scroll strips `page` from the cache key, so the rows
+  // already on screen stay in `currentData` while the next batch loads.
+  const loading = isFetching && !currentData;
 
   // paymentStatus isn't a server filter — narrow what's loaded client-side.
   const rows = useMemo(() => {
@@ -721,11 +736,11 @@ export function OrdersPage() {
 
       <div className="mb-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
         <span>
-          {isLoading
+          {loading
             ? "Loading orders…"
             : `Showing ${rows.length} of ${total} ${total === 1 ? "order" : "orders"}`}
         </span>
-        {isFetching && !isLoading && <span>Refreshing…</span>}
+        {isFetching && !loading && <span>Refreshing…</span>}
       </div>
 
       {/* The queue scrolls instead of paging: the next batch loads as the
@@ -784,11 +799,40 @@ export function OrdersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
-                [0, 1, 2, 3].map((i) => (
+              {loading ? (
+                // Shaped like a real row rather than one bar across all eight
+                // columns: switching tabs is the common case now that the
+                // skeleton actually shows for it, and the table shouldn't
+                // reflow its column widths on every switch.
+                Array.from({ length: 6 }, (_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={8}>
-                      <Skeleton className="h-6 w-full" />
+                    <TableCell>
+                      <Skeleton className="h-4 w-24" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="mt-1.5 h-3 w-16" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-28" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-16" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-12" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-14" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-5 w-20 rounded-full" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-2">
+                        <Skeleton className="h-8 w-20 rounded-md" />
+                        <Skeleton className="h-8 w-24 rounded-md" />
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

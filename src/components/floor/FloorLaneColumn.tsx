@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronDown, Loader2 } from "@/components/ui/icons";
 import { FloorOrderCard } from "./FloorOrderCard";
+import { FloorLaneSkeleton } from "./FloorOrderCardSkeleton";
 import type { FloorLane, QueueAction } from "./types";
 import type { LaneDrag } from "./useLaneDrag";
 
@@ -107,11 +108,20 @@ export function FloorLaneColumn({
   const total = page?.meta.total ?? 0;
   const remaining = Math.max(0, total - orders.length);
 
+  // Report only once a page has actually landed. `total` reads 0 before the
+  // first response, and reporting that would have every lane claim to be empty
+  // on mount — which is how the board came to print "nothing to go out" over a
+  // set of loading placeholders. Silence until we know is the honest answer.
   useEffect(() => {
+    if (!page) return;
     onTotal(lane.status, total);
-  }, [lane.status, total, onTotal]);
+  }, [lane.status, total, onTotal, page]);
 
   const accent = ORDER_STATUS_ACCENT[lane.status];
+  // Nothing has ever arrived for this lane. A refetch keeps the page it's
+  // already showing — swapping settled cards for placeholders every thirty
+  // seconds would make a board that's up all shift look permanently broken.
+  const loading = isLoading && !page;
   const dragging = !!drag?.active;
   const isTarget = dragging && accepted && drag.over === lane.status;
   const action = actions.find(
@@ -138,12 +148,22 @@ export function FloorLaneColumn({
           style={{ background: accent }}
         />
         <h2 className="text-lg font-bold tracking-tight">{lane.label}</h2>
-        <span
-          className="rounded-full px-3 py-1 text-base font-bold tabular-nums"
-          style={{ background: `${accent}22`, color: accent }}
-        >
-          {total}
-        </span>
+        {/* A count is a fact someone acts on — "two to bake" sends a chef to
+            the bench. Showing a confident 0 before the lane has answered is
+            worse than showing that we're still asking. */}
+        {loading ? (
+          <Skeleton
+            className="h-8 w-11 rounded-full"
+            style={{ background: `${accent}22` }}
+          />
+        ) : (
+          <span
+            className="rounded-full px-3 py-1 text-base font-bold tabular-nums"
+            style={{ background: `${accent}22`, color: accent }}
+          >
+            {total}
+          </span>
+        )}
         <p className="ml-auto hidden truncate text-sm font-medium text-muted-foreground lg:block">
           {lane.hint}
         </p>
@@ -168,11 +188,8 @@ export function FloorLaneColumn({
       )}
 
       <div className="grid gap-4">
-        {isLoading && !page ? (
-          <>
-            <Skeleton className="h-44 w-full rounded-2xl" />
-            <Skeleton className="h-44 w-full rounded-2xl" />
-          </>
+        {loading ? (
+          <FloorLaneSkeleton accent={accent} withDetail={!!renderDetail} />
         ) : orders.length === 0 && !isTarget ? (
           <div className="rounded-2xl border-2 border-dashed py-12 text-center text-base font-medium text-muted-foreground">
             Nothing here
