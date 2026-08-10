@@ -29,7 +29,7 @@ const ROLE_PERMISSIONS: Partial<Record<Role, PermissionKey[]>> = {
     "delivery.view",
     "customers.view",
   ],
-  chef: ["orders.view", "orders.status", "orders.create", "kitchen.view"],
+  chef: ["orders.view", "orders.status", "kitchen.view"],
 };
 
 const mockState = vi.hoisted(() => ({
@@ -176,5 +176,45 @@ describe("the kitchen role's view of the customer", () => {
     asRole("chef");
     openDrawer();
     expect(screen.queryByRole("tab", { name: "Customer" })).toBeNull();
+  });
+});
+
+/**
+ * The same drawer opened out of a customer's order history.
+ *
+ * There the order is a record being looked up, not one being worked: the
+ * fulfilment buttons belong to the queue and the boards, and the customer tab
+ * would only repeat the drawer this one opened on top of. Permissions are
+ * unchanged — this role can advance an order everywhere else, which is what
+ * makes the absence here worth asserting.
+ */
+describe("the read-only drawer over a customer's history", () => {
+  const openReadOnly = () =>
+    render(<OrderDetailDrawer readOnly orderId="o1" onOpenChange={vi.fn()} />);
+
+  it("still shows the order itself", () => {
+    openReadOnly();
+
+    expect(screen.getByText("DIV-0001")).toBeVisible();
+    expect(screen.getByText("Timeline")).toBeVisible();
+  });
+
+  it("normally offers the next status — the baseline this drops", () => {
+    openDrawer();
+    expect(
+      screen.getByRole("button", { name: /mark delivered/i }),
+    ).toBeVisible();
+  });
+
+  it("offers no way to advance the order from here", () => {
+    openReadOnly();
+    expect(screen.queryByRole("button", { name: /mark delivered/i })).toBeNull();
+  });
+
+  it("drops the customer tab, which is the drawer underneath", () => {
+    openReadOnly();
+    expect(screen.queryByRole("tab", { name: "Customer" })).toBeNull();
+    // No tab strip at all once there is only one panel left.
+    expect(screen.queryByRole("tab", { name: "Order" })).toBeNull();
   });
 });

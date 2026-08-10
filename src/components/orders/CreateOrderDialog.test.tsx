@@ -23,6 +23,10 @@ vi.mock("@/features/api/ordersApi", () => ({
 /** Every arg object the picker has asked the customer list for, in order. */
 const customerQueries: { page?: number; limit?: number; search?: string }[] = [];
 
+/** Bodies posted to POST /customers, and what the next call resolves to. */
+const created: Record<string, unknown>[] = [];
+let createResult: Record<string, unknown> = {};
+
 vi.mock("@/features/api/customersApi", () => {
   // One stable page object across renders, the way RTK Query hands back a
   // cached response — a fresh identity each render would look like a new page
@@ -42,7 +46,16 @@ vi.mock("@/features/api/customersApi", () => {
       customerQueries.push(args);
       return { data: result, currentData: result, isFetching: false };
     },
+    // A branch-scoped user cannot read back a customer with no orders yet, so
+    // this stays empty for exactly the customer the form just created.
     useGetCustomerQuery: () => ({ data: undefined }),
+    useCreateCustomerMutation: () => [
+      (body: Record<string, unknown>) => {
+        created.push(body);
+        return { unwrap: () => Promise.resolve(createResult) };
+      },
+      { isLoading: false },
+    ],
   };
 });
 vi.mock("@/features/api/catalogApi", () => ({
@@ -105,6 +118,87 @@ describe("CreateOrderDialog customer picker", () => {
     await waitFor(() =>
       expect(lastCustomerQuery()).toMatchObject({ search: "vik", page: 1 }),
     );
+  });
+});
+
+/**
+ * Adding the customer without leaving the order.
+ *
+ * The case this exists for: an order arrives by phone from someone who has
+ * never bought here, so the search that would normally find them cannot. Before
+ * this, the only way through was to abandon the half-typed order.
+ */
+describe("CreateOrderDialog new customer", () => {
+  beforeEach(() => {
+    customerQueries.length = 0;
+    created.length = 0;
+    createResult = {
+      id: "c-new",
+      name: "Riya Sharma",
+      phone: "+919812345678",
+      email: null,
+      isActive: true,
+      orderCount: 0,
+      totalSpent: "0.00",
+      lastOrderAt: null,
+      createdAt: "2026-08-10T00:00:00.000Z",
+      addresses: [],
+      matchedExisting: false,
+    };
+  });
+
+  const openForm = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByRole("button", { name: /new customer/i }));
+  };
+
+  it("carries the name that was searched for into the form", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.type(
+      screen.getByPlaceholderText(/search by name, phone or email/i),
+      "Riya",
+    );
+    await openForm(user);
+
+    expect(screen.getByPlaceholderText(/full name/i)).toHaveValue("Riya");
+  });
+
+  it("posts the new customer against the order's branch, and selects them", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await openForm(user);
+
+    await user.type(screen.getByPlaceholderText(/full name/i), "Riya Sharma");
+    await user.type(screen.getByPlaceholderText(/^phone number$/i), "9812345678");
+    await user.click(screen.getByRole("button", { name: /add customer/i }));
+
+    await waitFor(() => expect(created).toHaveLength(1));
+    expect(created[0]).toMatchObject({
+      name: "Riya Sharma",
+      phone: "+919812345678",
+      shopId: "shop-1",
+    });
+
+    // The order now has its customer, and the picker is out of the way.
+    expect(await screen.findByText("Riya Sharma")).toBeVisible();
+    expect(
+      screen.queryByPlaceholderText(/search by name, phone or email/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("goes back to the picker if the form is cancelled", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await openForm(user);
+
+    expect(screen.queryByPlaceholderText(/full name/i)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: /^back$/i }));
+
+    expect(
+      screen.getByPlaceholderText(/search by name, phone or email/i),
+    ).toBeVisible();
+    expect(created).toHaveLength(0);
   });
 });
 

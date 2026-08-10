@@ -56,6 +56,7 @@ const ENTITY_ICON: Record<string, IconComponent> = {
   custom_cake: CakeSlice,
   gallery: Images,
   enquiry: Phone,
+  customer: UsersIcon,
 };
 
 const ENTITY_LABEL: Record<string, string> = {
@@ -73,6 +74,7 @@ const ENTITY_LABEL: Record<string, string> = {
   custom_cake: "Custom cake",
   gallery: "Gallery",
   enquiry: "Enquiry",
+  customer: "Customer",
 };
 
 const entityLabel = (key: string): string =>

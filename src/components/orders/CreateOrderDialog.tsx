@@ -10,6 +10,7 @@ import {
   Store,
   StickyNote,
   Trash2,
+  UserPlus,
   UserRound,
 } from "@/components/ui/icons";
 import type { IconComponent } from "@/components/ui/icons";
@@ -27,8 +28,11 @@ import { useListCustomersQuery, useGetCustomerQuery } from "@/features/api/custo
 import { useListProductsQuery, useListAddonsQuery } from "@/features/api/catalogApi";
 import { useGetSlotsQuery } from "@/features/api/schedulingApi";
 import { useListShopsQuery } from "@/features/api/shopsApi";
+import { NewCustomerForm } from "@/components/customers/NewCustomerForm";
 import type {
+  CreatedCustomer,
   Customer,
+  CustomerAddress,
   DeliveryType,
   OrderPaymentMethod,
   Product,
@@ -116,6 +120,14 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
   const [shopId, setShopId] = useState("");
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerSearch, setCustomerSearch] = useState("");
+  const [addingCustomer, setAddingCustomer] = useState(false);
+  /**
+   * Addresses handed back when a customer is added here, kept because the
+   * server may not read them back to us: a branch-scoped user can only fetch a
+   * customer who has ordered at their branch, and this one has ordered nowhere
+   * yet — that is the whole reason they are being created.
+   */
+  const [newAddresses, setNewAddresses] = useState<CustomerAddress[]>([]);
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
   const [deliveryType, setDeliveryType] = useState<DeliveryType>("pickup");
   const [addressId, setAddressId] = useState("");
@@ -136,6 +148,8 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
       setShopId(defaultShopId ?? "");
       setCustomer(null);
       setCustomerSearch("");
+      setAddingCustomer(false);
+      setNewAddresses([]);
       setLines([emptyLine()]);
       setDeliveryType("pickup");
       setAddressId("");
@@ -184,7 +198,7 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
         limit: CUSTOMER_PAGE_SIZE,
         search: search || undefined,
       },
-      { skip: !open || Boolean(customer) },
+      { skip: !open || Boolean(customer) || addingCustomer },
     );
   ingestCustomers(customerResults);
 
@@ -203,6 +217,27 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
   const { data: customerDetail } = useGetCustomerQuery(customer?.id ?? "", {
     skip: !customer,
   });
+  // Whatever the customer actually has on file, falling back to what creating
+  // them here returned. Prefers the fetched list once it has something in it,
+  // so an address added elsewhere since is not hidden by the local copy.
+  const addressOptions = customerDetail?.addresses?.length
+    ? customerDetail.addresses
+    : newAddresses;
+
+  /**
+   * Takes the order straight to the customer that was just added — including
+   * the address they were given, since a delivery order is the case that most
+   * often needed a new customer in the first place.
+   */
+  const useNewCustomer = (created: CreatedCustomer) => {
+    setCustomer(created);
+    setNewAddresses(created.addresses);
+    setAddingCustomer(false);
+    setCustomerSearch("");
+    const preferred =
+      created.addresses.find((a) => a.isDefault) ?? created.addresses[0];
+    setAddressId(preferred?.id ?? "");
+  };
 
   const { data: productPage } = useListProductsQuery(
     { page: 1, limit: 100, shopId },
@@ -344,22 +379,47 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
                       className="shrink-0"
                       onClick={() => {
                         setCustomer(null);
+                        setNewAddresses([]);
                         setAddressId("");
                       }}
                     >
                       Change
                     </Button>
                   </div>
+                ) : addingCustomer ? (
+                  <NewCustomerForm
+                    shopId={shopId || undefined}
+                    // Whatever they typed looking for this customer is almost
+                    // always the name they are about to type again.
+                    defaultName={customerSearch}
+                    askForAddress={deliveryType === "delivery"}
+                    onCreated={useNewCustomer}
+                    onCancel={() => setAddingCustomer(false)}
+                  />
                 ) : (
                   <div className="space-y-2">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        className="pl-9"
-                        placeholder="Search by name, phone or email…"
-                        value={customerSearch}
-                        onChange={(e) => setCustomerSearch(e.target.value)}
-                      />
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          className="pl-9"
+                          placeholder="Search by name, phone or email…"
+                          value={customerSearch}
+                          onChange={(e) => setCustomerSearch(e.target.value)}
+                        />
+                      </div>
+                      {/* The order that prompted this feature is the one where
+                          the caller isn't in the directory at all — so adding
+                          them sits next to the search that just failed. */}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="shrink-0"
+                        onClick={() => setAddingCustomer(true)}
+                      >
+                        <UserPlus className="mr-1 size-4" />
+                        New customer
+                      </Button>
                     </div>
                     <div
                       ref={setCustomerListEl}
@@ -370,8 +430,19 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
                           <Loader2 className="size-4 animate-spin" /> Searching…
                         </div>
                       ) : customerOptions.length === 0 ? (
-                        <div className="p-3 text-sm text-muted-foreground">
-                          No customers found.
+                        <div className="flex flex-col items-start gap-2 p-3">
+                          <p className="text-sm text-muted-foreground">
+                            No customers found.
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setAddingCustomer(true)}
+                          >
+                            <UserPlus className="mr-1 size-3.5" />
+                            Add{customerSearch.trim() ? ` “${customerSearch.trim()}”` : " a customer"}
+                          </Button>
                         </div>
                       ) : (
                         <InfiniteScroll
@@ -493,7 +564,7 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
                           />
                         </SelectTrigger>
                         <SelectContent>
-                          {(customerDetail?.addresses ?? []).map((a) => (
+                          {addressOptions.map((a) => (
                             <SelectItem key={a.id} value={a.id}>
                               {a.label ? `${a.label}: ` : ""}
                               {a.fullAddress}
@@ -501,13 +572,12 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
                           ))}
                         </SelectContent>
                       </Select>
-                      {customer &&
-                        (customerDetail?.addresses ?? []).length === 0 && (
-                          <p className="text-xs text-muted-foreground">
-                            This customer has no saved addresses. Choose
-                            Pickup, or ask them to add one.
-                          </p>
-                        )}
+                      {customer && addressOptions.length === 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          This customer has no saved addresses. Choose Pickup,
+                          or ask them to add one.
+                        </p>
+                      )}
                     </Field>
                   )}
 

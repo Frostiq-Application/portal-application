@@ -33,6 +33,16 @@ import { useCan } from "@/hooks/useCan";
 interface Props {
   orderId: string | null;
   onOpenChange: (o: boolean) => void;
+  /**
+   * Show the order alone: no fulfilment actions, and no customer tab.
+   *
+   * For the drawer opened out of a customer's own order history, where the
+   * order is a record being read rather than one being worked — the customer
+   * tab would only repeat the drawer sitting directly underneath it, and
+   * fulfilment belongs to the queue and the kitchen and delivery boards, where
+   * the order is actually in hand.
+   */
+  readOnly?: boolean;
 }
 
 /** Small square thumbnail with a graceful fallback when there's no image. */
@@ -76,11 +86,14 @@ function Thumb({
  * cake, the note and the timeline; the money and the customer are not theirs to
  * see, and cancelling is not theirs to do — showing those buttons would only
  * produce a 403 they can't act on.
+ *
+ * It also opens over a customer's order history, where it is read rather than
+ * worked — see {@link Props.readOnly}.
  */
-export function OrderDetailDrawer({ orderId, onOpenChange }: Props) {
+export function OrderDetailDrawer({ orderId, onOpenChange, readOnly }: Props) {
   const { can } = useCan();
   const showMoney = can("orders.manage");
-  const showCustomer = can("customers.view");
+  const showCustomer = can("customers.view") && !readOnly;
   const canAdvance = can("orders.status");
   const { data: order, isLoading } = useGetOrderQuery(orderId as string, {
     skip: !orderId,
@@ -284,8 +297,9 @@ export function OrderDetailDrawer({ orderId, onOpenChange }: Props) {
                 )}
               </Tabs>
 
-              {/* Actions */}
-              {!showCancel ? (
+              {/* Actions — the whole block, not just the buttons inside it, so
+                  a read-only drawer ends cleanly at the timeline. */}
+              {readOnly ? null : !showCancel ? (
                 <div className="flex flex-wrap items-center gap-2 border-t pt-4">
                   {canAdvance &&
                     NEXT_STATUSES[order.status].map((s) => (

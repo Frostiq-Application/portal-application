@@ -554,6 +554,34 @@ export interface CustomerDetail extends Customer {
   orders: CustomerOrderSummary[];
 }
 
+/** The one address a staff-created customer can be given up front. */
+export interface NewCustomerAddress {
+  label?: string;
+  fullAddress: string;
+  landmark?: string;
+  city?: string;
+  pincode?: string;
+}
+
+/** POST /customers — shop-side entry for a caller who isn't on file yet. */
+export interface NewCustomerBody {
+  name: string;
+  phone: string;
+  email?: string;
+  /** The branch the order is for. Required only for platform super admins. */
+  shopId?: string;
+  address?: NewCustomerAddress;
+}
+
+export interface CreatedCustomer extends Customer {
+  addresses: CustomerAddress[];
+  /**
+   * True when the phone number was already on file and that customer was
+   * returned instead of a duplicate being created.
+   */
+  matchedExisting: boolean;
+}
+
 // ==================== CMS · Occasions / Featured ====================
 
 export interface Occasion {
