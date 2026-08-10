@@ -76,7 +76,6 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
           account_super_admin: "full",
           shop_admin: "scoped",
           staff: "scoped",
-          chef: "scoped",
         },
       },
       {

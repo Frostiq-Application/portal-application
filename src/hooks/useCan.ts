@@ -65,7 +65,7 @@ const FALLBACK_PERMISSIONS: Record<Role, PermissionKey[]> = {
     "kitchen.view",
     "delivery.view",
   ],
-  chef: ["orders.view", "orders.status", "orders.create", "kitchen.view"],
+  chef: ["orders.view", "orders.status", "kitchen.view"],
   delivery_manager: [
     "orders.view",
     "orders.status",
