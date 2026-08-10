@@ -157,6 +157,8 @@ function ProrationWorking({
   daysRemaining,
   daysInCycle,
   prorationAmount,
+  renewsOn,
+  freeMonthsNote,
 }: {
   basis: NonNullable<ChangePreview["basis"]>;
   newPlanName: string;
@@ -164,9 +166,47 @@ function ProrationWorking({
   daysRemaining: number;
   daysInCycle: number;
   prorationAmount: string;
+  renewsOn?: string;
+  /** "6 months, 1 free" — why the cycle price isn't months × monthly. */
+  freeMonthsNote?: string;
 }) {
   const current = `${basis.currentPlanName} · ${basis.currentCycleName} (you already pay)`;
   const full = daysRemaining >= daysInCycle;
+
+  // A longer cycle isn't a top-up — the account is buying a new term today and
+  // handing back the days it has left. The only figure that needs explaining is
+  // the credit; the itemised quote below already shows what the term costs.
+  if (basis.kind === "restart") {
+    return (
+      <section className="space-y-2 rounded-xl border border-dashed p-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          How this is worked out
+        </h3>
+        <Row
+          label={`${newPlanName} · ${newCycleName}`}
+          sub={freeMonthsNote}
+          value={inr(basis.newCyclePrice)}
+        />
+        <Row
+          label={current}
+          value={`${inr(basis.currentCyclePrice)} · ${inr(basis.currentPerDay)}/day`}
+        />
+        <Row
+          label={`× ${basis.creditedDays} day${basis.creditedDays === 1 ? "" : "s"} you've paid for and haven't used`}
+          value={`− ${inr(basis.creditAmount)}`}
+          muted
+        />
+        <Separator className="my-1" />
+        <Row label="Due today, before fees" value={inr(prorationAmount)} strong />
+        <p className="pt-1 text-xs text-muted-foreground">
+          None of what you've paid is lost — it comes off today's charge. Your{" "}
+          {newCycleName.toLowerCase()} term starts today
+          {renewsOn ? ` and renews ${formatDate(renewsOn)}` : ""}, then{" "}
+          {inr(basis.newCyclePrice)} every {newCycleName.toLowerCase()} cycle.
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className="space-y-2 rounded-xl border border-dashed p-4">
@@ -182,6 +222,7 @@ function ProrationWorking({
         <>
           <Row
             label={`${newPlanName} · ${newCycleName}`}
+            sub={freeMonthsNote}
             value={`${inr(basis.newCyclePrice)} · ${inr(basis.newPerDay)}/day`}
           />
           <Row
@@ -204,6 +245,7 @@ function ProrationWorking({
         <>
           <Row
             label={`${newPlanName} · ${newCycleName}`}
+            sub={freeMonthsNote}
             value={inr(basis.newCyclePrice)}
           />
           <Row label={current} value={`− ${inr(basis.currentCyclePrice)}`} />
@@ -238,11 +280,14 @@ function ProrationWorking({
 
 function Row({
   label,
+  sub,
   value,
   muted,
   strong,
 }: {
   label: string;
+  /** A quieter second line, for the make-up of the figure beside it. */
+  sub?: string;
   value: string;
   muted?: boolean;
   strong?: boolean;
@@ -256,6 +301,9 @@ function Row({
         )}
       >
         {label}
+        {sub && (
+          <span className="block text-xs text-muted-foreground/80">{sub}</span>
+        )}
       </span>
       <span
         className={cn(
@@ -390,7 +438,11 @@ export function ChangePlanSheet({
         await verify(result).unwrap();
         setPayStage("done");
         await new Promise((r) => setTimeout(r, 1000));
-        toast.success(`Upgraded to ${plan.name}. New features are live.`);
+        toast.success(
+          preview.basis?.currentPlanName === plan.name
+            ? `You're on ${cycle.name.toLowerCase()} billing now.`
+            : `Upgraded to ${plan.name}. New features are live.`,
+        );
       } else {
         await schedule({
           planId: plan.id,
@@ -428,11 +480,26 @@ export function ChangePlanSheet({
   }
 
   const immediate = view?.mode === "immediate";
+  /** Moving onto a longer cycle: a new term starting today, not a top-up. */
+  const restartTerm = immediate && view?.restartTerm === true;
+  /** Only the billing cycle is changing — the plan itself stays put. */
+  const cycleOnly = restartTerm && view?.basis?.currentPlanName === plan?.name;
   /** A trial or ₹0 account buying a plan for the first time. */
   const firstPurchase = view?.mode === "checkout";
   const fromTrial = firstPurchase && view?.trial === true;
   const trialDaysLeft = view?.daysRemaining ?? 0;
   const price = plan?.cyclePrices.find((p) => p.code === cycle?.code);
+  /**
+   * Why a longer cycle doesn't cost months × monthly. The discount *is* the
+   * free months, and a price that looks arbitrary next to a monthly figure the
+   * account already knows is the one people ask about.
+   */
+  const freeMonthsNote =
+    cycle && cycle.freeMonths > 0
+      ? `${cycle.months} months billed as ${cycle.payableMonths} — ${cycle.freeMonths} month${
+          cycle.freeMonths === 1 ? "" : "s"
+        } free`
+      : undefined;
 
   return (
     <>
@@ -468,14 +535,20 @@ export function ChangePlanSheet({
                 ? fromTrial
                   ? "Activate your plan"
                   : "Start your subscription"
-                : immediate
-                  ? "Upgrade"
-                  : "Change plan"}
+                : cycleOnly
+                  ? `Switch to ${cycle?.name.toLowerCase() ?? "a longer cycle"} billing`
+                  : immediate
+                    ? "Upgrade"
+                    : "Change plan"}
           </SheetTitle>
           <SheetDescription>
-            {currentPlanName && plan
-              ? `${currentPlanName} → ${plan.name}${cycle ? ` · ${cycle.name}` : ""}`
-              : "Review your change"}
+            {/* "Growth Plus → Growth Plus · Semi-annually" reads as a change
+                that isn't one. When only the cycle moves, say so. */}
+            {cycleOnly && view?.basis
+              ? `${plan?.name} · ${view.basis.currentCycleName} → ${cycle?.name}`
+              : currentPlanName && plan
+                ? `${currentPlanName} → ${plan.name}${cycle ? ` · ${cycle.name}` : ""}`
+                : "Review your change"}
           </SheetDescription>
         </SheetHeader>
 
@@ -508,9 +581,11 @@ export function ChangePlanSheet({
                       ? fromTrial
                         ? "This ends your trial and starts your subscription"
                         : "This starts your subscription"
-                      : immediate
-                        ? "This applies right away"
-                        : `This takes effect on ${formatDate(view.effectiveAt)}`}
+                      : restartTerm
+                        ? `Your ${cycle?.name.toLowerCase() ?? "new"} term starts today`
+                        : immediate
+                          ? "This applies right away"
+                          : `This takes effect on ${formatDate(view.effectiveAt)}`}
                   </p>
                   <p className="mt-0.5 text-muted-foreground">
                     {firstPurchase
@@ -521,9 +596,15 @@ export function ChangePlanSheet({
                               : `You have ${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} of trial left`
                           }. There's nothing paid to prorate against, so this is the full ${cycle?.name.toLowerCase() ?? "cycle"} price and a fresh period starts the moment it's paid. Everything you've set up stays exactly as it is.`
                         : `You're on a free plan, so there's nothing to prorate, so this is the full ${cycle?.name.toLowerCase() ?? "cycle"} price, and a new period starts the moment it's paid.`
-                      : immediate
-                        ? `You'll be charged the difference for the ${view.daysRemaining} day${view.daysRemaining === 1 ? "" : "s"} left in your current period, and the new features unlock immediately.`
-                        : "Nothing is charged or refunded now. You keep your current plan and everything in it until then. You can undo this any time before it lands."}
+                      : restartTerm
+                        ? `You're charged for the new term now, less the ${view.daysRemaining} day${view.daysRemaining === 1 ? "" : "s"} you've already paid for${
+                            view.renewsOn
+                              ? `. Your renewal date moves to ${formatDate(view.renewsOn)}`
+                              : ""
+                          }.`
+                        : immediate
+                          ? `You'll be charged the difference for the ${view.daysRemaining} day${view.daysRemaining === 1 ? "" : "s"} left in your current period, and the new features unlock immediately.`
+                          : "Nothing is charged or refunded now. You keep your current plan and everything in it until then. You can undo this any time before it lands."}
                   </p>
                 </div>
               </div>
@@ -542,6 +623,11 @@ export function ChangePlanSheet({
                     <p className="font-semibold">
                       {plan.name} · {cycle.name}
                     </p>
+                    {freeMonthsNote && (
+                      <p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-400">
+                        {freeMonthsNote}
+                      </p>
+                    )}
                   </div>
                   <p className="text-lg font-bold tabular-nums">
                     {inrShort(price.price)}
@@ -630,11 +716,16 @@ export function ChangePlanSheet({
                   daysRemaining={view.daysRemaining ?? 0}
                   daysInCycle={view.daysInCycle ?? 0}
                   prorationAmount={view.prorationAmount}
+                  renewsOn={view.renewsOn}
+                  freeMonthsNote={freeMonthsNote}
                 />
               )}
 
               {immediate ? (
-                <QuoteSummary quote={view.quote} title="Prorated charge now" />
+                <QuoteSummary
+                  quote={view.quote}
+                  title={restartTerm ? "Due today" : "Prorated charge now"}
+                />
               ) : firstPurchase ? (
                 <QuoteSummary quote={view.quote} title="Due at checkout" />
               ) : (
@@ -663,7 +754,9 @@ export function ChangePlanSheet({
               : firstPurchase
                 ? "Continue to checkout"
                 : immediate
-                  ? `Pay ${view ? inr(view.quote.totalAmount) : ""} and upgrade`
+                  ? `Pay ${view ? inr(view.quote.totalAmount) : ""} and ${
+                      cycleOnly ? "switch" : "upgrade"
+                    }`
                   : "Schedule this change"}
             {firstPurchase && !loading && <ArrowRight className="size-4" />}
           </Button>

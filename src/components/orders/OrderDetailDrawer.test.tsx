@@ -16,9 +16,9 @@ import type { PermissionKey, Role } from "@/types";
  *      API returned `customerId` and nothing else, so every field in the block
  *      read "Not provided" no matter who was looking.
  *
- * The block itself is name + phone. Email used to hold the second slot and sat
- * empty on nearly every order, which reads as a broken field rather than an
- * absent one.
+ * The block is name + phone + email. Email sits empty on nearly every order,
+ * which used to read as a broken field rather than an absent one; it now says
+ * which field is missing instead of going blank, so it earns its slot.
  */
 
 /** Server-side base permissions, mirrored from BASE_ROLE_PERMISSIONS. */
@@ -126,14 +126,15 @@ describe("the delivery role's view of the customer", () => {
 
     // Name twice on purpose: the heading, and a copyable field below it.
     expect(screen.getAllByText("Priya Sharma").length).toBeGreaterThan(0);
-    expect(screen.getByText("+919876543210")).toBeVisible();
+    // Grouped for reading, dialled raw — see the href assertion below.
+    expect(screen.getByText("+91 98765 43210")).toBeVisible();
   });
 
   it("makes the number dialable and messageable rather than read-only", async () => {
     openDrawer();
     await openCustomerTab();
 
-    expect(screen.getByText("+919876543210")).toHaveAttribute(
+    expect(screen.getByText("+91 98765 43210")).toHaveAttribute(
       "href",
       "tel:+919876543210",
     );
@@ -142,13 +143,15 @@ describe("the delivery role's view of the customer", () => {
     ).toHaveAttribute("href", "https://wa.me/919876543210");
   });
 
-  it("labels the two fields name and phone, email is gone from the block", async () => {
+  it("labels the three fields, and says an absent email is absent", async () => {
     openDrawer();
     await openCustomerTab();
 
     expect(screen.getByText("Name")).toBeVisible();
     expect(screen.getByText("Phone")).toBeVisible();
-    expect(screen.queryByText("Email")).toBeNull();
+    expect(screen.getByText("Email")).toBeVisible();
+    // The point of keeping the row: empty, it reads as absent, not broken.
+    expect(screen.getByText("No email on this account")).toBeVisible();
   });
 
   it("says which field is missing, not that the whole customer is", async () => {
@@ -164,7 +167,7 @@ describe("the delivery role's view of the customer", () => {
     await openCustomerTab();
 
     expect(screen.getByText("Not provided")).toBeVisible();
-    expect(screen.getByText("+919876543210")).toBeVisible();
+    expect(screen.getByText("+91 98765 43210")).toBeVisible();
   });
 });
 

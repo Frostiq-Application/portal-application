@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Facebook, Instagram, Loader2, MessageCircle, Quote } from "@/components/ui/icons";
+import { Facebook, Instagram, Loader2, MessageCircle, Phone, Quote } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { apiError } from "@/lib/apiError";
 import {
@@ -11,6 +11,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getCountryCallingCode } from "react-phone-number-input";
+import { CountryCodeSelect } from "./CountryCodeSelect";
+
+/** What the storefront falls back to when the brand has never set one. */
+const DEFAULT_COUNTRY = "IN";
+
+/** "IN" → "+91"; anything unrecognised shows as-is rather than crashing. */
+function dialCodeOf(iso: string): string {
+  try {
+    return `+${getCountryCallingCode(iso as Parameters<typeof getCountryCallingCode>[0])}`;
+  } catch {
+    return iso;
+  }
+}
 
 export function BrandTab() {
   const { data } = useGetAccountContentQuery();
@@ -20,6 +34,7 @@ export function BrandTab() {
   const [instagramUrl, setInstagram] = useState("");
   const [facebookUrl, setFacebook] = useState("");
   const [whatsappUrl, setWhatsapp] = useState("");
+  const [phoneCountryCode, setPhoneCountryCode] = useState(DEFAULT_COUNTRY);
 
   // Seeded during render rather than in an effect: the fields fill in on the
   // same paint the fetched brand content arrives, not one frame later.
@@ -31,11 +46,19 @@ export function BrandTab() {
     setInstagram(data.instagramUrl ?? "");
     setFacebook(data.facebookUrl ?? "");
     setWhatsapp(data.whatsappUrl ?? "");
+    setPhoneCountryCode(data.phoneCountryCode ?? DEFAULT_COUNTRY);
   }
 
   const submit = async () => {
     try {
-      await save({ tagline, aboutText, instagramUrl, facebookUrl, whatsappUrl }).unwrap();
+      await save({
+        tagline,
+        aboutText,
+        instagramUrl,
+        facebookUrl,
+        whatsappUrl,
+        phoneCountryCode,
+      }).unwrap();
       toast.success("Brand content saved");
     } catch (err) {
       toast.error(apiError(err));
@@ -109,6 +132,33 @@ export function BrandTab() {
                   onChange={(e) => setWhatsapp(e.target.value)}
                   placeholder="wa.me/…"
                 />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Customer phone numbers</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label>Country</Label>
+              <CountryCodeSelect
+                value={phoneCountryCode}
+                onChange={setPhoneCountryCode}
+              />
+              <p className="text-xs text-muted-foreground">
+                The storefront's phone field starts here, so customers type
+                only their local number.
+              </p>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>What the customer sees</Label>
+              <div className="flex h-9 items-center gap-2 rounded-md border bg-muted/30 px-3 text-sm">
+                <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span>{dialCodeOf(phoneCountryCode)}</span>
+                <span className="text-muted-foreground">98765 43210</span>
               </div>
             </div>
           </CardContent>

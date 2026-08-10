@@ -127,6 +127,8 @@ export interface Quote {
   planAmount: string;
   addonAmount: string;
   discountAmount: string;
+  /** Value of a period given up, deducted from this charge. */
+  creditAmount: string;
   subtotal: string;
   gatewayFee: string;
   taxAmount: string;
@@ -364,11 +366,21 @@ export interface ChangePreview {
   trial?: boolean;
   trialEndsAt?: string | null;
   /**
+   * `immediate` only — a move onto a longer cycle, which starts that cycle
+   * today instead of topping up the current period. The renewal date moves, so
+   * the sheet must not promise that it doesn't.
+   */
+  restartTerm?: boolean;
+  /** `immediate` only — the renewal date once this change lands. */
+  renewsOn?: string;
+  /**
    * `immediate` only — the figures the prorated charge was worked out from, so
    * the drawer can show its working. Server-computed: re-deriving the formula in
    * the UI is a second implementation that can disagree with what is charged.
    */
   basis?: {
+    /** `restart` buys a new term and credits the old one; `topup` doesn't. */
+    kind: "topup" | "restart";
     currentPlanName: string;
     currentCycleName: string;
     currentCyclePrice: string;
@@ -377,6 +389,9 @@ export interface ChangePreview {
     perDay: boolean;
     currentPerDay: string;
     newPerDay: string;
+    /** `restart` only — the unused days handed back against the charge. */
+    creditAmount: string;
+    creditedDays: number;
   };
 }
 
