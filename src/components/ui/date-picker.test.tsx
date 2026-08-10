@@ -3,6 +3,18 @@ import { describe, expect, it } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DatePicker, DateTimePicker } from "./date-picker";
+import { formatDate } from "@/lib/utils";
+
+/**
+ * The trigger prints the day through the app's own formatter, which asks for
+ * the ambient locale: "10 Mar 2025" where that is en-IN, "Mar 10, 2025" where
+ * it is en-US. Matching a literal made the suite pass or fail on which machine
+ * it ran on, so match whatever this environment actually renders.
+ *
+ * The day buttons inside the grid are safe as literals — react-day-picker
+ * labels those through date-fns' own en-US locale, whatever the system says.
+ */
+const showing = (iso: string) => (name: string) => name.includes(formatDate(iso));
 
 /** Drives the picker the way a form does — controlled, string in, string out. */
 function Harness({ initial = "", ...rest }: { initial?: string; min?: string }) {
@@ -22,7 +34,7 @@ describe("DatePicker", () => {
     const user = userEvent.setup();
     render(<Harness initial="2025-03-10" />);
 
-    await user.click(screen.getByRole("button", { name: /10 Mar 2025/ }));
+    await user.click(screen.getByRole("button", { name: showing("2025-03-10") }));
     const grid = await screen.findByRole("grid");
     await user.click(
       within(grid).getByRole("button", { name: /March 11th, 2025/ }),
@@ -37,7 +49,7 @@ describe("DatePicker", () => {
     const user = userEvent.setup();
     render(<Harness initial="2025-03-10" />);
 
-    await user.click(screen.getByRole("button", { name: /10 Mar 2025/ }));
+    await user.click(screen.getByRole("button", { name: showing("2025-03-10") }));
     await user.click(screen.getByRole("button", { name: "Clear" }));
 
     expect(value()).toBe("");
@@ -48,7 +60,7 @@ describe("DatePicker", () => {
     const user = userEvent.setup();
     render(<Harness initial="2025-03-10" min="2025-03-10" />);
 
-    await user.click(screen.getByRole("button", { name: /10 Mar 2025/ }));
+    await user.click(screen.getByRole("button", { name: showing("2025-03-10") }));
     const grid = await screen.findByRole("grid");
 
     expect(
