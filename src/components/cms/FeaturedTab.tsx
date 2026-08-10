@@ -11,6 +11,7 @@ import {
   useCreateOccasionMutation,
   useGetOccasionProductsQuery,
   useListOccasionsQuery,
+  useUpdateOccasionMutation,
 } from "@/features/api/cmsApi";
 import { useListProductsQuery } from "@/features/api/catalogApi";
 import { useAppSelector } from "@/app/hooks";
@@ -23,6 +24,7 @@ import { ShopSelect } from "@/components/ShopSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -72,26 +74,13 @@ function FeaturedEditor({ shopId }: { shopId: string }) {
         ) : (
           <ul className="space-y-1">
             {(occasions ?? []).map((o) => (
-              <li key={o.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedId(o.id)}
-                  className={cn(
-                    "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
-                    o.id === effectiveId
-                      ? "bg-primary/10 font-medium text-primary"
-                      : "hover:bg-muted",
-                  )}
-                >
-                  <Sparkles className="h-3.5 w-3.5 shrink-0 opacity-70" />
-                  <span className="truncate">{o.name}</span>
-                  {!o.isActive && (
-                    <span className="ml-auto text-[10px] uppercase text-muted-foreground">
-                      off
-                    </span>
-                  )}
-                </button>
-              </li>
+              <OccasionRow
+                key={o.id}
+                occasion={o}
+                isSelected={o.id === effectiveId}
+                canManage={canManageOccasions}
+                onSelect={() => setSelectedId(o.id)}
+              />
             ))}
             {(occasions ?? []).length === 0 && (
               <p className="px-1 py-4 text-sm text-muted-foreground">
@@ -118,6 +107,75 @@ function FeaturedEditor({ shopId }: { shopId: string }) {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * One occasion in the sidebar: selects the occasion, and — for admins who may
+ * manage them — switches it on or off. The switch sits beside the select
+ * button rather than inside it, so neither swallows the other's clicks.
+ */
+function OccasionRow({
+  occasion,
+  isSelected,
+  canManage,
+  onSelect,
+}: {
+  occasion: Occasion;
+  isSelected: boolean;
+  canManage: boolean;
+  onSelect: () => void;
+}) {
+  const [updateOccasion, { isLoading }] = useUpdateOccasionMutation();
+
+  const toggle = async (isActive: boolean) => {
+    try {
+      await updateOccasion({ id: occasion.id, body: { isActive } }).unwrap();
+      toast.success(
+        isActive
+          ? `${occasion.name} is live on the storefront`
+          : `${occasion.name} hidden from the storefront`,
+      );
+    } catch (err) {
+      toast.error(apiError(err));
+    }
+  };
+
+  return (
+    <li
+      className={cn(
+        "flex items-center gap-1 rounded-md pr-2 transition-colors",
+        isSelected ? "bg-primary/10" : "hover:bg-muted",
+      )}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        className={cn(
+          "flex min-w-0 flex-1 items-center gap-2 rounded-md px-3 py-2 text-left text-sm",
+          isSelected && "font-medium text-primary",
+          !occasion.isActive && !isSelected && "text-muted-foreground",
+        )}
+      >
+        <Sparkles className="h-3.5 w-3.5 shrink-0 opacity-70" />
+        <span className="truncate">{occasion.name}</span>
+      </button>
+      {canManage ? (
+        <Switch
+          checked={occasion.isActive}
+          onCheckedChange={toggle}
+          disabled={isLoading}
+          className="shrink-0"
+          aria-label={`${occasion.isActive ? "Deactivate" : "Activate"} ${occasion.name}`}
+        />
+      ) : (
+        !occasion.isActive && (
+          <span className="shrink-0 text-[10px] uppercase text-muted-foreground">
+            off
+          </span>
+        )
+      )}
+    </li>
   );
 }
 
@@ -243,9 +301,17 @@ function ProductPicker({
     <div className="rounded-lg border bg-background">
       <div className="flex flex-wrap items-center gap-3 border-b p-3">
         <div className="min-w-0">
-          <h3 className="font-medium">{occasion.name}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-medium">{occasion.name}</h3>
+            {!occasion.isActive && (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Inactive
+              </span>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">
             {selected.size} selected
+            {!occasion.isActive && " · hidden from the storefront until active"}
           </p>
         </div>
         <div className="relative ml-auto w-full sm:w-56">
