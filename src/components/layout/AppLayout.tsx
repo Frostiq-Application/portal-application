@@ -15,11 +15,13 @@ import { useEntitlements } from "@/hooks/useEntitlements";
 import {
   selectHasUnseenOrders,
   selectHasUnseenEnquiries,
+  selectHasUnseenCustomCakes,
 } from "@/features/notifications/notificationsSlice";
 import { FrostiqueMark } from "@/components/common/FrostiqueMark";
 import { SplashScreen } from "@/components/common/SplashScreen";
 import { OrderNotifications } from "@/components/orders/OrderNotifications";
 import { EnquiryNotifications } from "@/components/enquiries/EnquiryNotifications";
+import { CustomCakeNotifications } from "@/components/custom-cake/CustomCakeNotifications";
 import { AccountDeactivatedGate } from "@/components/gating/AccountDeactivatedGate";
 import { NoSubscriptionGate } from "@/components/gating/NoSubscriptionGate";
 import { navFor, type NavItem } from "@/config/nav";
@@ -74,6 +76,13 @@ const GROUP_ORDER: NavItem["group"][] = [
   "Configuration",
 ];
 
+/** Hover text for the unseen dot, per row that can carry one. */
+const UNSEEN_LABEL: Record<string, string> = {
+  "/orders": "New orders",
+  "/queries": "New queries",
+  "/custom-cakes": "New custom cake requests",
+};
+
 /**
  * The sidebar. Exported so its plan-gating behaviour can be tested directly —
  * locking the wrong item is a silent revenue bug, not a visual one.
@@ -86,6 +95,7 @@ export function SidebarNav() {
   const { setOpenMobile } = useSidebar();
   const hasUnseenOrders = useAppSelector(selectHasUnseenOrders);
   const hasUnseenEnquiries = useAppSelector(selectHasUnseenEnquiries);
+  const hasUnseenCustomCakes = useAppSelector(selectHasUnseenCustomCakes);
   // Plan-gated items are shown, not hidden. A feature the bakery can't see is a
   // feature it will never buy — and a menu that silently changes shape after an
   // upgrade is disorienting.
@@ -205,7 +215,7 @@ export function SidebarNav() {
                  label isn't there, so it moves to the icon's corner. */
               <span
                 className="ml-auto size-2 shrink-0 rounded-full bg-red-500 group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:right-1 group-data-[collapsible=icon]:top-1 group-data-[collapsible=icon]:ml-0"
-                title={item.path === "/orders" ? "New orders" : "New queries"}
+                title={UNSEEN_LABEL[item.path]}
               />
             )}
           </NavLink>
@@ -239,6 +249,7 @@ export function SidebarNav() {
   function unseen(path: string) {
     if (path === "/orders") return hasUnseenOrders;
     if (path === "/queries") return hasUnseenEnquiries;
+    if (path === "/custom-cakes") return hasUnseenCustomCakes;
     return false;
   }
 }
@@ -409,6 +420,8 @@ export function AppLayout() {
       <OrderNotifications />
       {/* App-wide enquiry alerts (platform super admin only): same pattern. */}
       <EnquiryNotifications />
+      {/* App-wide custom-cake alerts: same pattern, one connection. */}
+      <CustomCakeNotifications />
 
       <AppSidebar brand={brand} />
 

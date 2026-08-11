@@ -7,7 +7,10 @@ import {
   type Credentials,
 } from "@/features/auth/authSlice";
 import { setSelectedBranch } from "@/features/branch/branchSlice";
-import { newOrderArrived } from "@/features/notifications/notificationsSlice";
+import {
+  customCakeArrived,
+  newOrderArrived,
+} from "@/features/notifications/notificationsSlice";
 import type { AuthUser } from "@/types";
 
 const user = (id: string): AuthUser => ({
@@ -89,6 +92,7 @@ describe("session teardown", () => {
     store.dispatch(setCredentials(credentials("a")));
     store.dispatch(setSelectedBranch("shop-1"));
     store.dispatch(newOrderArrived());
+    store.dispatch(customCakeArrived());
 
     store.dispatch(logout());
 
@@ -97,5 +101,6 @@ describe("session teardown", () => {
     expect(store.getState().branch.selectedBranchId).toBe("");
     expect(localStorage.getItem("frostique-portal-branch")).toBe("");
     expect(store.getState().notifications.hasUnseenOrders).toBe(false);
+    expect(store.getState().notifications.hasUnseenCustomCakes).toBe(false);
   });
 });

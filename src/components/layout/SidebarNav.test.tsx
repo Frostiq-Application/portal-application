@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { NAV_ITEMS, navForRole } from "@/config/nav";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -16,6 +16,11 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 const mockState = vi.hoisted(() => ({
   role: "account_super_admin" as string,
   granted: new Set<string>(),
+  notifications: {
+    hasUnseenOrders: false,
+    hasUnseenEnquiries: false,
+    hasUnseenCustomCakes: false,
+  },
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -28,8 +33,11 @@ vi.mock("@/hooks/useEntitlements", () => ({
     entitlements: undefined,
   }),
 }));
+// The nav's only Redux reads are the unseen-dot selectors, so a state stub with
+// the notifications slice is enough to drive them.
 vi.mock("@/app/hooks", () => ({
-  useAppSelector: () => false,
+  useAppSelector: (selector: (s: unknown) => unknown) =>
+    selector({ notifications: mockState.notifications }),
   useAppDispatch: () => vi.fn(),
 }));
 
@@ -47,6 +55,44 @@ const renderNav = () =>
       </SidebarProvider>
     </MemoryRouter>,
   );
+
+beforeEach(() => {
+  mockState.notifications = {
+    hasUnseenOrders: false,
+    hasUnseenEnquiries: false,
+    hasUnseenCustomCakes: false,
+  };
+});
+
+describe("SidebarNav unseen dots", () => {
+  /**
+   * The dot is how a request that landed while the owner was on another screen
+   * gets noticed at all — Custom Cakes carries one exactly like Orders does.
+   */
+  it("marks Custom Cakes when a request arrived off-screen", () => {
+    mockState.role = "account_super_admin";
+    mockState.granted = new Set(["can_use_custom_cake"]);
+    mockState.notifications.hasUnseenCustomCakes = true;
+
+    renderNav();
+
+    const link = screen.getByRole("link", { name: /custom cakes/i });
+    expect(within(link).getByTitle("New custom cake requests")).toBeVisible();
+    // Orders is quiet — one arrival must not light up every row.
+    const orders = screen.getByRole("link", { name: /^orders$/i });
+    expect(within(orders).queryByTitle("New orders")).toBeNull();
+  });
+
+  it("leaves Custom Cakes unmarked while the queue is caught up", () => {
+    mockState.role = "account_super_admin";
+    mockState.granted = new Set(["can_use_custom_cake"]);
+
+    renderNav();
+
+    const link = screen.getByRole("link", { name: /custom cakes/i });
+    expect(within(link).queryByTitle("New custom cake requests")).toBeNull();
+  });
+});
 
 describe("SidebarNav plan gating", () => {
   it("shows a gated item locked rather than hiding it", () => {

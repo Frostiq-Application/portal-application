@@ -11,6 +11,13 @@ interface NotificationsState {
   hasUnseenEnquiries: boolean;
   /** Live SSE connection state for the Queries indicator. */
   enquiryStreamStatus: StreamStatus;
+  /**
+   * A new custom-cake request landed while the user was away from the Custom
+   * Cakes queue.
+   */
+  hasUnseenCustomCakes: boolean;
+  /** Live SSE connection state for the Custom Cakes indicator. */
+  customCakeStreamStatus: StreamStatus;
 }
 
 const initialState: NotificationsState = {
@@ -18,6 +25,8 @@ const initialState: NotificationsState = {
   streamStatus: "connecting",
   hasUnseenEnquiries: false,
   enquiryStreamStatus: "connecting",
+  hasUnseenCustomCakes: false,
+  customCakeStreamStatus: "connecting",
 };
 
 const notificationsSlice = createSlice({
@@ -46,6 +55,17 @@ const notificationsSlice = createSlice({
     setEnquiryStreamStatus(state, action: PayloadAction<StreamStatus>) {
       state.enquiryStreamStatus = action.payload;
     },
+    /** A new custom-cake request arrived off-screen — raise the sidebar dot. */
+    customCakeArrived(state) {
+      state.hasUnseenCustomCakes = true;
+    },
+    /** User opened the Custom Cakes queue — clear the dot. */
+    customCakesSeen(state) {
+      state.hasUnseenCustomCakes = false;
+    },
+    setCustomCakeStreamStatus(state, action: PayloadAction<StreamStatus>) {
+      state.customCakeStreamStatus = action.payload;
+    },
     /**
      * Back to a blank slate when the session ends. These dots say "something
      * arrived for *you* while you weren't looking" — carrying one into the next
@@ -64,6 +84,9 @@ export const {
   enquiryArrived,
   enquiriesSeen,
   setEnquiryStreamStatus,
+  customCakeArrived,
+  customCakesSeen,
+  setCustomCakeStreamStatus,
   resetNotifications,
 } = notificationsSlice.actions;
 
@@ -75,5 +98,9 @@ export const selectHasUnseenEnquiries = (s: RootState) =>
   s.notifications.hasUnseenEnquiries;
 export const selectEnquiryStreamStatus = (s: RootState) =>
   s.notifications.enquiryStreamStatus;
+export const selectHasUnseenCustomCakes = (s: RootState) =>
+  s.notifications.hasUnseenCustomCakes;
+export const selectCustomCakeStreamStatus = (s: RootState) =>
+  s.notifications.customCakeStreamStatus;
 
 export default notificationsSlice.reducer;
