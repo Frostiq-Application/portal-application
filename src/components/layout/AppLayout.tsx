@@ -4,6 +4,7 @@ import {
   Crown,
   LogOut,
   Moon,
+  Plus,
   Sun,
   UserRound,
 } from "@/components/ui/icons";
@@ -320,6 +321,7 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, role } = useAuth();
+  const { can } = useCan();
   const {
     isExempt,
     isLoading,
@@ -430,6 +432,16 @@ export function AppLayout() {
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-1 h-4" />
           <div className="ml-auto flex items-center gap-2">
+            {!isExempt && can("orders.manage") && (
+              <Button
+                size="sm"
+                className="gap-1.5"
+                onClick={() => navigate("/orders?new=1")}
+              >
+                <Plus className="h-4 w-4" />
+                New Order
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"

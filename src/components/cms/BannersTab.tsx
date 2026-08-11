@@ -1,5 +1,14 @@
 import { useState } from "react";
-import { ImageIcon, Images, Loader2, Plus, Trash2 } from "@/components/ui/icons";
+import {
+  ArrowDown,
+  ArrowUp,
+  ExternalLink,
+  ImageIcon,
+  Images,
+  Loader2,
+  Plus,
+  Trash2,
+} from "@/components/ui/icons";
 import { toast } from "sonner";
 import { apiError } from "@/lib/apiError";
 import { cn } from "@/lib/utils";
@@ -78,7 +87,19 @@ function BannerPreview({
   );
 }
 
-function BannerCard({ banner }: { banner: Banner }) {
+function BannerCard({
+  banner,
+  index,
+  total,
+  onMove,
+  reordering,
+}: {
+  banner: Banner;
+  index: number;
+  total: number;
+  onMove: (from: number, to: number) => void;
+  reordering: boolean;
+}) {
   const [updateBanner] = useUpdateBannerMutation();
   const [deleteBanner, { isLoading: deleting }] = useDeleteBannerMutation();
 
@@ -112,9 +133,23 @@ function BannerCard({ banner }: { banner: Banner }) {
           alt={banner.title ?? "banner"}
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
-        <div className="absolute left-2 top-2">
+        <div className="absolute left-2 top-2 flex items-center gap-1.5">
+          <span className="rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white">
+            #{index + 1}
+          </span>
           <ScopeBadge shopId={banner.shopId} accountId={banner.accountId} />
         </div>
+        {banner.tapAction === "open_url" && banner.tapTarget && (
+          <a
+            href={banner.tapTarget}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={banner.tapTarget}
+            className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        )}
         {(banner.title || banner.subtitle || banner.ctaLabel) && (
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3">
             {banner.title && (
@@ -139,6 +174,27 @@ function BannerCard({ banner }: { banner: Banner }) {
           />
           {banner.isActive ? "Live" : "Hidden"}
         </label>
+        <div className="flex items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground"
+            disabled={reordering || index === 0}
+            onClick={() => onMove(index, index - 1)}
+            aria-label="Move banner up"
+          >
+            <ArrowUp className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground"
+            disabled={reordering || index === total - 1}
+            onClick={() => onMove(index, index + 1)}
+            aria-label="Move banner down"
+          >
+            <ArrowDown className="h-4 w-4" />
+          </Button>
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button
@@ -169,6 +225,7 @@ function BannerCard({ banner }: { banner: Banner }) {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        </div>
       </CardContent>
     </Card>
   );
@@ -177,31 +234,64 @@ function BannerCard({ banner }: { banner: Banner }) {
 export function BannersTab() {
   const { data: banners, isLoading } = useListBannersQuery();
   const [createBanner, { isLoading: creating }] = useCreateBannerMutation();
+  const [updateBanner] = useUpdateBannerMutation();
   const [imageUrl, setImageUrl] = useState("");
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [ctaLabel, setCtaLabel] = useState("");
+  const [link, setLink] = useState("");
+  const [reordering, setReordering] = useState(false);
+
+  const list = banners ?? [];
 
   const add = async () => {
     if (!imageUrl.trim()) return toast.error("Add an image first");
+    const url = link.trim();
+    if (url && !/^https?:\/\//i.test(url)) {
+      return toast.error("Link must start with http:// or https://");
+    }
     try {
       await createBanner({
         imageUrl: imageUrl.trim(),
         title: title.trim() || undefined,
         subtitle: subtitle.trim() || undefined,
         ctaLabel: ctaLabel.trim() || undefined,
+        tapAction: url ? "open_url" : undefined,
+        tapTarget: url || undefined,
+        displayOrder: list.length,
       }).unwrap();
       toast.success("Banner added");
       setImageUrl("");
       setTitle("");
       setSubtitle("");
       setCtaLabel("");
+      setLink("");
     } catch (err) {
       toast.error(apiError(err));
     }
   };
 
-  const list = banners ?? [];
+  const move = async (from: number, to: number) => {
+    if (to < 0 || to >= list.length) return;
+    const next = [...list];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setReordering(true);
+    try {
+      await Promise.all(
+        next
+          .map((b, i) => ({ b, i }))
+          .filter(({ b, i }) => b.displayOrder !== i)
+          .map(({ b, i }) =>
+            updateBanner({ id: b.id, body: { displayOrder: i } }).unwrap(),
+          ),
+      );
+    } catch (err) {
+      toast.error(apiError(err));
+    } finally {
+      setReordering(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -243,6 +333,18 @@ export function BannersTab() {
                   onChange={(e) => setSubtitle(e.target.value)}
                   placeholder="Order your favourites today"
                 />
+              </div>
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <Label>Link</Label>
+                <Input
+                  type="url"
+                  value={link}
+                  onChange={(e) => setLink(e.target.value)}
+                  placeholder="https://example.com/offer"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Optional — where the banner takes the customer when tapped.
+                </p>
               </div>
             </div>
           </div>
@@ -288,8 +390,15 @@ export function BannersTab() {
         </Empty>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {list.map((b) => (
-            <BannerCard key={b.id} banner={b} />
+          {list.map((b, i) => (
+            <BannerCard
+              key={b.id}
+              banner={b}
+              index={i}
+              total={list.length}
+              onMove={move}
+              reordering={reordering}
+            />
           ))}
         </div>
       )}

@@ -20,6 +20,7 @@ import {
   X,
 } from "@/components/ui/icons";
 import type { IconComponent } from "@/components/ui/icons";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { apiError } from "@/lib/apiError";
@@ -432,7 +433,25 @@ export function OrdersPage() {
   const [sortBy, setSortBy] = useState<OrderSortBy>("schedule");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [openId, setOpenId] = useState<string | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
+  // `?new=1` (the shell header's New Order button) lands here with the create
+  // dialog already open. Holding the flag in the URL rather than in a one-shot
+  // effect means arriving from the header while already on /orders reopens it,
+  // and closing the dialog leaves a clean /orders behind.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const createOpen = searchParams.get("new") === "1";
+  const setCreateOpen = useCallback(
+    (open: boolean) =>
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (open) next.set("new", "1");
+          else next.delete("new");
+          return next;
+        },
+        { replace: true },
+      ),
+    [setSearchParams],
+  );
   // Ids whose background action just failed and snapped back — flashed briefly.
   const [flashIds, setFlashIds] = useState<Set<string>>(new Set());
 

@@ -53,6 +53,8 @@ export interface CreateBannerBody {
   title?: string;
   subtitle?: string;
   ctaLabel?: string;
+  tapAction?: BannerTapAction;
+  tapTarget?: string;
   displayOrder?: number;
 }
 

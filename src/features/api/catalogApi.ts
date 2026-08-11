@@ -78,6 +78,29 @@ export interface CloneResult {
   addonsCreated: number;
 }
 
+// ---- Bulk upload ----
+export interface BulkRowIssue {
+  /** Excel row number, as the user sees it in their sheet. */
+  row: number;
+  name: string;
+  reason: string;
+}
+export interface BulkSheetReport {
+  sheet: string;
+  found: boolean;
+  total: number;
+  created: number;
+  skipped: BulkRowIssue[];
+  failed: BulkRowIssue[];
+}
+export interface BulkUploadReport {
+  categories: BulkSheetReport;
+  products: BulkSheetReport;
+  addons: BulkSheetReport;
+  /** Failed rows as a fix-and-reupload .xlsx, base64. Null when all clean. */
+  errorReportBase64: string | null;
+}
+
 export const catalogApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
     // Categories
@@ -216,6 +239,34 @@ export const catalogApi = baseApi.injectEndpoints({
         { type: "Addon", id: "LIST" },
       ],
     }),
+
+    // One workbook in, a per-row report out. Everything that did import is
+    // live immediately, so all three lists refetch.
+    bulkUploadCatalog: build.mutation<
+      BulkUploadReport,
+      { file: File; shopId: string }
+    >({
+      query: ({ file, shopId }) => {
+        const form = new FormData();
+        form.append("file", file);
+        form.append("shopId", shopId);
+        return { url: "/catalog/bulk-upload", method: "POST", body: form };
+      },
+      invalidatesTags: [
+        { type: "Product", id: "LIST" },
+        { type: "Category", id: "LIST" },
+        { type: "Addon", id: "LIST" },
+      ],
+    }),
+
+    // A mutation (not a query) so nothing is cached and each click re-downloads.
+    // The blob is handed back for the caller to save; auth rides the normal way.
+    downloadBulkUploadSample: build.mutation<Blob, void>({
+      query: () => ({
+        url: "/catalog/bulk-upload/sample",
+        responseHandler: (response) => response.blob(),
+      }),
+    }),
   }),
   overrideExisting: false,
 });
@@ -236,4 +287,6 @@ export const {
   useUpdateAddonMutation,
   useDeleteAddonMutation,
   useCloneCatalogMutation,
+  useBulkUploadCatalogMutation,
+  useDownloadBulkUploadSampleMutation,
 } = catalogApi;
