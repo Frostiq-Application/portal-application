@@ -11,6 +11,7 @@ import type { Order } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowRight, Eye, GripVertical, Loader2 } from "@/components/ui/icons";
+import { CustomCakeTag } from "@/components/orders/CustomCakeBrief";
 import type { QueueAction } from "./types";
 
 /** How the card is being dragged right now, or null when it's sitting still. */
@@ -143,6 +144,7 @@ export const FloorOrderCard = memo(function FloorOrderCard({
             <span className="truncate font-mono text-lg font-bold tracking-tight">
               {order.orderNumber}
             </span>
+            {order.isCustomCake && <CustomCakeTag className="shrink-0" />}
           </div>
           <span className="shrink-0 text-right">
             <span className="block text-base font-semibold leading-tight">
@@ -184,6 +186,37 @@ export const FloorOrderCard = memo(function FloorOrderCard({
               </li>
             ))}
           </ul>
+
+          {/* Just enough of the brief to work from without opening the sheet:
+              the reference photo (which IS the spec), what to pipe on it, and
+              the allergy. Everything else waits behind Details — a lane full of
+              full briefs is a lane nobody can scan. */}
+          {order.customCake && (
+            <div className="grid gap-3">
+              {order.customCake.referenceImageUrls.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto">
+                  {order.customCake.referenceImageUrls.slice(0, 3).map((url) => (
+                    <img
+                      key={url}
+                      src={url}
+                      alt="Reference"
+                      className="size-20 shrink-0 rounded-xl border object-cover"
+                    />
+                  ))}
+                </div>
+              )}
+              {order.customCake.cakeMessage && (
+                <p className="rounded-xl bg-muted px-4 py-2 text-base font-semibold leading-snug">
+                  “{order.customCake.cakeMessage}”
+                </p>
+              )}
+              {order.customCake.allergyInfo && (
+                <p className="rounded-xl bg-red-600 px-4 py-2 text-base font-bold leading-snug text-white">
+                  Allergy: {order.customCake.allergyInfo}
+                </p>
+              )}
+            </div>
+          )}
 
           {order.customerNote && (
             <p className="rounded-xl bg-amber-100 px-4 py-3 text-base font-medium leading-snug text-amber-950 dark:bg-amber-950/50 dark:text-amber-100">

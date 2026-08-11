@@ -8,7 +8,6 @@ import {
   Search,
   Settings2,
 } from "@/components/ui/icons";
-import { toast } from "sonner";
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import {
   ALL_BRANCHES,
@@ -19,10 +18,15 @@ import {
   useListCustomCakesQuery,
   type CustomCakeRequest,
   type CustomCakeStatus,
+  CUSTOM_CAKE_PIPELINE,
   CUSTOM_CAKE_STATUS_ACCENT,
   CUSTOM_CAKE_STATUS_LABELS,
 } from "@/features/api/customCakeApi";
-import type { CustomCakeStreamEvent } from "@/types";
+import { ORDER_STATUS_LABEL, ORDER_STATUS_TONE } from "@/lib/orders";
+import { cn } from "@/lib/utils";
+import type { OrderEvent } from "@/types";
+import { selectCustomCakeStreamStatus } from "@/features/notifications/notificationsSlice";
+import { useOrderStream } from "@/hooks/useOrderStream";
 import { ShopSelect } from "@/components/ShopSelect";
 import { SegmentedStrip, type SegmentedItem } from "@/components/SegmentedStrip";
 import { LiveIndicator } from "@/components/LiveIndicator";
@@ -33,7 +37,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useEntitlements } from "@/hooks/useEntitlements";
-import { useCustomCakeStream } from "@/hooks/useCustomCakeStream";
 import { CreateCustomCakeDialog } from "@/components/custom-cake/CreateCustomCakeDialog";
 import { CustomCakeDetailSheet } from "@/components/custom-cake/CustomCakeDetailSheet";
 import { CustomCakeOptionsDrawer } from "@/components/custom-cake/CustomCakeOptionsDrawer";
@@ -47,17 +50,12 @@ type StatusFilter = "all" | CustomCakeStatus;
 /** The page has two workspaces: the request queue and the design gallery. */
 type CustomCakeSection = "requests" | "gallery";
 
-const STATUS_ORDER: CustomCakeStatus[] = [
-  "submitted",
-  "under_review",
-  "quotation_sent",
-  "accepted",
-  "preparing",
-  "ready",
-  "delivered",
-  "rejected",
-  "cancelled",
-];
+/**
+ * The request's own pipeline, and all of it. Preparing/ready/delivered used to
+ * be tabs here; they now live on the order an accepted request becomes, which
+ * is what stops the two screens showing different states for one cake.
+ */
+const STATUS_ORDER: CustomCakeStatus[] = CUSTOM_CAKE_PIPELINE;
 
 const NO_ITEMS: CustomCakeRequest[] = [];
 
@@ -104,33 +102,36 @@ export function CustomCakesPage() {
   // making the memo below recompute every time. One shared constant is stable.
   const items = data?.items ?? NO_ITEMS;
 
-  // Realtime: when a request changes for this brand, refresh the affected
-  // request + the list so every open tab reflects it live. New requests toast.
-  const onEvent = useCallback(
-    (e: CustomCakeStreamEvent) => {
-      // A branch is always selected on this page; ignore other branches.
-      if (shopId && e.shopId !== shopId) return;
-      dispatch(
-        customCakeApi.util.invalidateTags([
-          { type: "CustomCake", id: e.requestId },
-          { type: "CustomCake", id: "LIST" },
-          { type: "CustomCake", id: `events:${e.requestId}` },
-        ]),
-      );
-      if (e.type === "created") {
-        toast.info(`New custom cake request ${e.requestNumber}`, {
-          description: "A fresh request just landed in the queue.",
-        });
-      }
-    },
-    [dispatch, shopId],
-  );
   // Realtime is a plan feature (Growth+); without it the list still works,
   // just no live updates and no Live indicator. Also needs the custom-cake add-on.
   const { hasFeature } = useEntitlements();
   const realtimeEnabled =
     hasFeature("can_use_realtime") && hasFeature("can_use_custom_cake");
-  const streamStatus = useCustomCakeStream(onEvent, realtimeEnabled);
+  // The request stream itself is owned by CustomCakeNotifications in the app
+  // shell — one connection for the whole portal, so a request landing on any
+  // screen still rings the bell and raises the sidebar dot. It invalidates the
+  // cache too, which is what keeps this queue live; all this page needs from it
+  // is the connection status for the indicator.
+  const streamStatus = useAppSelector(selectCustomCakeStreamStatus);
+
+  // An accepted request shows its ORDER's status, so a cake advanced on the
+  // kitchen board has to repaint this queue too. The order stream carries the
+  // request id precisely so this page can listen without the two backend
+  // modules having to know about each other.
+  const onOrderEvent = useCallback(
+    (e: OrderEvent) => {
+      if (!e.customCakeRequestId) return;
+      if (shopId && e.shopId !== shopId) return;
+      dispatch(
+        customCakeApi.util.invalidateTags([
+          { type: "CustomCake", id: e.customCakeRequestId },
+          { type: "CustomCake", id: "LIST" },
+        ]),
+      );
+    },
+    [dispatch, shopId],
+  );
+  useOrderStream(onOrderEvent, realtimeEnabled);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
@@ -346,13 +347,32 @@ function RequestRow({
         {request.quotedPrice && (
           <p className="text-sm font-medium">₹{request.quotedPrice}</p>
         )}
+        {request.convertedOrderNumber && (
+          <p className="font-mono text-xs text-muted-foreground">
+            {request.convertedOrderNumber}
+          </p>
+        )}
       </div>
-      <span
-        className="shrink-0 rounded-full px-2.5 py-1 text-xs font-medium"
-        style={{ backgroundColor: `${accent}22`, color: accent }}
-      >
-        {CUSTOM_CAKE_STATUS_LABELS[request.status]}
-      </span>
+      {/* Once accepted, the cake's real state is its order's. Showing the
+          request's own "Accepted" here forever is precisely what made the two
+          screens look out of sync, so the order's status takes over the badge. */}
+      {request.convertedOrderStatus ? (
+        <span
+          className={cn(
+            "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium",
+            ORDER_STATUS_TONE[request.convertedOrderStatus],
+          )}
+        >
+          {ORDER_STATUS_LABEL[request.convertedOrderStatus]}
+        </span>
+      ) : (
+        <span
+          className="shrink-0 rounded-full px-2.5 py-1 text-xs font-medium"
+          style={{ backgroundColor: `${accent}22`, color: accent }}
+        >
+          {CUSTOM_CAKE_STATUS_LABELS[request.status]}
+        </span>
+      )}
       <Button
         size="sm"
         variant="outline"

@@ -399,6 +399,40 @@ export interface OrderDeliveryAddress {
   longitude: string | null;
 }
 
+/**
+ * The custom cake brief, carried by the order it became.
+ *
+ * A converted custom cake is one synthetic order line, which tells the kitchen
+ * the weight and shape and nothing else. The sponge, the decorations, the
+ * reference photos and — critically — the allergy note live here, because a
+ * chef or a rider cannot open the custom cake desk: it is a separate permission
+ * and, on some plans, a separate add-on.
+ */
+export interface OrderCustomCake {
+  requestId: string;
+  requestNumber: string;
+  cakeType: string | null;
+  weight: string | null;
+  shape: string | null;
+  theme: string | null;
+  occasion: string | null;
+  sponge: string | null;
+  cream: string | null;
+  filling: string | null;
+  flavour: string | null;
+  colour: string | null;
+  decorations: string[];
+  topper: string | null;
+  cakeMessage: string | null;
+  referenceImageUrls: string[];
+  neededDate: string | null;
+  neededTime: string | null;
+  notes: string | null;
+  specialInstructions: string | null;
+  allergyInfo: string | null;
+  quotedPrice: string | null;
+}
+
 export interface Order {
   id: string;
   orderNumber: string;
@@ -421,6 +455,11 @@ export interface Order {
   paymentStatus: OrderPaymentStatus;
   customerNote: string | null;
   cancellationReason: string | null;
+  /** True when this order came from a custom cake request. */
+  isCustomCake: boolean;
+  customCakeRequestId: string | null;
+  /** The brief. Null on ordinary catalog orders. */
+  customCake: OrderCustomCake | null;
   items: OrderItem[];
   statusHistory: OrderStatusHistory[];
   createdAt: string;
@@ -436,6 +475,12 @@ export interface OrderEvent {
   type: "created" | "status" | "payment" | "cancelled";
   status: OrderStatus;
   paymentStatus: OrderPaymentStatus;
+  /**
+   * Set when the order is a converted custom cake — the custom cake desk
+   * listens for these so an order advanced on the kitchen board updates the
+   * request's card without a refresh.
+   */
+  customCakeRequestId?: string | null;
   at: string;
 }
 

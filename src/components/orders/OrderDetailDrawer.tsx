@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CustomCakeBrief, CustomCakeTag } from "./CustomCakeBrief";
 import { OrderCustomerPanel } from "./OrderCustomerPanel";
 import { useCan } from "@/hooks/useCan";
 
@@ -154,6 +155,7 @@ export function OrderDetailDrawer({ orderId, onOpenChange, readOnly }: Props) {
                 >
                   {ORDER_STATUS_LABEL[order.status]}
                 </span>
+                {order.isCustomCake && <CustomCakeTag />}
               </SheetTitle>
               <SheetDescription>
                 {order.deliveryType === "delivery" ? "Delivery" : "Pickup"} ·{" "}
@@ -174,6 +176,12 @@ export function OrderDetailDrawer({ orderId, onOpenChange, readOnly }: Props) {
                 )}
 
                 <TabsContent value="order" className="mt-4 space-y-6">
+                  {/* The brief first: on a custom cake the single order line
+                      below carries almost none of what was actually agreed. */}
+                  {order.customCake && (
+                    <CustomCakeBrief cake={order.customCake} />
+                  )}
+
                   {/* Items — each line carries the product photo and add-on photos. */}
                   <div className="space-y-3">
                     {order.items.map((it) => (

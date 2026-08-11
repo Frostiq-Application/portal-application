@@ -1,16 +1,38 @@
 import { baseApi } from "./baseApi";
-import type { DeliveryType } from "@/types";
+import type { DeliveryType, OrderPaymentStatus, OrderStatus } from "@/types";
 
+/**
+ * A request's own lifecycle — the negotiation, and nothing else.
+ *
+ * Accepting converts it into an order, and from there the ORDER's status is the
+ * only fulfilment state there is. `rejected`/`preparing`/`ready`/`delivered` are
+ * retired: they duplicated `OrderStatus`, which is exactly how a request and the
+ * order it became came to show different things. They stay in the union only
+ * because historical timeline events still carry them.
+ */
 export type CustomCakeStatus =
   | "submitted"
   | "under_review"
   | "quotation_sent"
   | "accepted"
+  | "cancelled"
+  | LegacyCustomCakeStatus;
+
+/** @deprecated Read-only, for old timeline rows. Never sent to the API. */
+export type LegacyCustomCakeStatus =
   | "rejected"
   | "preparing"
   | "ready"
-  | "delivered"
-  | "cancelled";
+  | "delivered";
+
+/** The stages a request can actually be moved to, in pipeline order. */
+export const CUSTOM_CAKE_PIPELINE: CustomCakeStatus[] = [
+  "submitted",
+  "under_review",
+  "quotation_sent",
+  "accepted",
+  "cancelled",
+];
 
 export interface CustomCakeRequest {
   id: string;
@@ -47,6 +69,17 @@ export interface CustomCakeRequest {
   adminNotes: string | null;
   resolutionReason: string | null;
   convertedOrderId: string | null;
+  /**
+   * The order this request became. Null until it is accepted.
+   *
+   * `convertedOrderStatus` is the live status of that order — where the cake
+   * actually is. The request's own `status` deliberately stops at `accepted`,
+   * so this is what the desk reads for anything past the quote, rather than a
+   * second copy that drifts.
+   */
+  convertedOrderNumber: string | null;
+  convertedOrderStatus: OrderStatus | null;
+  convertedOrderPaymentStatus: OrderPaymentStatus | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -162,10 +195,13 @@ export const customCakeApi = baseApi.injectEndpoints({
         method: "PATCH",
         body,
       }),
+      // Order tags too: moving a request to `accepted` creates the order, so
+      // the queue must not keep showing a list that predates it.
       invalidatesTags: (_r, _e, { id }) => [
         { type: "CustomCake", id },
         { type: "CustomCake", id: "LIST" },
         { type: "CustomCake", id: `events:${id}` },
+        { type: "Order", id: "LIST" },
       ],
     }),
 
@@ -209,6 +245,7 @@ export const customCakeApi = baseApi.injectEndpoints({
       invalidatesTags: (_r, _e, { id }) => [
         { type: "CustomCake", id },
         { type: "CustomCake", id: "LIST" },
+        { type: "CustomCake", id: `events:${id}` },
         { type: "Order", id: "LIST" },
       ],
     }),
@@ -297,16 +334,21 @@ export const CUSTOM_CAKE_FIELD_LABELS: Record<string, string> = {
   topper: "Topper",
 };
 
+/**
+ * Every label, live and retired — old timeline events still reference the
+ * retired ones, and a history that renders "undefined" is worse than one that
+ * names a stage nobody can reach any more.
+ */
 export const CUSTOM_CAKE_STATUS_LABELS: Record<CustomCakeStatus, string> = {
   submitted: "Submitted",
   under_review: "Under review",
   quotation_sent: "Quotation sent",
   accepted: "Accepted",
-  rejected: "Rejected",
+  cancelled: "Cancelled",
+  rejected: "Cancelled",
   preparing: "Preparing",
   ready: "Ready",
   delivered: "Delivered",
-  cancelled: "Cancelled",
 };
 
 /** Hex accents per status (aligned with the Orders status palette). */

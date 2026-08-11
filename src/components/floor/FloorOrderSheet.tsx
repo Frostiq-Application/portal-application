@@ -34,6 +34,7 @@ import {
   User,
   X,
 } from "@/components/ui/icons";
+import { CustomCakeBrief, CustomCakeTag } from "@/components/orders/CustomCakeBrief";
 import type { QueueAction } from "./types";
 
 interface Props {
@@ -187,12 +188,15 @@ export function FloorOrderSheet({
                 <X className="size-6" />
               </Button>
 
-              <span
-                className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-bold uppercase tracking-wide text-white"
-                style={{ background: accent }}
-              >
-                {ORDER_STATUS_LABEL[order.status]}
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-bold uppercase tracking-wide text-white"
+                  style={{ background: accent }}
+                >
+                  {ORDER_STATUS_LABEL[order.status]}
+                </span>
+                {order.isCustomCake && <CustomCakeTag />}
+              </div>
 
               <SheetTitle className="mt-3 font-mono text-3xl font-bold tracking-tight sm:text-4xl">
                 {order.orderNumber}
@@ -232,6 +236,15 @@ export function FloorOrderSheet({
             </div>
 
             <div className="min-h-0 flex-1 space-y-8 overflow-y-auto px-6 py-6 sm:px-8">
+              {/* The brief comes before the line items, not after: on a custom
+                  cake the line below says "Custom Cake CC-…" and nothing you
+                  could actually bake from. This is the recipe. */}
+              {order.customCake && (
+                <Section title="Custom cake brief">
+                  <CustomCakeBrief cake={order.customCake} variant="floor" />
+                </Section>
+              )}
+
               <Section title={`What to make · ${order.items.length} item${order.items.length === 1 ? "" : "s"}`}>
                 <div className="space-y-3">
                   {order.items.map((it) => (

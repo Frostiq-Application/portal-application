@@ -2,18 +2,19 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { MessageCircle, Phone, Receipt, ShoppingBag, StickyNote } from "@/components/ui/icons";
 import {
-  useConvertCustomCakeMutation,
   useGetCustomCakeEventsQuery,
   useQuoteCustomCakeMutation,
   useSetCustomCakeNotesMutation,
   useUpdateCustomCakeStatusMutation,
   type CustomCakeRequest,
   type CustomCakeStatus,
+  CUSTOM_CAKE_PIPELINE,
   CUSTOM_CAKE_STATUS_ACCENT,
   CUSTOM_CAKE_STATUS_LABELS,
 } from "@/features/api/customCakeApi";
+import { ORDER_STATUS_LABEL, ORDER_STATUS_TONE } from "@/lib/orders";
 import { apiError } from "@/lib/apiError";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import { waLink, telLink } from "@/lib/contact";
 import {
   Sheet,
@@ -41,17 +42,12 @@ import {
 } from "@/components/ui/select";
 import { ImagePreviewDialog } from "@/components/custom-cake/ImagePreviewDialog";
 
-const ADVANCEABLE: CustomCakeStatus[] = [
-  "submitted",
-  "under_review",
-  "quotation_sent",
-  "accepted",
-  "preparing",
-  "ready",
-  "delivered",
-  "rejected",
-  "cancelled",
-];
+/**
+ * What the desk can set. Only the negotiation — the stages after `accepted`
+ * belong to the order this request becomes, and are worked from the orders
+ * queue and the kitchen and delivery boards.
+ */
+const ADVANCEABLE: CustomCakeStatus[] = CUSTOM_CAKE_PIPELINE;
 
 export function CustomCakeDetailSheet({
   request,
@@ -97,9 +93,10 @@ function SheetBody({ request }: { request: CustomCakeRequest }) {
   const [quote, quoteState] = useQuoteCustomCakeMutation();
   const [setNotesMut, notesState] = useSetCustomCakeNotesMutation();
   const [updateStatus, statusState] = useUpdateCustomCakeStatusMutation();
-  const [convert, convertState] = useConvertCustomCakeMutation();
 
-  const needsReason = nextStatus === "rejected" || nextStatus === "cancelled";
+  const needsReason = nextStatus === "cancelled";
+  /** Accepted and converted: the order is now the only thing that moves. */
+  const isOrder = !!request.convertedOrderId;
 
   const onQuote = async () => {
     const n = Number(price);
@@ -142,10 +139,23 @@ function SheetBody({ request }: { request: CustomCakeRequest }) {
     }
   };
 
-  const onConvert = async () => {
+  /**
+   * Accept on the customer's behalf — the phone call where they say yes.
+   * Identical to the customer tapping Accept in the storefront: the request is
+   * accepted and the order is raised in one step, so there is never a window
+   * where a cake is agreed but has no row on the order desk.
+   */
+  const onAccept = async () => {
     try {
-      const res = await convert({ id: request.id }).unwrap();
-      toast.success(`Order ${res.orderNumber} created`);
+      const res = await updateStatus({
+        id: request.id,
+        status: "accepted",
+      }).unwrap();
+      toast.success(
+        res.convertedOrderNumber
+          ? `Accepted — order ${res.convertedOrderNumber} created`
+          : "Quote accepted",
+      );
     } catch (e) {
       toast.error(apiError(e));
     }
@@ -239,6 +249,11 @@ function SheetBody({ request }: { request: CustomCakeRequest }) {
 
       <Separator />
 
+      {/* The order this request became — and the only place its progress is
+          tracked once it exists. Shown first, because on an accepted request
+          "where is the cake" is the question the desk actually opened this for. */}
+      {isOrder && <LinkedOrder request={request} />}
+
       {/* Quote */}
       <section className="space-y-2">
         <Label className="flex items-center gap-2">
@@ -248,12 +263,7 @@ function SheetBody({ request }: { request: CustomCakeRequest }) {
         {request.status === "quotation_sent" && request.quotedPrice && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
             Waiting for the customer to respond to ₹{request.quotedPrice}.
-          </div>
-        )}
-        {request.status === "accepted" && request.quotedPrice && (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-            Customer accepted ₹{request.quotedPrice}. Convert it to an order
-            below.
+            Accepting below raises the order straight away.
           </div>
         )}
         {(request.status === "cancelled" || request.status === "rejected") &&
@@ -264,88 +274,102 @@ function SheetBody({ request }: { request: CustomCakeRequest }) {
             </div>
           )}
 
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-              ₹
-            </span>
-            <Input
-              className="pl-7"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="0.00"
-              inputMode="decimal"
+        {isOrder ? (
+          <p className="text-sm text-muted-foreground">
+            Agreed at ₹{request.quotedPrice}. Change the price on the order.
+          </p>
+        ) : (
+          <>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                  ₹
+                </span>
+                <Input
+                  className="pl-7"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="0.00"
+                  inputMode="decimal"
+                />
+              </div>
+              <Button onClick={onQuote} disabled={quoteState.isLoading}>
+                {request.quotedPrice ? "Send revised quote" : "Send quote"}
+              </Button>
+            </div>
+            <Textarea
+              value={quoteNote}
+              onChange={(e) => setQuoteNote(e.target.value)}
+              placeholder="Message to the customer (optional), shown with the quote"
+              rows={2}
             />
-          </div>
-          <Button onClick={onQuote} disabled={quoteState.isLoading}>
-            {request.quotedPrice ? "Send revised quote" : "Send quote"}
-          </Button>
-        </div>
-        <Textarea
-          value={quoteNote}
-          onChange={(e) => setQuoteNote(e.target.value)}
-          placeholder="Message to the customer (optional), shown with the quote"
-          rows={2}
-        />
+          </>
+        )}
       </section>
+
+      {/* Accept — the same act as the customer tapping Accept, for the shop
+          that took the yes over the phone. It raises the order itself, so
+          there is no second "convert" step to forget. */}
+      {!isOrder && request.status === "quotation_sent" && (
+        <section>
+          <Button
+            className="w-full"
+            onClick={onAccept}
+            disabled={statusState.isLoading}
+          >
+            <ShoppingBag className="mr-2 h-4 w-4" />
+            Accept on customer's behalf & create order
+          </Button>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {request.customerId
+              ? "The order lands in the queue as Confirmed."
+              : "A customer record is created from the contact details above."}
+          </p>
+        </section>
+      )}
 
       {/* Status */}
       <section className="space-y-2">
         <Label>Status</Label>
-        <div className="flex gap-2">
-          <Select
-            value={nextStatus}
-            onValueChange={(v) => setNextStatus(v as CustomCakeStatus)}
-          >
-            <SelectTrigger className="flex-1">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ADVANCEABLE.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {CUSTOM_CAKE_STATUS_LABELS[s]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            onClick={onUpdateStatus}
-            disabled={statusState.isLoading || nextStatus === request.status}
-          >
-            Update
-          </Button>
-        </div>
-        {needsReason && (
-          <Textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="Reason shown to the customer"
-            rows={2}
-          />
-        )}
-      </section>
-
-      {/* Convert to order */}
-      <section>
-        {request.convertedOrderId ? (
-          <p className="text-sm text-muted-foreground">
-            ✓ Converted to an order.
+        {isOrder ? (
+          <p className="text-xs text-muted-foreground">
+            This request is now an order. Advance or cancel it from the orders
+            queue — that keeps both screens showing the same thing.
           </p>
         ) : (
-          <Button
-            variant="secondary"
-            className="w-full"
-            onClick={onConvert}
-            disabled={convertState.isLoading || !request.customerId}
-          >
-            <ShoppingBag className="mr-2 h-4 w-4" />
-            Convert to order
-          </Button>
-        )}
-        {!request.customerId && !request.convertedOrderId && (
-          <p className="mt-1 text-xs text-muted-foreground">
-            Guest request. A registered customer is required to convert.
-          </p>
+          <>
+            <div className="flex gap-2">
+              <Select
+                value={nextStatus}
+                onValueChange={(v) => setNextStatus(v as CustomCakeStatus)}
+              >
+                <SelectTrigger className="flex-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ADVANCEABLE.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {CUSTOM_CAKE_STATUS_LABELS[s]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={onUpdateStatus}
+                disabled={statusState.isLoading || nextStatus === request.status}
+              >
+                Update
+              </Button>
+            </div>
+            {needsReason && (
+              <Textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Reason shown to the customer"
+                rows={2}
+              />
+            )}
+          </>
         )}
       </section>
 
@@ -421,6 +445,57 @@ function SheetBody({ request }: { request: CustomCakeRequest }) {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+/**
+ * The order an accepted request became, with its live status.
+ *
+ * This block is the fix for the two screens disagreeing: the request stops at
+ * "Accepted" and never moves again, so the only fulfilment state anywhere is
+ * the order's, read straight from it here. Nothing on this card is a second
+ * copy that can drift.
+ */
+function LinkedOrder({ request }: { request: CustomCakeRequest }) {
+  const status = request.convertedOrderStatus;
+  return (
+    <section className="space-y-2 rounded-lg border bg-muted/30 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <Label className="flex items-center gap-2">
+          <ShoppingBag className="h-4 w-4" /> Order
+        </Label>
+        {status && (
+          <span
+            className={cn(
+              "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+              ORDER_STATUS_TONE[status],
+            )}
+          >
+            {ORDER_STATUS_LABEL[status]}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-2 text-sm">
+        <span className="font-mono font-medium">
+          {request.convertedOrderNumber ?? "—"}
+        </span>
+        {request.convertedOrderPaymentStatus && (
+          <span
+            className={
+              request.convertedOrderPaymentStatus === "paid"
+                ? "text-xs text-emerald-600"
+                : "text-xs text-amber-600"
+            }
+          >
+            {request.convertedOrderPaymentStatus}
+          </span>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Baking, delivery and cancellation all happen on this order — the request
+        above is the record of how it was agreed.
+      </p>
+    </section>
   );
 }
 

@@ -26,8 +26,8 @@ const STEPS = [
   },
   {
     icon: ShoppingBag,
-    title: "Convert to an order",
-    body: "Once accepted, turn a request into a regular order in one tap. It joins your normal order queue.",
+    title: "Accepted becomes an order",
+    body: "The moment a quote is accepted the order is raised for you and joins the normal queue. From then on the order is where it's baked, delivered or cancelled — the request keeps the record of what was agreed.",
   },
 ];
 

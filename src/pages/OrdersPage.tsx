@@ -66,6 +66,7 @@ import { selectStreamStatus } from "@/features/notifications/notificationsSlice"
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ShopSelect } from "@/components/ShopSelect";
 import { SegmentedStrip } from "@/components/SegmentedStrip";
+import { CustomCakeTag } from "@/components/orders/CustomCakeBrief";
 import { OrderDetailDrawer } from "@/components/orders/OrderDetailDrawer";
 import { CreateOrderDialog } from "@/components/orders/CreateOrderDialog";
 import { Button } from "@/components/ui/button";
@@ -859,6 +860,10 @@ export function OrdersPage() {
                         into three lines and doubles the row height. */}
                     <TableCell className="whitespace-nowrap font-mono font-medium">
                       {o.orderNumber}
+                      {/* A custom cake order is not an ordinary one — it has a
+                          brief behind it and no catalog product — so the queue
+                          says so before anyone opens it. */}
+                      {o.isCustomCake && <CustomCakeTag className="ml-2 align-middle" />}
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
                       <DeliveryDay order={o} today={today} />
