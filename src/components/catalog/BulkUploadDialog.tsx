@@ -244,6 +244,15 @@ export function BulkUploadDialog({ open, onOpenChange, shopId }: Props) {
     [sheets],
   );
   const clean = report !== null && totals.failed === 0 && totals.created > 0;
+
+  // A long failure list scrolls, and a row sliced off at the container's edge
+  // reads as a rendering fault rather than "there is more". Track whether
+  // anything is still below the fold so the list can say so.
+  const [moreBelow, setMoreBelow] = useState(false);
+  const measureList = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    setMoreBelow(el.scrollHeight - el.clientHeight - el.scrollTop > 8);
+  }, []);
   // One burst per report — memo keeps the particles from re-scattering on
   // unrelated re-renders.
   const particles = useMemo(
@@ -541,26 +550,41 @@ export function BulkUploadDialog({ open, onOpenChange, shopId }: Props) {
             </div>
 
             {allFailures.length > 0 && (
-              <div className="max-h-44 space-y-1 overflow-y-auto rounded-xl border bg-muted/30 p-2">
-                {allFailures.map((f, i) => (
-                  <div
-                    key={`${f.sheet}-${f.row}-${i}`}
-                    className="flex items-start gap-2 rounded-lg bg-background px-3 py-2 text-xs motion-safe:animate-row-enter"
-                    style={{ animationDelay: `${Math.min(i, 12) * 50}ms` }}
-                  >
-                    <span
-                      className="mt-1 size-1.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: SHEET_ACCENT[f.sheet] }}
-                    />
-                    <div className="min-w-0">
-                      <span className="font-medium">
-                        {f.sheet} · row {f.row}
-                        {f.name ? ` · ${f.name}` : ""}
-                      </span>
-                      <span className="text-muted-foreground"> — {f.reason}</span>
+              <div className="relative">
+                <div
+                  ref={measureList}
+                  onScroll={(e) => measureList(e.currentTarget)}
+                  className="max-h-44 space-y-1 overflow-y-auto rounded-xl border bg-muted/30 p-2"
+                >
+                  {allFailures.map((f, i) => (
+                    <div
+                      key={`${f.sheet}-${f.row}-${i}`}
+                      className="flex items-start gap-2 rounded-lg bg-background px-3 py-2 text-xs motion-safe:animate-row-enter"
+                      style={{ animationDelay: `${Math.min(i, 12) * 50}ms` }}
+                    >
+                      <span
+                        className="mt-1 size-1.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: SHEET_ACCENT[f.sheet] }}
+                      />
+                      <div className="min-w-0">
+                        <span className="font-medium">
+                          {f.sheet} · row {f.row}
+                          {f.name ? ` · ${f.name}` : ""}
+                        </span>
+                        <span className="text-muted-foreground"> — {f.reason}</span>
+                      </div>
                     </div>
+                  ))}
+                </div>
+                {/* Fades the sliced-off row and names what's hidden, so a long
+                    list reads as scrollable rather than broken. */}
+                {moreBelow && (
+                  <div className="pointer-events-none absolute inset-x-px bottom-px flex h-12 items-end justify-center rounded-b-xl bg-gradient-to-t from-background via-background/85 to-transparent pb-1.5">
+                    <span className="text-[11px] font-medium text-muted-foreground">
+                      Scroll for the rest
+                    </span>
                   </div>
-                ))}
+                )}
               </div>
             )}
 
