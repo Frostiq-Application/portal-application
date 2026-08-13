@@ -307,3 +307,12 @@ export const PERMISSION_CATALOG: PermissionGroup[] = [
     ],
   },
 ];
+
+/** Human label for a permission key, falling back to the key itself. */
+export const PERMISSION_LABELS: Record<string, string> = Object.fromEntries(
+  PERMISSION_CATALOG.flatMap((g) => g.rows.map((r) => [r.key, r.label])),
+);
+
+export function permissionLabel(key: string): string {
+  return PERMISSION_LABELS[key] ?? key;
+}

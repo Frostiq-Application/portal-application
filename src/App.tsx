@@ -60,24 +60,34 @@ function HomeRoute() {
   const { can } = useCan();
   const { hasFeature } = useEntitlements();
 
+  const available = navFor(role, can);
+  const firstAvailable = available.find((i) => i.path !== "/")?.path;
+
   if (isFloorRole(role)) {
+    const natural = homePathForRole(role);
     // A chef's home is the kitchen board — but only if the brand's plan
     // includes it. Landing them on the upgrade card every single login would
     // be a screen they can't act on (they can't buy a plan) in place of the
     // work they can still do, so fall back to the order queue.
-    const boarded =
-      role === "staff" || hasFeature("can_use_floor_boards");
-    const home =
-      boarded || !can("orders.view") ? homePathForRole(role) : "/orders";
+    const boarded = role === "staff" || hasFeature("can_use_floor_boards");
+    // …and only if they still hold the permission for it. A restrict-mode
+    // custom role can take `orders.view` off a staff member, and sending them
+    // to /orders anyway bounces off PermissionRoute straight back here —
+    // a redirect loop, not a closed door.
+    const permitted = available.some((i) => i.path === natural);
+    const home = permitted && (boarded || !can("orders.view"))
+      ? natural
+      : (firstAvailable ?? "/profile");
     return <Navigate to={home} replace />;
   }
   if (can("analytics.view")) return <DashboardPage />;
 
-  const firstAvailable = navFor(role, can).find((i) => i.path !== "/");
+  // Same reasoning for the board roles: with no reachable page at all, the
+  // profile is the one screen nothing gates, so land there rather than loop.
   return firstAvailable ? (
-    <Navigate to={firstAvailable.path} replace />
+    <Navigate to={firstAvailable} replace />
   ) : (
-    <DashboardPage />
+    <Navigate to="/profile" replace />
   );
 }
 

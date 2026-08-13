@@ -301,3 +301,35 @@ export function navFor(
 ): NavItem[] {
   return navForRole(role).filter((i) => can(i.permission));
 }
+
+/** Every permission key that has a page behind it. */
+const NAV_PERMISSIONS = new Set(
+  NAV_ITEMS.map((i) => i.permission).filter(Boolean) as PermissionKey[],
+);
+
+/**
+ * Of `keys`, the ones this base role still can't act on.
+ *
+ * The coarse `roles` filter is about which product surface you're on, and the
+ * server's `@Roles` guards enforce the same split above the permission check —
+ * so granting `cms.manage` to a chef buys them nothing at all. Custom roles
+ * move the permission gate, never this one, which makes for a role that looks
+ * right on the Roles page and does nothing in practice. Surfaced where the
+ * role is picked, while the choice is still cheap to change.
+ */
+export function unreachablePermissions(
+  role: Role | undefined,
+  keys: string[],
+): string[] {
+  if (!role) return [];
+  const reachable = new Set(
+    navForRole(role)
+      .map((i) => i.permission)
+      .filter(Boolean) as PermissionKey[],
+  );
+  // Keys with no page of their own (nothing in the sidebar gates on them) are
+  // left alone — there's no nav entry to judge them against.
+  return keys.filter(
+    (k) => NAV_PERMISSIONS.has(k as PermissionKey) && !reachable.has(k as PermissionKey),
+  );
+}
