@@ -592,7 +592,12 @@ export interface CustomerOrderSummary {
   deliveryType: DeliveryType;
   scheduledDate: string;
   createdAt: string;
+  /** Converted from a custom cake request rather than ordered off the catalog. */
+  isCustomCake: boolean;
 }
+
+/** Which half of a customer's history to page — see `CustomerOrdersQuery`. */
+export type CustomerOrderType = "cake" | "custom";
 
 export interface CustomerDetail extends Customer {
   addresses: CustomerAddress[];

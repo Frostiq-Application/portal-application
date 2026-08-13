@@ -4,6 +4,7 @@ import type {
   Customer,
   CustomerDetail,
   CustomerOrderSummary,
+  CustomerOrderType,
   NewCustomerBody,
   Paginated,
   PaginationQuery,
@@ -17,6 +18,8 @@ export interface CustomerOrdersQuery {
   customerId: string;
   page?: number;
   limit?: number;
+  /** Omitted returns the whole history; the drawer always asks for one half. */
+  type?: CustomerOrderType;
 }
 
 export const customersApi = baseApi.injectEndpoints({
@@ -55,6 +58,11 @@ export const customersApi = baseApi.injectEndpoints({
      * profile carries only a capped slice, which is enough for the panels that
      * read it inline but not for a list the user pages through.
      *
+     * `type` splits the history into catalog orders and custom cake orders.
+     * The split is the server's so each list pages on its own count — filtering
+     * a mixed page here would hand the drawer short pages and a total that
+     * disagrees with the rows under it.
+     *
      * Tagged with the orders it returned so a status change or cancellation
      * made elsewhere in the portal reaches the history the same way it reaches
      * the orders table.
@@ -63,9 +71,13 @@ export const customersApi = baseApi.injectEndpoints({
       Paginated<CustomerOrderSummary>,
       CustomerOrdersQuery
     >({
-      query: ({ customerId, page, limit }) => ({
+      query: ({ customerId, page, limit, type }) => ({
         url: `/customers/${customerId}/orders`,
-        params: { page: page ?? 1, limit: limit ?? 10 },
+        params: {
+          page: page ?? 1,
+          limit: limit ?? 10,
+          ...(type ? { type } : {}),
+        },
       }),
       providesTags: (result) => [
         ...(result?.data ?? []).map((o) => ({
