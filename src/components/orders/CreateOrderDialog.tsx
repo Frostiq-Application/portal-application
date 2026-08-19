@@ -28,12 +28,15 @@ import { useListCustomersQuery, useGetCustomerQuery } from "@/features/api/custo
 import { useListProductsQuery, useListAddonsQuery } from "@/features/api/catalogApi";
 import { useGetSlotsQuery } from "@/features/api/schedulingApi";
 import { useListShopsQuery } from "@/features/api/shopsApi";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { CustomerPhoneLookup } from "@/components/customers/CustomerPhoneLookup";
 import { NewCustomerForm } from "@/components/customers/NewCustomerForm";
 import type {
   CreatedCustomer,
   Customer,
   CustomerAddress,
   DeliveryType,
+  OrderCustomer,
   OrderPaymentMethod,
   Product,
 } from "@/types";
@@ -117,17 +120,35 @@ interface Props {
 export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) {
   const [createOrder, { isLoading: saving }] = useCreateOrderMutation();
 
+  /**
+   * Whether this brand has the customer directory.
+   *
+   * It decides how the buyer is picked, and nothing else on the form. With it,
+   * staff search the directory as before. Without it, they identify the customer
+   * by their full phone number — see {@link CustomerPhoneLookup}. The branch
+   * exists because every customer route except that lookup and creation sits
+   * behind this flag, so the old search 403s for those brands and left them
+   * unable to create an order at all.
+   */
+  const { hasFeature } = useEntitlements();
+  const canBrowseCustomers = hasFeature("can_use_customer_data");
+
   const [shopId, setShopId] = useState("");
-  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [customer, setCustomer] = useState<OrderCustomer | null>(null);
   const [customerSearch, setCustomerSearch] = useState("");
   const [addingCustomer, setAddingCustomer] = useState(false);
+  /** Seeds the create form when the lookup found nobody on that number. */
+  const [newCustomerPhone, setNewCustomerPhone] = useState("");
   /**
-   * Addresses handed back when a customer is added here, kept because the
-   * server may not read them back to us: a branch-scoped user can only fetch a
-   * customer who has ordered at their branch, and this one has ordered nowhere
-   * yet — that is the whole reason they are being created.
+   * Addresses carried on the picked customer, kept because the server may not
+   * read them back to us. Two reasons it can't: a branch-scoped user can only
+   * fetch a customer who has ordered at their branch, and a customer added mid
+   * order has ordered nowhere yet — that is the whole reason they are being
+   * created; and on a plan without the directory, `GET /customers/:id` is gated
+   * away entirely. Both the lookup and creation responses carry addresses so
+   * the delivery picker has something to show either way.
    */
-  const [newAddresses, setNewAddresses] = useState<CustomerAddress[]>([]);
+  const [pickedAddresses, setPickedAddresses] = useState<CustomerAddress[]>([]);
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
   const [deliveryType, setDeliveryType] = useState<DeliveryType>("pickup");
   const [addressId, setAddressId] = useState("");
@@ -149,7 +170,8 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
       setCustomer(null);
       setCustomerSearch("");
       setAddingCustomer(false);
-      setNewAddresses([]);
+      setNewCustomerPhone("");
+      setPickedAddresses([]);
       setLines([emptyLine()]);
       setDeliveryType("pickup");
       setAddressId("");
@@ -198,7 +220,13 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
         limit: CUSTOMER_PAGE_SIZE,
         search: search || undefined,
       },
-      { skip: !open || Boolean(customer) || addingCustomer },
+      {
+        // Skipped outright without the directory: the endpoint 403s there, and
+        // asking anyway would put an "upgrade your plan" error on a form the
+        // brand is perfectly entitled to use.
+        skip:
+          !open || !canBrowseCustomers || Boolean(customer) || addingCustomer,
+      },
     );
   ingestCustomers(customerResults);
 
@@ -215,29 +243,38 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
     if (!searching) loadNextCustomers();
   }, [searching, loadNextCustomers]);
   const { data: customerDetail } = useGetCustomerQuery(customer?.id ?? "", {
-    skip: !customer,
+    // Gated behind the directory as well, so the picked customer's addresses
+    // have to come from the response that picked them.
+    skip: !customer || !canBrowseCustomers,
   });
-  // Whatever the customer actually has on file, falling back to what creating
-  // them here returned. Prefers the fetched list once it has something in it,
-  // so an address added elsewhere since is not hidden by the local copy.
+  // Whatever the customer actually has on file, falling back to what picking or
+  // creating them here returned. Prefers the fetched list once it has something
+  // in it, so an address added elsewhere since is not hidden by the local copy.
   const addressOptions = customerDetail?.addresses?.length
     ? customerDetail.addresses
-    : newAddresses;
+    : pickedAddresses;
 
   /**
-   * Takes the order straight to the customer that was just added — including
-   * the address they were given, since a delivery order is the case that most
-   * often needed a new customer in the first place.
+   * Attach a customer to the order, along with whatever addresses came back
+   * with them, and pre-select the one to deliver to. A delivery order is the
+   * case that most often sent staff looking for the customer in the first
+   * place, so the address is chosen here rather than left to be found.
    */
-  const useNewCustomer = (created: CreatedCustomer) => {
-    setCustomer(created);
-    setNewAddresses(created.addresses);
+  const attachCustomer = (
+    picked: OrderCustomer,
+    addresses: CustomerAddress[],
+  ) => {
+    setCustomer(picked);
+    setPickedAddresses(addresses);
     setAddingCustomer(false);
+    setNewCustomerPhone("");
     setCustomerSearch("");
-    const preferred =
-      created.addresses.find((a) => a.isDefault) ?? created.addresses[0];
+    const preferred = addresses.find((a) => a.isDefault) ?? addresses[0];
     setAddressId(preferred?.id ?? "");
   };
+
+  const useNewCustomer = (created: CreatedCustomer) =>
+    attachCustomer(created, created.addresses);
 
   const { data: productPage } = useListProductsQuery(
     { page: 1, limit: 100, shopId },
@@ -379,7 +416,7 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
                       className="shrink-0"
                       onClick={() => {
                         setCustomer(null);
-                        setNewAddresses([]);
+                        setPickedAddresses([]);
                         setAddressId("");
                       }}
                     >
@@ -390,11 +427,32 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
                   <NewCustomerForm
                     shopId={shopId || undefined}
                     // Whatever they typed looking for this customer is almost
-                    // always the name they are about to type again.
-                    defaultName={customerSearch}
+                    // always the name they are about to type again. Nothing to
+                    // carry over on the lookup path — that box held a number.
+                    defaultName={canBrowseCustomers ? customerSearch : ""}
+                    defaultPhone={newCustomerPhone || undefined}
+                    lockPhone={Boolean(newCustomerPhone)}
                     askForAddress={deliveryType === "delivery"}
                     onCreated={useNewCustomer}
-                    onCancel={() => setAddingCustomer(false)}
+                    // The email turned out to belong to someone already on
+                    // file, and staff said it is the same person: put that
+                    // customer on the order rather than a second record.
+                    onUseExisting={(found) =>
+                      attachCustomer(found, found.addresses)
+                    }
+                    onCancel={() => {
+                      setAddingCustomer(false);
+                      setNewCustomerPhone("");
+                    }}
+                  />
+                ) : !canBrowseCustomers ? (
+                  <CustomerPhoneLookup
+                    shopId={shopId || undefined}
+                    onSelect={(found) => attachCustomer(found, found.addresses)}
+                    onAddNew={(phone) => {
+                      setNewCustomerPhone(phone);
+                      setAddingCustomer(true);
+                    }}
                   />
                 ) : (
                   <div className="space-y-2">
@@ -464,7 +522,12 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
                                 key={c.id}
                                 type="button"
                                 className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
-                                onClick={() => setCustomer(c)}
+                                // No addresses on a directory row; the detail
+                                // query below fetches them. Passing none also
+                                // clears the last pick's selected address,
+                                // which would otherwise ride along onto a
+                                // different customer's order.
+                                onClick={() => attachCustomer(c, [])}
                               >
                                 <span className="truncate font-medium">
                                   {c.name ?? "Unnamed customer"}
@@ -613,11 +676,7 @@ export function CreateOrderDialog({ open, onOpenChange, defaultShopId }: Props) 
                             disabled={!s.available}
                           >
                             {s.start.slice(0, 5)} – {s.end.slice(0, 5)}
-                            {!s.available
-                              ? " (full)"
-                              : s.remaining != null
-                                ? ` (${s.remaining} left)`
-                                : ""}
+                            {!s.available ? " (full)" : ""}
                           </SelectItem>
                         ))}
                       </SelectContent>

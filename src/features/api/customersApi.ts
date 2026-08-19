@@ -3,6 +3,7 @@ import type {
   CreatedCustomer,
   Customer,
   CustomerDetail,
+  CustomerLookupResult,
   CustomerOrderSummary,
   CustomerOrderType,
   NewCustomerBody,
@@ -11,6 +12,12 @@ import type {
 } from "@/types";
 
 export interface CustomersQuery extends PaginationQuery {
+  shopId?: string;
+}
+
+export interface CustomerLookupQuery {
+  /** The customer's full number — the server matches its last 10 digits. */
+  phone: string;
   shopId?: string;
 }
 
@@ -49,6 +56,30 @@ export const customersApi = baseApi.injectEndpoints({
     getCustomer: build.query<CustomerDetail, string>({
       query: (id) => ({ url: `/customers/${id}` }),
       providesTags: (_r, _e, id) => [{ type: "Customer", id }],
+    }),
+
+    /**
+     * The buyer behind a phone number, for writing an order up.
+     *
+     * The only customer read that works on a plan without the customer
+     * directory, which is why order entry uses it instead of `listCustomers`
+     * there — everything else in this file 403s for those brands. It answers
+     * with one customer or none: no browsing, and no spend or history even on a
+     * hit, since that is the directory module itself.
+     *
+     * A miss comes back as `found: false`, not an error. It is the ordinary
+     * result for the call this whole flow exists to serve — someone who has
+     * never ordered before — and it leads straight into customer creation.
+     *
+     * Untagged: this is a point lookup for a form in progress, and letting a
+     * `Customer` invalidation refetch it would swap the picked customer out from
+     * under a half-written order.
+     */
+    lookupCustomerByPhone: build.query<CustomerLookupResult, CustomerLookupQuery>({
+      query: ({ phone, shopId }) => ({
+        url: "/customers/lookup",
+        params: { phone, ...(shopId ? { shopId } : {}) },
+      }),
     }),
 
     /**
@@ -106,6 +137,7 @@ export const customersApi = baseApi.injectEndpoints({
 export const {
   useListCustomersQuery,
   useGetCustomerQuery,
+  useLazyLookupCustomerByPhoneQuery,
   useListCustomerOrdersQuery,
   useCreateCustomerMutation,
 } = customersApi;

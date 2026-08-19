@@ -561,16 +561,34 @@ export interface Coupon {
 
 // ==================== Customers ====================
 
-export interface Customer {
+/**
+ * A customer as order entry knows them: who they are and how to reach them.
+ *
+ * Split out from {@link Customer} because a brand without the customer
+ * directory never sees the rest. Their order form identifies the buyer through
+ * `GET /customers/lookup`, which answers with exactly this and no spend or
+ * history — that aggregate is the module they haven't bought.
+ */
+export interface OrderCustomer {
   id: string;
   name: string | null;
   phone: string | null;
   email: string | null;
   isActive: boolean;
+  /**
+   * False when staff typed these details at the counter and nobody has
+   * confirmed them. Turns true the first time the customer signs in on the
+   * storefront, which is also when their staff-taken orders become visible to
+   * them.
+   */
+  isVerified: boolean;
+  createdAt: string;
+}
+
+export interface Customer extends OrderCustomer {
   orderCount: number;
   totalSpent: string;
   lastOrderAt: string | null;
-  createdAt: string;
 }
 
 export interface CustomerAddress {
@@ -617,10 +635,41 @@ export interface NewCustomerAddress {
 export interface NewCustomerBody {
   name: string;
   phone: string;
-  email?: string;
+  /**
+   * Required on every plan. A storefront sign-in arrives with an email and no
+   * phone number, so this is the only thing that can connect the person signing
+   * in to the record staff created — and therefore the only thing that puts the
+   * order taken over the phone into their order history.
+   */
+  email: string;
   /** The branch the order is for. Required only for platform super admins. */
   shopId?: string;
   address?: NewCustomerAddress;
+}
+
+/** GET /customers/lookup — the one customer read available on every plan. */
+export interface CustomerLookup extends OrderCustomer {
+  addresses: CustomerAddress[];
+}
+
+export interface CustomerLookupResult {
+  found: boolean;
+  customer: CustomerLookup | null;
+}
+
+/**
+ * The 409 from POST /customers when the email is already on file.
+ *
+ * One address, one customer per brand — it is the only key a storefront sign-in
+ * can match on, so a shared one would leave whoever signs in seeing the orders
+ * on just one record. The response carries the customer holding it, because the
+ * clash almost always means it is that same person on a second number and
+ * attaching them is the way forward.
+ */
+export interface EmailInUseError {
+  error: "EMAIL_IN_USE";
+  message: string;
+  emailInUseBy: CustomerLookup;
 }
 
 export interface CreatedCustomer extends Customer {
