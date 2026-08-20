@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { ChefHat, Copy, KeyRound, MapPin, MoreHorizontal, Search, Store, Truck, UserCog, Users as UsersIcon } from "@/components/ui/icons";
+import { ChefHat, Copy, KeyRound, MapPin, MoreHorizontal, Search, Sparkles, Store, Truck, UserCog, Users as UsersIcon } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { useLimitState } from "@/hooks/useLimitState";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { useAuth } from "@/hooks/useAuth";
-import { isPlatformAdmin } from "@/lib/roles";
+import { isAccountAdmin, isPlatformAdmin } from "@/lib/roles";
 import { apiError } from "@/lib/apiError";
 import {
   useListUsersQuery,
@@ -13,6 +13,7 @@ import {
   useUpdateUserMutation,
 } from "@/features/api/usersApi";
 import { useListShopsQuery } from "@/features/api/shopsApi";
+import { useListCustomRolesQuery } from "@/features/api/rolesApi";
 import { roleLabel } from "@/lib/roles";
 import type { Role, User } from "@/types";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ import {
   LimitNotice,
 } from "@/components/gating/LimitNotice";
 import { BranchAssignmentDialog } from "@/components/users/BranchAssignmentDialog";
+import { RoleAssignmentDialog } from "@/components/users/RoleAssignmentDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -87,15 +89,28 @@ export function UsersPage() {
     search: debounced || undefined,
   });
   const { data: shops } = useListShopsQuery({ page: 1, limit: 100 });
+  // Branch owners can't reach /roles, so don't ask on their behalf.
+  const canUseCustomRoles = isPlatform || isAccountAdmin(role);
+  const { data: customRoles } = useListCustomRolesQuery(undefined, {
+    skip: !canUseCustomRoles,
+  });
   const [updateUser] = useUpdateUserMutation();
   const [resetPassword] = useResetUserPasswordMutation();
 
   const [assignFor, setAssignFor] = useState<User | null>(null);
+  const [roleFor, setRoleFor] = useState<User | null>(null);
 
   const shopName = useMemo(() => {
     const m = new Map((shops?.data ?? []).map((s) => [s.id, s.branchName]));
     return (id: string) => m.get(id) ?? id.slice(0, 6);
   }, [shops]);
+
+  const customRoleName = useMemo(() => {
+    const m = new Map((customRoles ?? []).map((r) => [r.id, r.name]));
+    // A role the viewer can't see (deleted, or another account's) shouldn't
+    // render as a raw uuid — better to show no badge at all.
+    return (id: string | null) => (id ? (m.get(id) ?? null) : null);
+  }, [customRoles]);
 
   const membersByRole = useMemo(() => {
     const rows = data?.data ?? [];
@@ -232,7 +247,10 @@ export function UsersPage() {
                         key={u.id}
                         user={u}
                         shopName={shopName}
+                        customRoleName={customRoleName(u.customRoleId)}
+                        canManageRole={canUseCustomRoles}
                         onManageBranch={() => setAssignFor(u)}
+                        onManageRole={() => setRoleFor(u)}
                         onReset={() => doReset(u)}
                         onToggleActive={() => toggleActive(u.id, !u.isActive)}
                       />
@@ -250,6 +268,13 @@ export function UsersPage() {
         open={!!assignFor}
         onOpenChange={(o) => !o && setAssignFor(null)}
       />
+
+      <RoleAssignmentDialog
+        user={roleFor}
+        currentRoleId={roleFor?.customRoleId ?? null}
+        open={!!roleFor}
+        onOpenChange={(o) => !o && setRoleFor(null)}
+      />
     </>
   );
 }
@@ -257,13 +282,19 @@ export function UsersPage() {
 function MemberCard({
   user,
   shopName,
+  customRoleName,
+  canManageRole,
   onManageBranch,
+  onManageRole,
   onReset,
   onToggleActive,
 }: {
   user: User;
   shopName: (id: string) => string;
+  customRoleName: string | null;
+  canManageRole: boolean;
   onManageBranch: () => void;
+  onManageRole: () => void;
   onReset: () => void;
   onToggleActive: () => void;
 }) {
@@ -300,6 +331,15 @@ function MemberCard({
           >
             {user.isActive ? "Active" : "Inactive"}
           </span>
+          {customRoleName && (
+            <span
+              title="Custom role"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-semibold text-indigo-600"
+            >
+              <Sparkles className="h-3 w-3" />
+              {customRoleName}
+            </span>
+          )}
         </div>
         <p className="truncate text-sm text-muted-foreground">
           {user.phone || "No phone number"}
@@ -342,6 +382,12 @@ function MemberCard({
             <DropdownMenuItem onClick={onManageBranch}>
               <Store className="mr-2 h-4 w-4" />
               Assign branch
+            </DropdownMenuItem>
+          )}
+          {canManageRole && (
+            <DropdownMenuItem onClick={onManageRole}>
+              <Sparkles className="mr-2 h-4 w-4" />
+              {customRoleName ? "Change custom role" : "Assign custom role"}
             </DropdownMenuItem>
           )}
           <DropdownMenuItem onClick={onReset}>

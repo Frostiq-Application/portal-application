@@ -20,6 +20,8 @@ export interface CreateUserBody {
   role: Role;
   accountId?: string;
   shopIds?: string[];
+  /** Optional custom role layered on top of (or replacing) the base role. */
+  customRoleId?: string;
 }
 
 export const usersApi = baseApi.injectEndpoints({

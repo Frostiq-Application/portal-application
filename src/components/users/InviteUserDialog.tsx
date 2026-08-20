@@ -3,10 +3,19 @@ import { Check, Loader2, Mail, User as UserIcon } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { InviteSentPanel } from "@/components/common/InviteSentPanel";
 import { useCreateUserMutation, type CreateUserBody } from "@/features/api/usersApi";
+import { useListCustomRolesQuery } from "@/features/api/rolesApi";
 import { useListAccountsQuery } from "@/features/api/accountsApi";
+import { unreachablePermissions } from "@/config/nav";
+import { permissionLabel } from "@/config/permissions";
 import { useListShopsQuery } from "@/features/api/shopsApi";
 import { useAuth } from "@/hooks/useAuth";
-import { FLOOR_ROLES, isFloorRole, isPlatformAdmin, roleLabel } from "@/lib/roles";
+import {
+  FLOOR_ROLES,
+  isAccountAdmin,
+  isFloorRole,
+  isPlatformAdmin,
+  roleLabel,
+} from "@/lib/roles";
 import { apiError } from "@/lib/apiError";
 import type { Role } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -29,6 +38,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+
+const NO_CUSTOM_ROLE = "none";
 
 export function InviteUserDialog() {
   const { role } = useAuth();
@@ -55,6 +66,9 @@ export function InviteUserDialog() {
   const [userRole, setUserRole] = useState<Role>(defaultRole);
   const [accountId, setAccountId] = useState("");
   const [shopIds, setShopIds] = useState<string[]>([]);
+  // Radix rejects an empty-string item value, so "none" stands in for
+  // "base role only" and is stripped before it reaches the request body.
+  const [customRoleId, setCustomRoleId] = useState(NO_CUSTOM_ROLE);
 
   const [createUser, { isLoading }] = useCreateUserMutation();
   const { data: accounts } = useListAccountsQuery(
@@ -71,6 +85,20 @@ export function InviteUserDialog() {
       : undefined,
     { skip: !needsBranch },
   );
+  // Only fetched while the dialog is open, and only for the roles the server
+  // lets near /roles at all — a branch owner would just take a 403.
+  const canUseCustomRoles = platform || isAccountAdmin(role);
+  const { data: customRoles } = useListCustomRolesQuery(undefined, {
+    skip: !open || !canUseCustomRoles,
+  });
+  const assignableRoles = (customRoles ?? []).filter((r) => r.isActive);
+  const pickedRole = assignableRoles.find((r) => r.id === customRoleId);
+  // Permissions the base role's surface can't reach anyway — see
+  // `unreachablePermissions`. Worth saying out loud: a "social media handler"
+  // built on Branch Staff would silently get none of CMS, Coupons or Catalog.
+  const deadPermissions = pickedRole
+    ? unreachablePermissions(userRole, pickedRole.permissions)
+    : [];
 
   /**
    * Who this viewer may invite.
@@ -93,6 +121,7 @@ export function InviteUserDialog() {
     setUserRole(defaultRole);
     setAccountId("");
     setShopIds([]);
+    setCustomRoleId(NO_CUSTOM_ROLE);
     setInviteToken(null);
     setInvitedEmail("");
   };
@@ -111,6 +140,7 @@ export function InviteUserDialog() {
       role: userRole,
       ...(platform && accountScoped && accountId ? { accountId } : {}),
       ...(needsBranch && shopIds.length ? { shopIds } : {}),
+      ...(customRoleId !== NO_CUSTOM_ROLE ? { customRoleId } : {}),
     };
     try {
       const res = await createUser(body).unwrap();
@@ -194,6 +224,47 @@ export function InviteUserDialog() {
                   </Select>
                 </div>
               )}
+
+              {/* Custom roles are what make a "social media handler" possible:
+                  the base role decides which tabs they're filed under and what
+                  the server scopes them to, the custom role decides which pages
+                  they can actually open. */}
+              {assignableRoles.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <Label>Custom role</Label>
+                  <Select value={customRoleId} onValueChange={setCustomRoleId}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_CUSTOM_ROLE}>
+                        No custom role
+                      </SelectItem>
+                      {assignableRoles.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>
+                          {r.name}
+                          {r.isTemplate ? " (template)" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {pickedRole
+                      ? pickedRole.mode === "restrict"
+                        ? `Limited to exactly the ${pickedRole.permissions.length} permission${pickedRole.permissions.length === 1 ? "" : "s"} on this role — nothing else.`
+                        : `Adds ${pickedRole.permissions.length} permission${pickedRole.permissions.length === 1 ? "" : "s"} on top of ${roleLabel(userRole)}.`
+                      : `They'll get the standard ${roleLabel(userRole)} access. Manage roles on the Roles page.`}
+                  </p>
+                  {deadPermissions.length > 0 && (
+                    <p className="rounded-md bg-amber-50 px-2.5 py-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                      {roleLabel(userRole)} can&rsquo;t reach{" "}
+                      {deadPermissions.map(permissionLabel).join(", ")} whatever
+                      the role grants &mdash; those pages are closed to that
+                      role. Pick a base role that has them, such as{" "}
+                      {roleLabel("shop_admin")}.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {platform && accountScoped && (
                 <div className="flex flex-col gap-1.5">
                   <Label>Shop</Label>

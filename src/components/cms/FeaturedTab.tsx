@@ -1,11 +1,13 @@
-import { useMemo, useState } from "react";
-import { Plus, Sparkles, Search } from "@/components/ui/icons";
+import { useCallback, useMemo, useState } from "react";
+import { Plus, Sparkles, Search, Loader2 } from "@/components/ui/icons";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { apiError } from "@/lib/apiError";
 import { useAuth } from "@/hooks/useAuth";
 import { isAccountAdmin } from "@/lib/roles";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useInfiniteList } from "@/hooks/useInfiniteList";
+import { InfiniteScroll } from "@/components/common/InfiniteScroll";
 import {
   useAssignOccasionProductsMutation,
   useCreateOccasionMutation,
@@ -19,7 +21,7 @@ import {
   ALL_BRANCHES,
   selectSelectedBranchId,
 } from "@/features/branch/branchSlice";
-import type { Occasion } from "@/types";
+import type { Occasion, Product } from "@/types";
 import { ShopSelect } from "@/components/ShopSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +29,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
+
+/** Rows per product request in the picker — one screenful plus a little. */
+const PRODUCT_PAGE_SIZE = 20;
 
 export function FeaturedTab() {
   const branchId = useAppSelector(selectSelectedBranchId);
@@ -235,11 +240,39 @@ function ProductPicker({
 }) {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 350);
-  const { data: products, isLoading: loadingProducts } = useListProductsQuery({
-    shopId,
-    limit: 100,
-    search: debouncedSearch || undefined,
-  });
+
+  // A branch's catalogue can run to thousands of products, so the picker never
+  // asks for all of them: a page at a time, and the next page as the box is
+  // scrolled. Keyed on the branch and the settled search term, so either one
+  // changing drops the accumulated pages and starts back at page 1.
+  const [listEl, setListEl] = useState<HTMLDivElement | null>(null);
+  const {
+    page,
+    items: rows,
+    hasMore,
+    ingest,
+    loadMore: loadNextPage,
+  } = useInfiniteList<Product>(`${shopId}|${debouncedSearch}`);
+
+  // `currentData`, not `data`: RTK keeps the PREVIOUS args' response in `data`
+  // while the new one is in flight, which reads to the accumulator as "nothing
+  // changed" and silently drops the page.
+  const { currentData: products, isFetching: loadingProducts } =
+    useListProductsQuery({
+      page,
+      limit: PRODUCT_PAGE_SIZE,
+      shopId,
+      search: debouncedSearch || undefined,
+    });
+  ingest(products);
+
+  // Memoized: InfiniteScroll rebuilds its IntersectionObserver whenever this
+  // identity changes, and a fresh observer re-fires on a sentinel already in
+  // view — which would skip a page.
+  const loadMore = useCallback(() => {
+    if (!loadingProducts) loadNextPage();
+  }, [loadingProducts, loadNextPage]);
+
   const { data: current, isFetching: loadingCurrent } =
     useGetOccasionProductsQuery({ occasionId: occasion.id, shopId });
   const [assign, { isLoading: saving }] = useAssignOccasionProductsMutation();
@@ -262,8 +295,6 @@ function ProductPicker({
       return next;
     });
 
-  const rows = products?.data ?? [];
-
   const savedSet = useMemo(
     () => new Set(current?.productIds ?? []),
     [current],
@@ -274,13 +305,19 @@ function ProductPicker({
     return false;
   }, [selected, savedSet]);
 
+  // Skeletons only while there is nothing to show for what was asked. Paging
+  // deeper keeps the loaded rows up and puts the loader underneath them.
+  const loadingFirstPage = page === 1 && loadingProducts && !products;
+
   const save = async () => {
     try {
-      // Preserve picker order by walking the product list.
+      // Preserve picker order by walking the loaded product rows.
       const ordered = rows
         .map((p) => p.id)
         .filter((id) => selected.has(id));
-      // Include any selected ids not on the current (filtered) page.
+      // Include any selected ids that are not among the loaded rows — a
+      // saved product on a page never scrolled to, or filtered out by the
+      // search box, must survive the save rather than be dropped.
       for (const id of selected) if (!ordered.includes(id)) ordered.push(id);
       const res = await assign({
         occasionId: occasion.id,
@@ -328,8 +365,8 @@ function ProductPicker({
         </Button>
       </div>
 
-      <div className="max-h-[28rem] overflow-y-auto p-2">
-        {loadingProducts || loadingCurrent ? (
+      <div ref={setListEl} className="max-h-[28rem] overflow-y-auto p-2">
+        {loadingFirstPage || loadingCurrent ? (
           <div className="space-y-2 p-2">
             {[0, 1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-12 w-full" />
@@ -340,39 +377,53 @@ function ProductPicker({
             {search ? "No products match." : "No products in this branch yet."}
           </p>
         ) : (
-          <ul className="divide-y">
-            {rows.map((p) => {
-              const checked = selected.has(p.id);
-              return (
-                <li key={p.id}>
-                  <label className="flex cursor-pointer items-center gap-3 rounded-md p-2 hover:bg-muted/50">
-                    <Checkbox
-                      checked={checked}
-                      onCheckedChange={() => toggle(p.id)}
-                    />
-                    {p.images[0] ? (
-                      <img
-                        src={p.images[0]}
-                        alt={p.name}
-                        className="h-9 w-9 rounded-md object-cover"
+          <InfiniteScroll
+            root={listEl}
+            rootMargin="120px"
+            hasMore={hasMore}
+            loading={loadingProducts}
+            onLoadMore={loadMore}
+            loader={
+              <div className="flex items-center justify-center gap-2 py-3 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Loading more…
+              </div>
+            }
+          >
+            <ul className="divide-y">
+              {rows.map((p) => {
+                const checked = selected.has(p.id);
+                return (
+                  <li key={p.id}>
+                    <label className="flex cursor-pointer items-center gap-3 rounded-md p-2 hover:bg-muted/50">
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={() => toggle(p.id)}
                       />
-                    ) : (
-                      <div className="h-9 w-9 rounded-md bg-muted" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium">
-                        {p.name}
+                      {p.images[0] ? (
+                        <img
+                          src={p.images[0]}
+                          alt={p.name}
+                          className="h-9 w-9 rounded-md object-cover"
+                        />
+                      ) : (
+                        <div className="h-9 w-9 rounded-md bg-muted" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium">
+                          {p.name}
+                        </div>
+                        <div className="text-xs capitalize text-muted-foreground">
+                          {p.productType}
+                          {!p.isActive && " · hidden"}
+                        </div>
                       </div>
-                      <div className="text-xs capitalize text-muted-foreground">
-                        {p.productType}
-                        {!p.isActive && " · hidden"}
-                      </div>
-                    </div>
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </InfiniteScroll>
         )}
       </div>
     </div>

@@ -45,17 +45,12 @@ vi.mock("@/hooks/useAuth", () => ({
   }),
 }));
 vi.mock("@/hooks/useEntitlements", () => ({
-  // Lifetime spend and order history are a separate, plan-gated concern; the
-  // contact block must stand up without them.
+  // The customers module is plan-gated; the contact block must stand up
+  // without it, off the copy of the buyer the order carries itself.
   useEntitlements: () => ({ hasFeature: () => false, isExempt: false }),
 }));
 vi.mock("@/features/api/customersApi", () => ({
   useGetCustomerQuery: () => ({ data: undefined, isLoading: false }),
-}));
-// Stands in for the plan-gated history block below the contact rows. It reaches
-// for the store and the router; neither has anything to do with the contact.
-vi.mock("@/components/gating/UpgradeNote", () => ({
-  UpgradeNote: () => <div data-testid="upgrade-note" />,
 }));
 vi.mock("@/features/api/ordersApi", () => ({
   useGetOrderQuery: () => ({

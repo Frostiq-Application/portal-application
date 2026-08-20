@@ -1,5 +1,7 @@
 import { useCallback, useState } from "react";
 import {
+  Cake,
+  CakeSlice,
   Loader2,
   MapPin,
   Phone,
@@ -15,8 +17,17 @@ import {
   useListCustomerOrdersQuery,
 } from "@/features/api/customersApi";
 import { useInfiniteList } from "@/hooks/useInfiniteList";
-import type { CustomerOrderSummary, OrderStatus } from "@/types";
+import type {
+  CustomerOrderSummary,
+  CustomerOrderType,
+  OrderStatus,
+} from "@/types";
 import { InfiniteScroll } from "@/components/common/InfiniteScroll";
+import {
+  SegmentedStrip,
+  type SegmentedItem,
+} from "@/components/SegmentedStrip";
+import { CustomCakeTag } from "@/components/orders/CustomCakeBrief";
 import { OrderDetailDrawer } from "@/components/orders/OrderDetailDrawer";
 import {
   Sheet,
@@ -32,6 +43,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 const ORDERS_PAGE_SIZE = 10;
 
 type Tab = "details" | "orders";
+
+/**
+ * The history is split rather than shown as one feed: a catalog order is a
+ * repeat purchase to be reordered from, a custom cake is a brief that was
+ * quoted and built, and staff open this drawer looking for one or the other.
+ * The server does the splitting so each side pages on its own count.
+ */
+const ORDER_SECTIONS: SegmentedItem<CustomerOrderType>[] = [
+  { value: "cake", label: "Cake orders", icon: Cake },
+  { value: "custom", label: "Custom cake orders", icon: CakeSlice },
+];
+
+const EMPTY_MESSAGE: Record<CustomerOrderType, string> = {
+  cake: "No cake orders yet.",
+  custom: "No custom cake orders yet.",
+};
 
 interface Props {
   customerId: string | null;
@@ -110,8 +137,11 @@ function CustomerDetailBody({
   onOpenOrder: (id: string) => void;
 }) {
   const [tab, setTab] = useState<Tab>("details");
+  const [section, setSection] = useState<CustomerOrderType>("cake");
   const { data, isLoading } = useGetCustomerQuery(customerId);
 
+  // Keyed on the section too: switching sides drops the pages loaded for the
+  // other one and starts back at page 1, so the two lists never interleave.
   const {
     page,
     items: orders,
@@ -119,7 +149,7 @@ function CustomerDetailBody({
     total,
     ingest,
     loadMore: loadNextPage,
-  } = useInfiniteList<CustomerOrderSummary>(customerId);
+  } = useInfiniteList<CustomerOrderSummary>(`${customerId}|${section}`);
 
   // Nothing is requested until the history tab is opened — most visits to this
   // drawer are someone checking a phone number or address.
@@ -128,7 +158,7 @@ function CustomerDetailBody({
   // `data` while the next one is in flight, which reads to the accumulator as
   // "nothing changed" and silently drops a page.
   const { currentData, isFetching } = useListCustomerOrdersQuery(
-    { customerId, page, limit: ORDERS_PAGE_SIZE },
+    { customerId, page, limit: ORDERS_PAGE_SIZE, type: section },
     { skip: tab !== "orders" },
   );
   ingest(currentData);
@@ -243,6 +273,14 @@ function CustomerDetailBody({
         </TabsContent>
 
         <TabsContent value="orders" className="mt-4">
+          <SegmentedStrip
+            variant="secondary"
+            className="mb-3"
+            value={section}
+            items={ORDER_SECTIONS}
+            onChange={setSection}
+          />
+
           {loadingFirstPage ? (
             <div className="space-y-2">
               <Skeleton className="h-16 w-full" />
@@ -251,7 +289,7 @@ function CustomerDetailBody({
             </div>
           ) : orders.length === 0 ? (
             <p className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
-              No orders yet.
+              {EMPTY_MESSAGE[section]}
             </p>
           ) : (
             <InfiniteScroll
@@ -269,7 +307,8 @@ function CustomerDetailBody({
               endMessage={
                 total > ORDERS_PAGE_SIZE ? (
                   <p className="py-3 text-center text-xs text-muted-foreground">
-                    All {total} orders shown
+                    All {total}{" "}
+                    {section === "custom" ? "custom cake" : "cake"} orders shown
                   </p>
                 ) : null
               }
@@ -338,6 +377,9 @@ function OrderRow({
             >
               {statusLabel(order.status)}
             </span>
+            {/* Same marker the orders table and the floor board use, so a row
+                opened from here reads the same as it does everywhere else. */}
+            {order.isCustomCake && <CustomCakeTag />}
           </div>
           <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
             <Clock className="h-3 w-3" />

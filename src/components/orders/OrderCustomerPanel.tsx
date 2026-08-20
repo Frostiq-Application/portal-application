@@ -1,21 +1,13 @@
-import { Clock, Copy, Mail, MapPin, MessageCircle, Navigation, Phone, ShoppingBag, Store, User, Wallet } from "@/components/ui/icons";
+import { Copy, Mail, MapPin, MessageCircle, Navigation, Phone, Store, User } from "@/components/ui/icons";
 import { formatPhoneNumberIntl } from "react-phone-number-input";
 import { toast } from "sonner";
-import { cn, formatDate } from "@/lib/utils";
-import { ORDER_STATUS_LABEL, ORDER_STATUS_TONE } from "@/lib/orders";
+import { formatDate } from "@/lib/utils";
 import { useGetCustomerQuery } from "@/features/api/customersApi";
 import { useEntitlements } from "@/hooks/useEntitlements";
-import { UpgradeNote } from "@/components/gating/UpgradeNote";
-import type { Order, OrderStatus } from "@/types";
+import type { Order } from "@/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-
-function inr(value: string | number): string {
-  return `₹${Number(value).toLocaleString("en-IN", {
-    maximumFractionDigits: 0,
-  })}`;
-}
 
 /** Initials for the avatar chip, e.g. "Arbaj Ansari" → "AA". */
 function initials(name: string | null): string {
@@ -40,16 +32,6 @@ function prettyPhone(phone: string): string {
  */
 function landmarkText(landmark: string): string {
   return landmark.replace(/^\s*near(by)?\b[\s,]*/i, "").trim() || landmark;
-}
-
-/** "completed" isn't in the portal's status map — fall back gracefully. */
-function statusLabel(status: OrderStatus | "completed"): string {
-  if (status === "completed") return "Completed";
-  return ORDER_STATUS_LABEL[status] ?? status;
-}
-function statusTone(status: OrderStatus | "completed"): string {
-  if (status === "completed") return ORDER_STATUS_TONE.delivered;
-  return ORDER_STATUS_TONE[status] ?? "bg-muted text-muted-foreground";
 }
 
 async function copy(value: string, label: string) {
@@ -134,26 +116,25 @@ function ContactRow({
 
 /**
  * The "Customer" tab of the order drawer: who placed the order, how to reach
- * them, where it goes, and — when the plan includes customer data — their
- * lifetime value and recent orders.
+ * them, and where it goes. Lifetime value and past orders belong to the
+ * customers module — staff working an order don't need them here.
  */
 export function OrderCustomerPanel({ order }: { order: Order }) {
   const { hasFeature } = useEntitlements();
-  const canSeeHistory = hasFeature("can_use_customer_data");
+  const canReadCustomers = hasFeature("can_use_customer_data");
 
-  // Lifetime stats/history live in the (plan-gated) customers module. The
-  // contact block above never depends on it, so a locked plan just hides the
-  // extras instead of breaking the tab.
+  // Only a fallback for the buyer's details (see below), and the customers
+  // module it reads from is plan-gated — so skip the call when it would 403.
   const { data: profile, isLoading: profileLoading } = useGetCustomerQuery(
     order.customerId,
-    { skip: !canSeeHistory },
+    { skip: !canReadCustomers },
   );
 
   // The order carries its own copy of the buyer so the contact block works on
   // every plan; the customers module is only a fallback for orders served by
   // an API build that predates that.
   const customer = order.customer ?? profile ?? null;
-  const identityLoading = !order.customer && canSeeHistory && profileLoading;
+  const identityLoading = !order.customer && canReadCustomers && profileLoading;
   const addr = order.deliveryAddress;
   const digits = customer?.phone?.replace(/\D/g, "") ?? "";
   const mapQuery =
@@ -165,9 +146,6 @@ export function OrderCustomerPanel({ order }: { order: Order }) {
             .filter(Boolean)
             .join(", "),
         ));
-
-  // Other orders by the same customer — this one is already on screen.
-  const otherOrders = (profile?.orders ?? []).filter((o) => o.id !== order.id);
 
   return (
     <div className="space-y-6">
@@ -342,97 +320,6 @@ export function OrderCustomerPanel({ order }: { order: Order }) {
         </div>
       )}
 
-      {/* Lifetime value + history (plan-gated) */}
-      {!canSeeHistory ? (
-        <UpgradeNote
-          feature="can_use_customer_data"
-          description="Lifetime spend and this customer’s past orders, right here in the order."
-        />
-      ) : profileLoading ? (
-        <div className="space-y-3">
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-24 w-full" />
-        </div>
-      ) : profile ? (
-        <>
-          <div className="grid grid-cols-2 gap-3">
-            <Stat
-              icon={ShoppingBag}
-              label="Total orders"
-              value={String(profile.orderCount)}
-            />
-            <Stat
-              icon={Wallet}
-              label="Lifetime spend"
-              value={inr(profile.totalSpent)}
-            />
-          </div>
-
-          <div>
-            <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">
-              Previous orders
-            </p>
-            {otherOrders.length === 0 ? (
-              <p className="rounded-lg border border-dashed py-6 text-center text-xs text-muted-foreground">
-                This is their first order.
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {otherOrders.map((o) => (
-                  <li
-                    key={o.id}
-                    className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm font-medium">
-                          {o.orderNumber}
-                        </span>
-                        <span
-                          className={cn(
-                            "rounded-full px-2 py-0.5 text-[10px] font-medium",
-                            statusTone(o.status),
-                          )}
-                        >
-                          {statusLabel(o.status)}
-                        </span>
-                      </div>
-                      <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        {formatDate(o.createdAt)} · {o.deliveryType}
-                        {o.paymentStatus === "pending" && " · Unpaid"}
-                      </div>
-                    </div>
-                    <span className="shrink-0 text-sm font-semibold">
-                      {inr(o.totalAmount)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </>
-      ) : null}
-    </div>
-  );
-}
-
-function Stat({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof ShoppingBag;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-lg border bg-background p-3">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Icon className="h-3.5 w-3.5" />
-        {label}
-      </div>
-      <div className="mt-1 text-xl font-bold">{value}</div>
     </div>
   );
 }

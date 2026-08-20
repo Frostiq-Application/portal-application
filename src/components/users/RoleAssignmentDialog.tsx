@@ -56,8 +56,9 @@ export function RoleAssignmentDialog({
         <DialogHeader>
           <DialogTitle>Assign custom role</DialogTitle>
           <DialogDescription>
-            {user?.name} keeps their base access; a custom role adds permissions
-            on top.
+            A role marked &ldquo;on top of base&rdquo; adds to what {user?.name}{" "}
+            already has; one marked &ldquo;only these&rdquo; replaces their
+            access entirely.
           </DialogDescription>
         </DialogHeader>
 
@@ -79,11 +80,15 @@ export function RoleAssignmentDialog({
                 <RoleRow
                   key={r.id}
                   label={r.name}
-                  sub={
-                    r.isTemplate
-                      ? `Template · ${r.permissions.length} permissions`
-                      : `${r.permissions.length} permissions`
-                  }
+                  sub={[
+                    r.isTemplate ? "Template" : null,
+                    `${r.permissions.length} permission${r.permissions.length === 1 ? "" : "s"}`,
+                    // The mode is the difference between "also gets these" and
+                    // "gets only these", which is the whole point of picking.
+                    r.mode === "restrict" ? "only these" : "on top of base",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                   selected={currentRoleId === r.id}
                   disabled={saving}
                   onClick={() => pick(r.id)}
