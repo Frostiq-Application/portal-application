@@ -18,6 +18,15 @@ export default defineConfig({
     // "Something went wrong" in the browser instead of an error here.
     strictPort: true,
   },
+  preview: {
+    // Serves the production build (`npm run preview:prod`). Pinned for the same
+    // reason `server.port` is: this exact origin is listed in the API's
+    // CORS_ORIGIN allow-list, and under NODE_ENV=production that list is matched
+    // exactly with no localhost escape hatch — drifting to 4175 turns into a
+    // blocked preflight, which reaches the browser as an unexplained failure.
+    port: 4174,
+    strictPort: true,
+  },
   test: {
     environment: "jsdom",
     globals: true,

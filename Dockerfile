@@ -6,11 +6,23 @@ RUN npm ci
 COPY . .
 
 # Baked into the JS bundle at build time (Vite only exposes VITE_-prefixed vars).
-# Override by setting VITE_API_BASE_URL as a Railway build variable; otherwise
-# falls back to whatever .env.production already has.
+# Optionally override by setting VITE_API_BASE_URL as a Railway build variable;
+# unset, the build falls back to .env.production.
+#
+# The variable is exported only when it is non-empty, and that `if` is the whole
+# point. `ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}` with the ARG unpassed sets
+# it to the EMPTY STRING, and Vite's loadEnv gives process.env priority over
+# .env files — so the empty value wins and the bundle ships with no API host at
+# all. That failure is silent at build time and only shows up as every request
+# in the browser going to the wrong place.
 ARG VITE_API_BASE_URL
-ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
-RUN npm run build:production
+RUN if [ -n "$VITE_API_BASE_URL" ]; then \
+      echo "Using VITE_API_BASE_URL from build arg: $VITE_API_BASE_URL"; \
+      VITE_API_BASE_URL="$VITE_API_BASE_URL" npm run build:production; \
+    else \
+      echo "No VITE_API_BASE_URL build arg; using .env.production"; \
+      npm run build:production; \
+    fi
 
 # ---- runner: serve the static build with nginx ----
 FROM nginx:1.27-alpine AS runner
