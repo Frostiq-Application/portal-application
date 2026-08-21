@@ -25,6 +25,7 @@ import { OrderNotifications } from "@/components/orders/OrderNotifications";
 import { EnquiryNotifications } from "@/components/enquiries/EnquiryNotifications";
 import { CustomCakeNotifications } from "@/components/custom-cake/CustomCakeNotifications";
 import { WhatsNewDialog } from "@/components/versions/WhatsNewDialog";
+import { VersionFooterLink } from "@/components/versions/VersionFooterLink";
 import { useLatestVersionQuery } from "@/features/api/versionsApi";
 import { AccountDeactivatedGate } from "@/components/gating/AccountDeactivatedGate";
 import { NoSubscriptionGate } from "@/components/gating/NoSubscriptionGate";
@@ -40,6 +41,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -314,6 +316,9 @@ function AppSidebar({
       <SidebarContent>
         <SidebarNav />
       </SidebarContent>
+      <SidebarFooter>
+        <VersionFooterLink />
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );
