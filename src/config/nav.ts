@@ -1,4 +1,4 @@
-import { Layers, LayoutDashboard, Building2, Store, Users as UsersIcon, Contact, CalendarClock, ShieldCheck, BarChart3, CreditCard, Tags, Image as ImageIcon, ScrollText, ShoppingBag, Cake, CakeSlice, ChefHat, Truck, Images, Phone, BadgePercent, Settings2, FileClock, type IconComponent } from "@/components/ui/icons";
+import { Layers, LayoutDashboard, Building2, Store, Users as UsersIcon, Contact, CalendarClock, ShieldCheck, BarChart3, CreditCard, Tags, Image as ImageIcon, ScrollText, ShoppingBag, Cake, CakeSlice, ChefHat, Truck, Images, Phone, BadgePercent, Settings2, FileClock, Rocket, type IconComponent } from "@/components/ui/icons";
 import type { PermissionKey, PlanFeatureKey, Role } from "@/types";
 
 export interface NavItem {
@@ -190,6 +190,14 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Tenancy",
     path: "/tenancy",
     icon: Layers,
+    roles: ["platform_super_admin"],
+    group: "Platform",
+  },
+  {
+    // The platform's own release log: what shipped, and who has read the note.
+    label: "Versions",
+    path: "/versions",
+    icon: Rocket,
     roles: ["platform_super_admin"],
     group: "Platform",
   },
