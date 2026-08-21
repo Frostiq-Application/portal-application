@@ -10,6 +10,7 @@ import { roleLabel } from "@/lib/roles";
 import { formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { AccountStatusBadge } from "@/components/StatusBadge";
+import { RecentUpdatesCard } from "@/components/versions/RecentUpdatesCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { OnboardingSource } from "@/types";
@@ -203,6 +204,9 @@ export function ProfilePage() {
             </CardContent>
           </Card>
         )}
+        {/* Which version this bakery is on, and the releases behind it. Sits
+            with their own account details rather than in a menu nobody opens. */}
+        <RecentUpdatesCard />
       </div>
 
       <EditMyBrandDialog
