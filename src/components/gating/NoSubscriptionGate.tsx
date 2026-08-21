@@ -12,6 +12,7 @@ import { formatDate } from "@/lib/utils";
 import type { Entitlements } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ServerErrorGate } from "@/components/gating/ServerErrorGate";
 
 /**
  * Shown to brand/shop admins whose account is active but whose subscription
@@ -34,7 +35,10 @@ export function NoSubscriptionGate({
   const navigate = useNavigate();
   const { role } = useAuth();
   const isOwner = role === "account_super_admin";
-  const { data } = useMySubscriptionQuery(undefined, { skip: !isOwner });
+  const { data, error, isError, isFetching, refetch } = useMySubscriptionQuery(
+    undefined,
+    { skip: !isOwner },
+  );
 
   const sub = data?.subscription;
   /** Non-null only while the account can still take the free trial. */
@@ -43,6 +47,22 @@ export function NoSubscriptionGate({
     dispatch(logout());
     navigate("/login", { replace: true });
   };
+
+  // Every branch below reads the owner's subscription, and an unread one looks
+  // exactly like a brand-new account: "choose a plan to get started", with a
+  // button into a checkout the server can't serve either. When the call failed
+  // we don't know which state this account is in, so we say so rather than
+  // guessing the alarming one.
+  if (isOwner && isError && !data) {
+    return (
+      <ServerErrorGate
+        error={error}
+        onRetry={refetch}
+        isRetrying={isFetching}
+        support={support}
+      />
+    );
+  }
 
   const headline = !sub
     ? isOwner

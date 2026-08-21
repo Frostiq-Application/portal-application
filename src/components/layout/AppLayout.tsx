@@ -25,6 +25,7 @@ import { EnquiryNotifications } from "@/components/enquiries/EnquiryNotification
 import { CustomCakeNotifications } from "@/components/custom-cake/CustomCakeNotifications";
 import { AccountDeactivatedGate } from "@/components/gating/AccountDeactivatedGate";
 import { NoSubscriptionGate } from "@/components/gating/NoSubscriptionGate";
+import { ServerErrorGate } from "@/components/gating/ServerErrorGate";
 import { navFor, type NavItem } from "@/config/nav";
 import { useCan } from "@/hooks/useCan";
 import { useSessionSync } from "@/hooks/useSessionSync";
@@ -325,6 +326,9 @@ export function AppLayout() {
   const {
     isExempt,
     isLoading,
+    isError,
+    error,
+    refetch,
     hasActiveSubscription,
     isAccountDeactivated,
     isSubscriptionExpired,
@@ -354,6 +358,16 @@ export function AppLayout() {
   // The whole shell is unreachable until the underlying issue is resolved.
   if (!isExempt) {
     if (isLoading) return <SplashScreen />;
+
+    // Nothing below this line can be decided without entitlements, and every
+    // one of those decisions treats an absent answer as a lockout. So when the
+    // call *failed* — API down, CORS, a 500 — say that, instead of picking the
+    // most alarming explanation for silence and telling a paying owner to go
+    // choose a plan. Retry stays on the screen so a blip costs one tap.
+    // Retry needs no spinner of its own here: refetching flips `isLoading`
+    // back on, and the branch above hands the wait to the splash screen.
+    if (isError) return <ServerErrorGate error={error} onRetry={refetch} />;
+
     // The account itself is deactivated (suspended/rejected/pending) — a plan
     // can't fix it, so send them to contact the super admin.
     if (isAccountDeactivated) {

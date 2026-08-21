@@ -28,6 +28,21 @@ const GATED_ROLES = [
 export interface EntitlementsState {
   /** True while the entitlements query is in flight (gated roles only). */
   isLoading: boolean;
+  /**
+   * True when the entitlements call itself failed — the server is unreachable
+   * or errored, so we know *nothing* about this account.
+   *
+   * This has to stay separate from "no plan". Every flag below reads a missing
+   * answer as the restrictive one, which is right when the server says the
+   * account has no plan and badly wrong when the server said nothing at all: a
+   * failed call put healthy accounts behind "choose a plan to get started".
+   * Callers must check this before acting on any lockout flag.
+   */
+  isError: boolean;
+  /** The failure behind `isError`, for the screen that reports it. */
+  error?: unknown;
+  /** Re-run the entitlements call — the retry button on that screen. */
+  refetch: () => void;
   /** True for platform super admin — never gated by a plan. */
   isExempt: boolean;
   /** Whether the brand has a usable subscription. Exempt roles are always true. */
@@ -74,9 +89,8 @@ export function useEntitlements(): EntitlementsState {
   const { role } = useAuth();
   const isExempt = !role || !GATED_ROLES.includes(role as never);
 
-  const { data, isLoading, isFetching } = useMyEntitlementsQuery(
-    isExempt ? skipToken : undefined,
-  );
+  const { data, isLoading, isFetching, isError, error, refetch } =
+    useMyEntitlementsQuery(isExempt ? skipToken : undefined);
 
   const hasFeature = (key: PlanFeatureKey): boolean => {
     if (isExempt) return true;
@@ -86,6 +100,11 @@ export function useEntitlements(): EntitlementsState {
 
   return {
     isLoading: !isExempt && (isLoading || isFetching),
+    // A stale-but-present answer still beats an error screen, so only report
+    // the failure when there is nothing at all left to gate on.
+    isError: !isExempt && isError && data == null,
+    error,
+    refetch,
     isExempt,
     hasActiveSubscription: isExempt
       ? true

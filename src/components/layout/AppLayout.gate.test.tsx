@@ -12,12 +12,18 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
  * subscription page lost the sidebar, on an Active plan, with nothing wrong.
  *
  * The shell is the default. Only a real lockout takes it away.
+ *
+ * And a lockout has to be something the server actually said. When the
+ * entitlements call fails we know nothing, so every flag below reads false and
+ * the account looks brand new — which is how an API outage came to greet
+ * paying owners with "choose a plan to get started".
  */
 
 const mockState = vi.hoisted(() => ({
   role: "account_super_admin" as string,
   isExempt: false,
   isLoading: false,
+  isError: false,
   hasActiveSubscription: true,
   isAccountDeactivated: false,
   isSubscriptionExpired: false,
@@ -34,6 +40,8 @@ vi.mock("@/hooks/useEntitlements", () => ({
   useEntitlements: () => ({
     ...mockState,
     hasFeature: () => true,
+    error: undefined,
+    refetch: () => {},
     entitlements: undefined,
     brand: undefined,
   }),
@@ -64,6 +72,9 @@ vi.mock("@/components/gating/NoSubscriptionGate", () => ({
 vi.mock("@/components/gating/AccountDeactivatedGate", () => ({
   AccountDeactivatedGate: () => <div data-testid="deactivated-gate" />,
 }));
+vi.mock("@/components/gating/ServerErrorGate", () => ({
+  ServerErrorGate: () => <div data-testid="server-error-gate" />,
+}));
 
 const { AppLayout } = await import("./AppLayout");
 
@@ -86,6 +97,7 @@ beforeEach(() => {
   mockState.role = "account_super_admin";
   mockState.isExempt = false;
   mockState.isLoading = false;
+  mockState.isError = false;
   mockState.hasActiveSubscription = true;
   mockState.isAccountDeactivated = false;
   mockState.isSubscriptionExpired = false;
@@ -132,6 +144,39 @@ describe("AppLayout — a locked-out account", () => {
     mockState.isSubscriptionExpired = true;
     renderAt("/orders");
     expect(screen.getByTestId("no-subscription-gate")).toBeInTheDocument();
+  });
+});
+
+describe("AppLayout — an account we couldn't ask about", () => {
+  it("reports the failure instead of inventing a lockout", () => {
+    mockState.isError = true;
+    // Exactly what a failed call leaves behind: every flag at its default.
+    mockState.hasActiveSubscription = false;
+    renderAt("/orders");
+
+    expect(screen.getByTestId("server-error-gate")).toBeInTheDocument();
+    expect(screen.queryByTestId("no-subscription-gate")).not.toBeInTheDocument();
+  });
+
+  it("does not send the owner to buy a plan they may already have", () => {
+    mockState.isError = true;
+    mockState.hasActiveSubscription = false;
+    renderAt("/my-subscription");
+
+    // The bare-checkout escape hatch is for a *known* lockout. Here the plan
+    // page can't load either, so the honest screen wins.
+    expect(screen.getByTestId("server-error-gate")).toBeInTheDocument();
+    expect(screen.queryByTestId("page")).not.toBeInTheDocument();
+  });
+
+  it("leaves the platform admin alone — they are never gated", () => {
+    mockState.isError = true;
+    mockState.isExempt = true;
+    mockState.role = "platform_super_admin";
+    renderAt("/orders");
+
+    expect(screen.queryByTestId("server-error-gate")).not.toBeInTheDocument();
+    expect(hasShell()).toBe(true);
   });
 });
 
