@@ -54,6 +54,15 @@ vi.mock("@/components/orders/OrderNotifications", () => ({
 vi.mock("@/components/enquiries/EnquiryNotifications", () => ({
   EnquiryNotifications: () => null,
 }));
+// Queries the release log through RTK Query, which needs a store this file
+// deliberately doesn't build.
+vi.mock("@/components/versions/WhatsNewDialog", () => ({
+  WhatsNewDialog: () => null,
+}));
+// The user menu shows the current version, which is an RTK Query call.
+vi.mock("@/features/api/versionsApi", () => ({
+  useLatestVersionQuery: () => ({ data: null }),
+}));
 
 const { AppLayout } = await import("./AppLayout");
 
