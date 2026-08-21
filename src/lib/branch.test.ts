@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { TIME_SLOTS, formatCoordinates, formatTimeLabel, parseCoordinates } from "./branch";
+import {
+  TIME_SLOTS,
+  formatCoordinates,
+  formatTimeLabel,
+  parseCoordinates,
+  parseGoogleReviewTarget,
+} from "./branch";
 
 /**
  * Map-link parsing.
@@ -93,5 +99,54 @@ describe("time slots", () => {
     expect(formatTimeLabel("12:00")).toBe("12:00 PM");
     expect(formatTimeLabel("09:30")).toBe("9:30 AM");
     expect(formatTimeLabel("21:00")).toBe("9:00 PM");
+  });
+});
+
+/**
+ * Google review targets.
+ *
+ * The important cases are the rejections. An ordinary Maps share link looks
+ * like it should work and doesn't — it carries a CID, not a Place ID — so
+ * accepting one would save a branch setting that silently never opens a review
+ * form. Better to refuse it and tell the shop where to look.
+ */
+describe("parseGoogleReviewTarget", () => {
+  it("takes a bare Place ID", () => {
+    expect(parseGoogleReviewTarget("ChIJN1t_tDeuEmsRUsoyG83frY4")).toEqual({
+      placeId: "ChIJN1t_tDeuEmsRUsoyG83frY4",
+    });
+  });
+
+  it("pulls the Place ID out of a place_id URL", () => {
+    expect(
+      parseGoogleReviewTarget(
+        "https://www.google.com/maps/place/?q=place_id:X&place_id=ChIJN1t_tDeuEmsRUsoyG83frY4",
+      ),
+    ).toEqual({ placeId: "ChIJN1t_tDeuEmsRUsoyG83frY4" });
+  });
+
+  it("keeps a link that already opens the review form", () => {
+    const url = "https://g.page/r/CabcDEF123/review";
+    expect(parseGoogleReviewTarget(url)).toEqual({ reviewUrl: url });
+    const writeReview =
+      "https://search.google.com/local/writereview?placeid=ChIJN1t_tDeuEmsRUsoyG83frY4";
+    // The place_id param wins — a Place ID is the more durable thing to store.
+    expect(parseGoogleReviewTarget(writeReview)).toEqual({
+      placeId: "ChIJN1t_tDeuEmsRUsoyG83frY4",
+    });
+  });
+
+  it("refuses an ordinary Maps link, which has no Place ID in it", () => {
+    expect(parseGoogleReviewTarget("https://maps.app.goo.gl/aBcDeFgH1")).toBeNull();
+    expect(
+      parseGoogleReviewTarget(
+        "https://www.google.com/maps/place/Frostique/@18.5074,73.8077,17z",
+      ),
+    ).toBeNull();
+  });
+
+  it("treats empty input as nothing set", () => {
+    expect(parseGoogleReviewTarget("")).toBeNull();
+    expect(parseGoogleReviewTarget("   ")).toBeNull();
   });
 });

@@ -83,3 +83,42 @@ export function formatCoordinates(
   if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
   return `${a.toFixed(5)}, ${b.toFixed(5)}`;
 }
+
+/** What a pasted review link or Place ID resolved to. */
+export interface GoogleReviewTarget {
+  /** A Place ID we can build the write-a-review link from. */
+  placeId?: string;
+  /** A link that already opens the review dialog — stored as-is. */
+  reviewUrl?: string;
+}
+
+/**
+ * Work out what someone pasted into the Google review field.
+ *
+ * Deliberately strict. An ordinary Maps link — `maps.app.goo.gl/…` or
+ * `/maps/place/…` — carries a CID, not a Place ID, and no amount of parsing
+ * turns one into the other client-side. Accepting those would store a value
+ * that silently never opens a review form, so they are rejected here and the
+ * field explains where to find the real thing instead.
+ */
+export function parseGoogleReviewTarget(input: string): GoogleReviewTarget | null {
+  const text = input.trim();
+  if (!text) return null;
+
+  // Explicit place_id param — the Place ID finder and Maps API both emit this.
+  const param = text.match(/[?&]place_?id=([A-Za-z0-9_-]+)/i);
+  if (param) return { placeId: param[1] };
+
+  // A link that already lands on the review dialog is usable as it stands.
+  if (/^https?:\/\//i.test(text)) {
+    if (/writereview|g\.page\/r\/|\/review\b/i.test(text)) return { reviewUrl: text };
+    return null;
+  }
+
+  // A bare Place ID. They start with a handful of known prefixes and are long.
+  if (/^(ChIJ|GhIJ|EhIJ|Ei|EicR|El|E)[A-Za-z0-9_-]{15,}$/.test(text)) {
+    return { placeId: text };
+  }
+
+  return null;
+}

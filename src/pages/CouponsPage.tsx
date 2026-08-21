@@ -229,7 +229,7 @@ function CouponTicket({ coupon, shopName, onEdit, onDelete }: CouponTicketProps)
           <Detail icon={Store} label={shopName} />
           <Detail
             icon={CalendarRange}
-            label={`${formatDate(coupon.validFrom)} – ${formatDate(coupon.validUntil)}`}
+            label={`${formatDate(coupon.validFrom)} – ${coupon.validUntil ? formatDate(coupon.validUntil) : "No expiry"}`}
           />
           {coupon.minOrderAmount ? (
             <Detail

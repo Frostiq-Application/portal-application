@@ -120,6 +120,11 @@ export interface Shop {
   openingTime: string | null;
   closingTime: string | null;
   closedDays: string[];
+  googlePlaceId: string | null;
+  googleReviewUrl: string | null;
+  reviewPromptEnabled: boolean;
+  reviewPromptDelayMinutes: number;
+  reviewCouponId: string | null;
   status: ShopStatus;
   createdAt: string;
   updatedAt: string;
@@ -552,7 +557,8 @@ export interface Coupon {
   usageLimitTotal: number | null;
   usageLimitPerCustomer: number | null;
   validFrom: string;
-  validUntil: string;
+  /** Null for a coupon that never expires (an earned reward, not a campaign). */
+  validUntil: string | null;
   isActive: boolean;
   isPublic: boolean;
   displayLabel: string | null;

@@ -24,14 +24,21 @@ import {
   formatCoordinates,
   formatTimeLabel,
   parseCoordinates,
+  parseGoogleReviewTarget,
 } from "@/lib/branch";
-import type { Shop } from "@/types";
+import {
+  useGetReviewCouponQuery,
+  useRemoveReviewCouponMutation,
+  useUpsertReviewCouponMutation,
+} from "@/features/api/reviewCouponApi";
+import type { CouponType, Shop } from "@/types";
 import { ImageUploader } from "@/components/ImageUploader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -80,6 +87,8 @@ export function ShopDialog({
   const [updateShop, { isLoading: updating }] = useUpdateShopMutation();
   const [createUser, { isLoading: invitingOwner }] = useCreateUserMutation();
   const [assignShop, { isLoading: assigning }] = useAssignShopMutation();
+  const [upsertReviewCoupon] = useUpsertReviewCouponMutation();
+  const [removeReviewCoupon] = useRemoveReviewCouponMutation();
   // Only the account's own staff can be assigned, so platform admins editing
   // someone else's branch see the list for that account.
   const { data: teamPage } = useListUsersQuery(
@@ -110,6 +119,24 @@ export function ShopDialog({
   const [openingTime, setOpeningTime] = useState("");
   const [closingTime, setClosingTime] = useState("");
   const [closedDays, setClosedDays] = useState<string[]>([]);
+  const [googlePlaceId, setGooglePlaceId] = useState("");
+  const [googleReviewUrl, setGoogleReviewUrl] = useState("");
+  const [reviewPromptEnabled, setReviewPromptEnabled] = useState(false);
+  const [reviewDelayHours, setReviewDelayHours] = useState("3");
+  /** Set when a paste didn't contain anything we can open a review form with. */
+  const [reviewLinkInvalid, setReviewLinkInvalid] = useState(false);
+
+  // Thank-you coupon. Given for the in-app rating, never for the Google review
+  // — paying for a Google review breaches Google's policy and the penalty lands
+  // on the shop's listing.
+  const [rewardOn, setRewardOn] = useState(false);
+  const [rewardCode, setRewardCode] = useState("THANKYOU");
+  const [rewardType, setRewardType] = useState<CouponType>("percentage");
+  const [rewardValue, setRewardValue] = useState("10");
+  const [rewardMaxDiscount, setRewardMaxDiscount] = useState("");
+  const [rewardMinOrder, setRewardMinOrder] = useState("");
+  /** Which branch's coupon the fields above currently hold. */
+  const [rewardSeeded, setRewardSeeded] = useState<string | null>(null);
   /** Once the user edits the slug by hand, stop syncing it from the name. */
   const [slugTouched, setSlugTouched] = useState(false);
 
@@ -133,12 +160,57 @@ export function ShopDialog({
       setOpeningTime(shop?.openingTime?.slice(0, 5) ?? "");
       setClosingTime(shop?.closingTime?.slice(0, 5) ?? "");
       setClosedDays(shop?.closedDays ?? []);
+      setGooglePlaceId(shop?.googlePlaceId ?? "");
+      setGoogleReviewUrl(shop?.googleReviewUrl ?? "");
+      setReviewPromptEnabled(shop?.reviewPromptEnabled ?? false);
+      // Stored in minutes, shown in hours — nobody thinks about this in minutes.
+      setReviewDelayHours(String((shop?.reviewPromptDelayMinutes ?? 180) / 60));
+      setReviewLinkInvalid(false);
+      // Reward fields start from the defaults; for an existing branch the block
+      // below overwrites them once its coupon arrives. Resetting the seed key
+      // is what lets that happen again for the next branch opened.
+      setRewardSeeded(null);
+      setRewardOn(false);
+      setRewardCode("THANKYOU");
+      setRewardType("percentage");
+      setRewardValue("10");
+      setRewardMaxDiscount("");
+      setRewardMinOrder("");
       setSlugTouched(false);
       setTab("branch");
       setOwnerName("");
       setOwnerEmail("");
       setOwnerPhone("");
       setResetToken(null);
+    }
+  }
+
+  /*
+   * The coupon lives in `coupons`, not on the branch row, so it arrives in its
+   * own request rather than with the shop. Seeded during render like everything
+   * else here — once, after the request settles, so a slow reply can't land on
+   * top of something the user has already typed.
+   */
+  const { data: existingReward, isLoading: rewardLoading } =
+    useGetReviewCouponQuery(shop?.id ?? "", { skip: !open || !shop?.id });
+  const rewardKey = open && shop?.id && !rewardLoading ? shop.id : null;
+  if (rewardKey && rewardKey !== rewardSeeded) {
+    setRewardSeeded(rewardKey);
+    setRewardOn(Boolean(existingReward));
+    if (existingReward) {
+      setRewardCode(existingReward.code);
+      setRewardType(existingReward.discountType);
+      setRewardValue(String(Number(existingReward.discountValue)));
+      setRewardMaxDiscount(
+        existingReward.maxDiscountAmount
+          ? String(Number(existingReward.maxDiscountAmount))
+          : "",
+      );
+      setRewardMinOrder(
+        existingReward.minOrderAmount
+          ? String(Number(existingReward.minOrderAmount))
+          : "",
+      );
     }
   }
 
@@ -182,6 +254,25 @@ export function ShopDialog({
     if (!parsed) return;
     setLatitude(String(parsed.lat));
     setLongitude(String(parsed.lng));
+  };
+
+  /**
+   * Route a pasted value to whichever field it actually is. Clearing the box
+   * clears both, so an emptied field saves as "no review link" rather than
+   * leaving the old one behind.
+   */
+  const applyReviewLink = (value: string) => {
+    if (!value.trim()) {
+      setGooglePlaceId("");
+      setGoogleReviewUrl("");
+      setReviewLinkInvalid(false);
+      return;
+    }
+    const parsed = parseGoogleReviewTarget(value);
+    setReviewLinkInvalid(!parsed);
+    if (!parsed) return;
+    setGooglePlaceId(parsed.placeId ?? "");
+    setGoogleReviewUrl(parsed.reviewUrl ?? "");
   };
 
   /** Closing before opening is only valid if the branch trades past midnight. */
@@ -271,6 +362,37 @@ export function ShopDialog({
       }
     };
 
+    /**
+     * Save the thank-you coupon, which is a coupon row rather than a branch
+     * column and so needs its own call. Non-fatal like the assignments above:
+     * the branch is the thing being saved, and losing it over a reward that
+     * didn't stick would be the wrong trade.
+     */
+    const syncReward = async (shopId: string) => {
+      try {
+        if (!reviewPromptEnabled || !rewardOn) {
+          if (existingReward) await removeReviewCoupon(shopId).unwrap();
+          return;
+        }
+        await upsertReviewCoupon({
+          shopId,
+          body: {
+            code: rewardCode.trim().toUpperCase(),
+            discountType: rewardType,
+            discountValue: Number(rewardValue || "0"),
+            ...(rewardType === "percentage" && rewardMaxDiscount.trim()
+              ? { maxDiscountAmount: Number(rewardMaxDiscount) }
+              : {}),
+            ...(rewardMinOrder.trim()
+              ? { minOrderAmount: Number(rewardMinOrder) }
+              : {}),
+          },
+        }).unwrap();
+      } catch (err) {
+        toast.error(apiError(err, "Branch saved, but the coupon didn't"));
+      }
+    };
+
     const body: CreateShopBody = {
       branchName: branchName.trim(),
       slug: slug.trim(),
@@ -286,6 +408,12 @@ export function ShopDialog({
       openingTime: openingTime || undefined,
       closingTime: closingTime || undefined,
       closedDays,
+      // null, not undefined — same reason as the banner: clearing the link has
+      // to reach the server as an instruction, not as an omitted key.
+      googlePlaceId: googlePlaceId.trim() || null,
+      googleReviewUrl: googleReviewUrl.trim() || null,
+      reviewPromptEnabled,
+      reviewPromptDelayMinutes: Math.round(Number(reviewDelayHours || "3") * 60),
     };
     try {
       if (isEdit && shop) {
@@ -293,6 +421,7 @@ export function ShopDialog({
         void _s;
         await updateShop({ id: shop.id, body: rest }).unwrap();
         await syncAssignments(shop.id);
+        await syncReward(shop.id);
         toast.success("Branch updated");
       } else {
         const created = await createShop({
@@ -300,6 +429,7 @@ export function ShopDialog({
           ...(platform && accountId ? { accountId } : {}),
         }).unwrap();
         await syncAssignments(created.id);
+        await syncReward(created.id);
         toast.success("Branch created");
 
         // Optionally hand the fresh branch to a Branch Owner. The branch is
@@ -562,6 +692,199 @@ export function ShopDialog({
             <p className="mt-2 text-xs text-muted-foreground">
               Tap a day to grey it out and mark the branch closed.
             </p>
+          </div>
+
+          <div className="sm:col-span-2">
+            <div className="rounded-lg border p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-0.5">
+                  <Label htmlFor="reviewPromptEnabled">Ask for reviews</Label>
+                  <p className="text-xs text-muted-foreground">
+                    A few hours after an order is delivered, ask the customer to
+                    rate it — then offer to share it on Google.
+                  </p>
+                </div>
+                <Switch
+                  id="reviewPromptEnabled"
+                  checked={reviewPromptEnabled}
+                  onCheckedChange={setReviewPromptEnabled}
+                />
+              </div>
+
+              {reviewPromptEnabled && (
+                <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1.5 sm:col-span-2">
+                    <Label htmlFor="googleReview">Google review link</Label>
+                    <Input
+                      id="googleReview"
+                      placeholder="Paste your Place ID or review link"
+                      defaultValue={googleReviewUrl || googlePlaceId}
+                      onChange={(e) => applyReviewLink(e.target.value)}
+                      onPaste={(e) =>
+                        applyReviewLink(e.clipboardData.getData("text"))
+                      }
+                    />
+                    {googlePlaceId || googleReviewUrl ? (
+                      <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                        <Check className="h-3.5 w-3.5" />
+                        {googleReviewUrl ? "Review link set" : "Place ID set"}
+                        <button
+                          type="button"
+                          className="ml-1 font-normal text-muted-foreground underline-offset-2 hover:underline"
+                          onClick={() => {
+                            setGooglePlaceId("");
+                            setGoogleReviewUrl("");
+                            setReviewLinkInvalid(false);
+                          }}
+                        >
+                          clear
+                        </button>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Find the branch on Google's Place ID finder and paste the
+                        ID. Without it, customers still rate the order in the
+                        app — they just aren't offered the Google step.
+                      </p>
+                    )}
+                    {reviewLinkInvalid && (
+                      <p className="text-xs text-destructive">
+                        That's an ordinary Maps link, which doesn't contain a
+                        Place ID. Use the Place ID finder, or paste a link that
+                        opens the review form directly.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="reviewDelay">Wait after delivery</Label>
+                    <div className="relative">
+                      <Input
+                        id="reviewDelay"
+                        type="number"
+                        min={1}
+                        max={168}
+                        step={1}
+                        className="pr-16"
+                        value={reviewDelayHours}
+                        onChange={(e) => setReviewDelayHours(e.target.value)}
+                      />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                        hours
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Asking the moment it arrives rates the delivery, not the
+                      cake.
+                    </p>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <div className="rounded-lg border p-3">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="rewardOn">Thank-you coupon</Label>
+                          <p className="text-xs text-muted-foreground">
+                            Given for rating in the app — never for the Google
+                            review, which Google's rules forbid paying for. It
+                            never expires and can be used once per customer.
+                          </p>
+                        </div>
+                        <Switch
+                          id="rewardOn"
+                          checked={rewardOn}
+                          onCheckedChange={setRewardOn}
+                        />
+                      </div>
+
+                      {rewardOn && (
+                        <div className="mt-3 grid gap-3 border-t pt-3 sm:grid-cols-2">
+                          <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="rewardCode">Coupon code</Label>
+                            <Input
+                              id="rewardCode"
+                              value={rewardCode}
+                              onChange={(e) =>
+                                setRewardCode(e.target.value.toUpperCase())
+                              }
+                              placeholder="THANKYOU"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="rewardType">Discount</Label>
+                            <div className="flex gap-2">
+                              <Select
+                                value={rewardType}
+                                onValueChange={(v) =>
+                                  setRewardType(v as CouponType)
+                                }
+                              >
+                                <SelectTrigger id="rewardType" className="w-28">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="percentage">%</SelectItem>
+                                  <SelectItem value="flat">₹</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={rewardValue}
+                                onChange={(e) => setRewardValue(e.target.value)}
+                                placeholder={rewardType === "flat" ? "100" : "10"}
+                              />
+                            </div>
+                          </div>
+
+                          {rewardType === "percentage" && (
+                            <div className="flex flex-col gap-1.5">
+                              <Label htmlFor="rewardMax">
+                                Cap the discount (₹)
+                              </Label>
+                              <Input
+                                id="rewardMax"
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={rewardMaxDiscount}
+                                onChange={(e) =>
+                                  setRewardMaxDiscount(e.target.value)
+                                }
+                                placeholder="No cap"
+                              />
+                            </div>
+                          )}
+
+                          <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="rewardMin">
+                              Minimum order (₹)
+                            </Label>
+                            <Input
+                              id="rewardMin"
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={rewardMinOrder}
+                              onChange={(e) => setRewardMinOrder(e.target.value)}
+                              placeholder="No minimum"
+                            />
+                          </div>
+
+                          <p className="text-xs text-muted-foreground sm:col-span-2">
+                            {isEdit
+                              ? "Editing this changes the coupon everyone holds, so nobody is left with a code that stopped working."
+                              : "The coupon is created when you save the branch."}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
   );

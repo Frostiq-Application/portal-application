@@ -23,6 +23,11 @@ export interface CreateShopBody {
   openingTime?: string;
   closingTime?: string;
   closedDays?: string[];
+  /** null clears the link; leaving the key out keeps whatever is there. */
+  googlePlaceId?: string | null;
+  googleReviewUrl?: string | null;
+  reviewPromptEnabled?: boolean;
+  reviewPromptDelayMinutes?: number;
 }
 
 export type UpdateShopBody = Partial<Omit<CreateShopBody, "accountId" | "slug">>;
