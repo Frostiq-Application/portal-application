@@ -21,6 +21,7 @@ import { QueriesPage } from "@/pages/QueriesPage";
 import { SubscriptionCouponsPage } from "@/pages/SubscriptionCouponsPage";
 import { BillingSettingsPage } from "@/pages/BillingSettingsPage";
 import { TenancyPage } from "@/pages/TenancyPage";
+import { VersionsPage } from "@/pages/VersionsPage";
 import { MySubscriptionPage } from "@/pages/MySubscriptionPage";
 import { CheckoutPage } from "@/pages/CheckoutPage";
 import { OnboardingPage } from "@/pages/OnboardingPage";
@@ -39,6 +40,7 @@ import { SchedulingPage } from "@/pages/SchedulingPage";
 import { AnalyticsPage } from "@/pages/AnalyticsPage";
 import { ActivityLogPage } from "@/pages/ActivityLogPage";
 import { ProfilePage } from "@/pages/ProfilePage";
+import { WhatsNewPage } from "@/pages/WhatsNewPage";
 import { useAuth } from "@/hooks/useAuth";
 import { homePathForRole, isFloorRole } from "@/lib/roles";
 import { useCan } from "@/hooks/useCan";
@@ -141,6 +143,9 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route index element={<HomeRoute />} />
             <Route path="/profile" element={<ProfilePage />} />
+            {/* Release history — no role or permission gate: whatever shipped,
+                someone on the floor is looking at the screen it changed. */}
+            <Route path="/whats-new" element={<WhatsNewPage />} />
 
             {/* Operations floor. The role list is the coarse gate; the
                 permission is what a custom role actually moves, so a chef sees
@@ -196,6 +201,7 @@ export default function App() {
                 element={<BillingSettingsPage />}
               />
               <Route path="/tenancy" element={<TenancyPage />} />
+              <Route path="/versions" element={<VersionsPage />} />
               <Route path="/queries" element={<QueriesPage />} />
             </Route>
 
