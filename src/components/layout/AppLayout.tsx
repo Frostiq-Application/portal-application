@@ -5,6 +5,7 @@ import {
   LogOut,
   Moon,
   Plus,
+  Rocket,
   Sun,
   UserRound,
 } from "@/components/ui/icons";
@@ -23,6 +24,8 @@ import { SplashScreen } from "@/components/common/SplashScreen";
 import { OrderNotifications } from "@/components/orders/OrderNotifications";
 import { EnquiryNotifications } from "@/components/enquiries/EnquiryNotifications";
 import { CustomCakeNotifications } from "@/components/custom-cake/CustomCakeNotifications";
+import { WhatsNewDialog } from "@/components/versions/WhatsNewDialog";
+import { useLatestVersionQuery } from "@/features/api/versionsApi";
 import { AccountDeactivatedGate } from "@/components/gating/AccountDeactivatedGate";
 import { NoSubscriptionGate } from "@/components/gating/NoSubscriptionGate";
 import { navFor, type NavItem } from "@/config/nav";
@@ -337,6 +340,9 @@ export function AppLayout() {
   const [defaultSidebarOpen] = useState(initialSidebarOpen);
   // Pull the session's permissions forward before anything gates on them.
   useSessionSync();
+  // Already fetched by the What's new dialog — RTK Query dedupes the two into
+  // one request, so showing the number in the menu costs nothing.
+  const { data: latestVersion } = useLatestVersionQuery();
 
   // Reflect the brand in the browser tab so the whole portal reads as theirs.
   useEffect(() => {
@@ -424,6 +430,10 @@ export function AppLayout() {
       <EnquiryNotifications />
       {/* App-wide custom-cake alerts: same pattern, one connection. */}
       <CustomCakeNotifications />
+      {/* The release note for whatever version is live, shown once per person.
+          Mounted here rather than per page so it doesn't matter where someone
+          lands after signing in. */}
+      <WhatsNewDialog />
 
       <AppSidebar brand={brand} />
 
@@ -478,6 +488,21 @@ export function AppLayout() {
                 <DropdownMenuItem onClick={() => navigate("/profile")}>
                   <UserRound className="mr-2 h-4 w-4" />
                   Profile
+                </DropdownMenuItem>
+                {/* Doubles as the answer to "which version am I on" — the
+                    number is right there, and the list behind it says what
+                    each release brought. */}
+                <DropdownMenuItem onClick={() => navigate("/whats-new")}>
+                  <Rocket className="mr-2 h-4 w-4" />
+                  What&apos;s new
+                  {latestVersion && (
+                    <span className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">
+                      {!latestVersion.seen && latestVersion.notify && (
+                        <span className="size-1.5 rounded-full bg-primary" />
+                      )}
+                      {latestVersion.version}
+                    </span>
+                  )}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={doLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
